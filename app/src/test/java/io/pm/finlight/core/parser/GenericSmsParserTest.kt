@@ -817,4 +817,149 @@ class GenericSmsParserTest : BaseSmsParserTest() {
             assertEquals("Coffee", result?.merchantName)
             assertEquals("STARBUCKS", result?.originalMerchantName)
         }
+
+    @Test
+    fun `test debit card noun phrase is not matched as expense transaction verb`() =
+        runBlocking {
+            // Setup with empty ignore rules to specifically verify regex-level protection
+            setupTest(ignoreRules = emptyList())
+            val smsBody = "Your HDFC Bank Debit Card 5501 was issued on 31/08/2026 and will reach you soon."
+            val mockSms =
+                SmsMessage(
+                    id = 2L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Debit Card noun phrase must not trigger expense keyword match", result)
+        }
+
+    @Test
+    fun `test currency-less transaction with action verb is correctly parsed`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Dear UPI user A/C X0763 debited by 185.0 on date 09Dec24 trf to KAGGIS CAKES AND Refno 434416868357. If not u? call9169070230. -SBI"
+            val mockSms =
+                SmsMessage(
+                    id = 3L,
+                    sender = "SBIUPI",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Currency-less transaction with action verb must be parsed", result)
+            assertEquals(185.0, result?.amount)
+            assertEquals("expense", result?.transactionType)
+        }
+
+    @Test
+    fun `test doctor appointment does not trigger expense match on Dr`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Your appointment with Dr. Sharma is confirmed for 15/09/2026. Token No. 42."
+            val mockSms =
+                SmsMessage(
+                    id = 4L,
+                    sender = "CLINIC",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Doctor appointment should not be parsed as a debit expense", result)
+        }
+
+    @Test
+    fun `test debit with Dr notation correctly parses as expense`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Rs. 500.00 Dr. from A/c X1234 and Cr. to Grocery Store on 02-Sep-26"
+            val mockSms =
+                SmsMessage(
+                    id = 5L,
+                    sender = "HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Bank Dr. notation should be parsed as expense", result)
+            assertEquals(500.0, result?.amount)
+            assertEquals("expense", result?.transactionType)
+        }
+
+    @Test
+    fun `test beneficiary addition does not trigger income match on added`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Beneficiary Rajesh Kumar has been added to your Account 1234."
+            val mockSms =
+                SmsMessage(
+                    id = 6L,
+                    sender = "HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Beneficiary addition notice should not be parsed as income", result)
+        }
 }

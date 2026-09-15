@@ -6,7 +6,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionType
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class MergeType {
     AUTO,
     MANUAL;
@@ -31,6 +33,7 @@ enum class MergeType {
  * (a UUID generated at merge time). The [mergeType] field distinguishes automatic
  * SMS-triggered merges ("AUTO") from user-initiated manual merges ("MANUAL").
  */
+@Serializable
 @Entity(
     tableName = "merge_records",
     foreignKeys = [
@@ -73,13 +76,13 @@ data class MergeRecord(
     val childAccountId: Int,
     val childCategoryId: Int?,
     val childTransactionType: TransactionType = TransactionType.EXPENSE,
-    val childSource: String,
-    val childNotes: String?,
-    val childSourceSmsId: Long?,
-    val childSourceSmsHash: String?,
-    val childSmsSignature: String?,
-    val childOriginalDescription: String?,
-    val childOriginalAmount: Double?,
-    val childCurrencyCode: String?,
-    val childConversionRate: Double?,
+    val childSource: String = "Manual Entry",
+    val childNotes: String? = null,
+    val childSourceSmsId: Long? = null,
+    val childSourceSmsHash: String? = null,
+    val childSmsSignature: String? = null,
+    val childOriginalDescription: String? = null,
+    val childOriginalAmount: Double? = null,
+    val childCurrencyCode: String? = null,
+    val childConversionRate: Double? = null,
 )

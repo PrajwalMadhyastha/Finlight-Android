@@ -9,18 +9,42 @@ package io.pm.finlight
 
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.AccountAliasDao
+import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import kotlinx.coroutines.flow.Flow
 
-class AccountRepository(private val db: AppDatabase) : IAccountRepository {
-    private val accountDao = db.accountDao()
+class AccountRepository(
+    private val accountDao: AccountDao,
+    private val accountAliasDao: AccountAliasDao,
+    private val db: AppDatabase,
+    private val mergeAccountsUseCase: MergeAccountsUseCase? = null,
+) : IAccountRepository {
+    constructor(
+        db: AppDatabase,
+        mergeAccountsUseCase: MergeAccountsUseCase? = null,
+    ) : this(
+        accountDao = db.accountDao(),
+        accountAliasDao = db.accountAliasDao(),
+        db = db,
+        mergeAccountsUseCase = mergeAccountsUseCase,
+    )
 
     override val accountsWithBalance: Flow<List<AccountWithBalance>> = accountDao.getAccountsWithBalance()
 
     override val allAccounts: Flow<List<Account>> = accountDao.getAllAccounts()
 
+    override suspend fun getAllAccountsSnapshot(): List<Account> {
+        return accountDao.getAllAccountsSnapshot()
+    }
+
     override fun getAccountById(accountId: Int): Flow<Account?> {
         return accountDao.getAccountById(accountId)
+    }
+
+    override suspend fun getAccountByIdSync(accountId: Int): Account? {
+        return accountDao.getAccountByIdSync(accountId)
     }
 
     override suspend fun insert(account: Account): Long {
@@ -30,11 +54,11 @@ class AccountRepository(private val db: AppDatabase) : IAccountRepository {
     override suspend fun update(account: Account) {
         db.withTransaction {
             // Check if the account name is being changed
-            val oldAccount = accountDao.getAccountByIdBlocking(account.id)
+            val oldAccount = accountDao.getAccountByIdSync(account.id)
             if (oldAccount != null && oldAccount.name != account.name) {
                 // Name changed: create an alias from the old name to this account
                 val alias = AccountAlias(aliasName = oldAccount.name, destinationAccountId = account.id)
-                db.accountAliasDao().insertAll(listOf(alias))
+                accountAliasDao.insertAll(listOf(alias))
             }
             accountDao.update(account)
         }
@@ -51,30 +75,17 @@ class AccountRepository(private val db: AppDatabase) : IAccountRepository {
      * @param destinationAccountId The ID of the account to keep.
      * @param sourceAccountIds The IDs of the accounts to merge and delete.
      */
+    @Deprecated(
+        message = "Use MergeAccountsUseCase directly from presentation/domain layer.",
+        replaceWith = ReplaceWith("mergeAccountsUseCase(destinationAccountId, sourceAccountIds)"),
+    )
     override suspend fun mergeAccounts(
         destinationAccountId: Int,
         sourceAccountIds: List<Int>,
     ) {
-        db.withTransaction {
-            // --- NEW: Create aliases for the source accounts before deleting them ---
-            val sourceAccounts = sourceAccountIds.mapNotNull { db.accountDao().getAccountByIdBlocking(it) }
-            val aliases =
-                sourceAccounts.map {
-                    AccountAlias(aliasName = it.name, destinationAccountId = destinationAccountId)
-                }
-            if (aliases.isNotEmpty()) {
-                db.accountAliasDao().insertAll(aliases)
-            }
-            // --- End of new logic ---
-
-            // 1. Re-assign goals from source accounts to the destination account.
-            db.goalDao().reassignGoals(sourceAccountIds, destinationAccountId)
-
-            // 2. Re-assign all transactions from source accounts to the destination account.
-            db.transactionWriteDao().reassignTransactions(sourceAccountIds, destinationAccountId)
-
-            // 3. Delete the now-empty source accounts.
-            db.accountDao().deleteByIds(sourceAccountIds)
-        }
+        val useCase =
+            mergeAccountsUseCase
+                ?: throw IllegalStateException("MergeAccountsUseCase must be provided to call mergeAccounts on AccountRepository")
+        useCase(destinationAccountId, sourceAccountIds)
     }
 }

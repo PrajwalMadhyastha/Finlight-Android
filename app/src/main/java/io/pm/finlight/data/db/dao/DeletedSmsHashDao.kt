@@ -26,4 +26,15 @@ interface DeletedSmsHashDao {
      */
     @Query("DELETE FROM deleted_sms_hashes WHERE smsHash = :hash")
     suspend fun deleteByHash(hash: String)
+
+    // --- Backup / Restore Parity ---
+
+    @Query("SELECT * FROM deleted_sms_hashes")
+    suspend fun getAll(): List<DeletedSmsHash>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAll(hashes: List<DeletedSmsHash>)
+
+    @Query("DELETE FROM deleted_sms_hashes")
+    suspend fun deleteAll()
 }

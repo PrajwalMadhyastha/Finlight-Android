@@ -142,6 +142,17 @@ class AccountDaoTest {
         }
 
     @Test
+    fun `getAllAccountsSnapshot returns all accounts synchronously`() =
+        runTest {
+            // Act
+            val accounts = accountDao.getAllAccountsSnapshot()
+            // Assert
+            assertEquals(2, accounts.size)
+            assertEquals("HDFC Bank", accounts[0].name)
+            assertEquals("ICICI Credit Card", accounts[1].name)
+        }
+
+    @Test
     fun `getAccountById returns correct account`() =
         runTest {
             // Act & Assert
@@ -154,10 +165,10 @@ class AccountDaoTest {
         }
 
     @Test
-    fun `getAccountByIdBlocking returns correct account`() =
+    fun `getAccountByIdSync returns correct account`() =
         runTest {
             // Act
-            val account = accountDao.getAccountByIdBlocking(account2.id)
+            val account = accountDao.getAccountByIdSync(account2.id)
             // Assert
             assertNotNull(account)
             assertEquals(account2.name, account?.name)
@@ -173,7 +184,7 @@ class AccountDaoTest {
             accountDao.update(updatedAccount)
 
             // Assert
-            val fromDb = accountDao.getAccountByIdBlocking(account1.id)
+            val fromDb = accountDao.getAccountByIdSync(account1.id)
             assertNotNull(fromDb)
             assertEquals("HDFC Savings", fromDb?.name)
         }
@@ -185,7 +196,7 @@ class AccountDaoTest {
             accountDao.delete(account1)
 
             // Assert
-            val fromDb = accountDao.getAccountByIdBlocking(account1.id)
+            val fromDb = accountDao.getAccountByIdSync(account1.id)
             assertNull(fromDb)
         }
 

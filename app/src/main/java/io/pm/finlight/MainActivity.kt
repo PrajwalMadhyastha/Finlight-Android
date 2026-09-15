@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import androidx.navigation.NavHostController
@@ -69,6 +70,7 @@ import androidx.navigation.navDeepLink
 import coil.compose.AsyncImage
 import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
@@ -90,8 +92,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.net.URLDecoder
 import java.util.concurrent.Executor
+import java.util.concurrent.TimeUnit
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -100,6 +104,8 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_ADD_EXPENSE = "io.pm.finlight.ACTION_ADD_EXPENSE"
         const val ACTION_ADD_INCOME = "io.pm.finlight.ACTION_ADD_INCOME"
         const val ACTION_SEARCH = "io.pm.finlight.ACTION_SEARCH"
+        private val MIN_SNAPSHOT_INTERVAL_MS = TimeUnit.MINUTES.toMillis(15)
+        private var lastSnapshotTimestamp = 0L
     }
 
     /**
@@ -158,6 +164,17 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         NotificationManagerCompat.from(this).cancelAll()
     }
+
+    override fun onStop() {
+        super.onStop()
+        val now = System.currentTimeMillis()
+        if (now - lastSnapshotTimestamp >= MIN_SNAPSHOT_INTERVAL_MS) {
+            lastSnapshotTimestamp = now
+            lifecycleScope.launch {
+                DataExportService.createBackupSnapshot(applicationContext)
+            }
+        }
+    }
 }
 
 @SuppressLint("NewApi")
@@ -202,9 +219,24 @@ fun FinanceAppWithLockScreen(
         }
     }
 
-    if (appLockEnabled == true && !isUnlocked) {
+    val biometricManager = remember { BiometricManager.from(context) }
+    val canAuthenticate =
+        remember {
+            val authenticators =
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                    BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                    BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS
+        }
+
+    if (appLockEnabled == null) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background,
+        ) {}
+    } else if (appLockEnabled == true && canAuthenticate && !isUnlocked) {
         LockScreen(onUnlock = { isUnlocked = true })
-    } else if (appLockEnabled != null) {
+    } else {
         MainAppScreen(shortcutAction = shortcutAction)
     }
 }
@@ -1457,8 +1489,15 @@ fun SplashScreen(
 
     LaunchedEffect(key1 = true) {
         val isFirstLaunch = !settingsViewModel.isFirstLaunchComplete.first()
+        val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+        val shouldCheckRestore =
+            isFirstLaunch ||
+                withContext(Dispatchers.IO) {
+                    snapshotFile.exists() &&
+                        AppDatabase.getInstance(context).transactionQueryDao().getAllTransactionsSimple().first().isEmpty()
+                }
 
-        if (isFirstLaunch) {
+        if (shouldCheckRestore) {
             statusText = "Checking for restored data..."
             val restored =
                 withContext(Dispatchers.IO) {
@@ -1468,7 +1507,7 @@ fun SplashScreen(
                 statusText = "Data restored successfully!"
                 delay(1500) // Give user time to see the message
             }
-            // Set the flag *after* the first-launch check is complete
+            // Set the flag *after* the restore check is complete
             settingsViewModel.setFirstLaunchComplete()
         }
 

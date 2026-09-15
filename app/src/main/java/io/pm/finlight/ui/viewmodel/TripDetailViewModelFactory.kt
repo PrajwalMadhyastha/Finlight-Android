@@ -3,10 +3,9 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.repository.TripRepository
-import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.di.ServiceLocator
 
 class TripDetailViewModelFactory(
     private val application: Application,
@@ -17,15 +16,7 @@ class TripDetailViewModelFactory(
         if (modelClass.isAssignableFrom(TripDetailViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val tripRepository = TripRepository(db.tripDao())
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = DefaultDispatcherProvider(),
-                )
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return TripDetailViewModel(

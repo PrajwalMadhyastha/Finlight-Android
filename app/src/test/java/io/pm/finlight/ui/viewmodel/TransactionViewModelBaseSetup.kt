@@ -59,6 +59,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var mergeTransactionsUseCase: io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 
+    @Mock protected lateinit var manageReimbursementUseCase: io.pm.finlight.domain.usecase.ManageReimbursementUseCase
+
     // Mocks for DAOs used by the ViewModel and internal logic
     @Mock protected lateinit var accountDao: AccountDao
 
@@ -133,6 +135,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             ).thenReturn(flowOf(emptyList()))
             whenever(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
             whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            whenever(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
             whenever(tagRepository.allTags).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(null))
             whenever(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
@@ -145,6 +148,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(transactionRepository.getRecentManualTransactions(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionRepository.getReimbursementsForExpense(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionQueryDao.getSmsHashesByIds(any())).thenReturn(emptyList())
+            whenever(transactionQueryDao.existsBySmsHash(anyString())).thenReturn(false)
         }
     }
 
@@ -167,6 +171,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 smsParseTemplateDao = smsParseTemplateDao,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
+                manageReimbursementUseCase = manageReimbursementUseCase,
                 dispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher),
             )
     }

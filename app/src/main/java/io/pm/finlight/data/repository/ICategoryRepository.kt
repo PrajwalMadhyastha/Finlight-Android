@@ -5,6 +5,8 @@ import kotlinx.coroutines.flow.Flow
 interface ICategoryRepository {
     val allCategories: Flow<List<Category>>
 
+    suspend fun getAllCategoriesSnapshot(): List<Category>
+
     suspend fun getCategoryById(id: Int): Category?
 
     suspend fun findByName(name: String): Category?

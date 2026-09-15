@@ -72,7 +72,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `linkReimbursementFromSelection delegates to repository and clears selection`() =
+    fun `linkReimbursementFromSelection delegates to manageReimbursementUseCase and clears selection`() =
         runTest {
             val expenseTxn =
                 TransactionDetails(
@@ -99,7 +99,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
                 viewModel.linkReimbursementFromSelection()
                 advanceUntilIdle()
 
-                verify(transactionRepository).linkReimbursement(incomeId = 2, expenseId = 1)
+                verify(manageReimbursementUseCase).linkReimbursement(incomeId = 2, expenseId = 1)
                 assertEquals("1 repayment(s) linked.", awaitItem())
                 assertFalse(viewModel.isSelectionModeActive.value)
 
@@ -128,7 +128,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `linkReimbursement hides sheet and calls repository`() =
+    fun `linkReimbursement hides sheet and calls manageReimbursementUseCase`() =
         runTest {
             whenever(transactionRepository.getCandidateReimbursements(1)).thenReturn(flowOf(emptyList()))
             initializeViewModel()
@@ -140,7 +140,7 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
             viewModel.linkReimbursement(incomeId = 2, expenseId = 1)
             advanceUntilIdle()
 
-            verify(transactionRepository).linkReimbursement(2, 1)
+            verify(manageReimbursementUseCase).linkReimbursement(2, 1)
             assertFalse(viewModel.showReimbursementPicker.value)
         }
 
@@ -149,14 +149,14 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
     // -----------------------------------------------------------------------
 
     @Test
-    fun `unlinkReimbursement delegates to repository with the correct incomeId`() =
+    fun `unlinkReimbursement delegates to manageReimbursementUseCase with the correct incomeId`() =
         runTest {
             initializeViewModel()
 
             viewModel.unlinkReimbursement(incomeId = 42)
             advanceUntilIdle()
 
-            verify(transactionRepository).unlinkReimbursement(42)
+            verify(manageReimbursementUseCase).unlinkReimbursement(42)
         }
 
     @Test

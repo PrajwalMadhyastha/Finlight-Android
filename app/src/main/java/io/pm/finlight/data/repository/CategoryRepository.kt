@@ -16,6 +16,8 @@ class CategoryRepository(private val categoryDao: CategoryDao) : ICategoryReposi
      */
     override val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
 
+    override suspend fun getAllCategoriesSnapshot(): List<Category> = categoryDao.getAllCategoriesSnapshot()
+
     /**
      * Retrieves a single category by its unique ID.
      */

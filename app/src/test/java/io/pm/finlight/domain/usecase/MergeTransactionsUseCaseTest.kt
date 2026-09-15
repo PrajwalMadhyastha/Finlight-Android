@@ -435,8 +435,8 @@ class MergeTransactionsUseCaseTest : BaseViewModelTest() {
 
             `when`(mergeRecordDao.getAllForParentAnyType(1)).thenReturn(listOf(record))
             `when`(transactionQueryDao.getTransactionByIdSync(1)).thenReturn(anchor)
-            `when`(accountDao.getAccountByIdBlocking(10)).thenReturn(Account(id = 10, name = "Account 1", type = "CHECKING"))
-            `when`(accountDao.getAccountByIdBlocking(20)).thenReturn(Account(id = 20, name = "Account 2", type = "SAVINGS"))
+            `when`(accountDao.getAccountByIdSync(10)).thenReturn(Account(id = 10, name = "Account 1", type = "CHECKING"))
+            `when`(accountDao.getAccountByIdSync(20)).thenReturn(Account(id = 20, name = "Account 2", type = "SAVINGS"))
 
             val breakdown = useCase.getMergedTransactionBreakdown(1)
 

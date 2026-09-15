@@ -50,7 +50,9 @@ import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.mockito.kotlin.any
+import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.whenever
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.io.ByteArrayInputStream
@@ -205,7 +207,11 @@ class SettingsViewModelTest : BaseViewModelTest() {
         runTest {
             `when`(transactionQueryDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
             `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(emptyList())
             `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
+            `when`(categoryDao.getAllCategoriesSnapshot()).thenReturn(emptyList())
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
             `when`(budgetDao.getAllBudgets()).thenReturn(flowOf(emptyList()))
             `when`(merchantMappingDao.getAllMappings()).thenReturn(flowOf(emptyList()))
             `when`(splitTransactionDao.getAllSplits()).thenReturn(flowOf(emptyList()))
@@ -274,7 +280,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val sms = SmsMessage(1, "ICICI", "ICICI Bank Acct XX123 debited for Rs 240.00 on 28-Jun-25; DAKSHIN CAFE credited.", 1L)
 
             // Mock dependencies
-            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(listOf(sms))
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
@@ -362,8 +368,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val shadowContentResolver = shadowOf(applicationContext.contentResolver)
             shadowContentResolver.registerInputStream(mockUri, ByteArrayInputStream(csvContent.toByteArray()))
 
-            `when`(accountDao.getAllAccounts()).thenReturn(flowOf(listOf(Account(1, "Savings", "Bank"))))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
             `when`(categoryDao.getAllCategories()).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
 
             initializeViewModel()
 
@@ -438,8 +445,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             setCsvValidationReport(viewModel, CsvValidationReport(reviewableRows = listOf(row1, row2)))
 
             val correctedData = listOf("", "", "2025-10-09 10:00:00", "a", "10", "expense", "Food", "Savings", "", "false", "")
-            `when`(accountDao.getAllAccounts()).thenReturn(flowOf(listOf(Account(1, "Savings", "Bank"))))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
             `when`(categoryDao.getAllCategories()).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
 
             // Act
             viewModel.updateAndRevalidateRow(1, correctedData)
@@ -483,7 +491,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             )
 
             `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(Account(1, "Savings", "Bank"))))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
+            `when`(categoryRepository.findByName("Food")).thenReturn(Category(1, "Food", "", ""))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
             `when`(tagDao.findByName("Work")).thenReturn(Tag(1, "Work"))
             `when`(tagDao.findByName("Personal")).thenReturn(null)
             `when`(tagDao.insert(anyObject())).thenReturn(2L)
@@ -507,6 +517,50 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertEquals(2, tagsCaptor.value.size)
             assertTrue(tagsCaptor.value.any { it.name == "Work" })
             assertTrue(tagsCaptor.value.any { it.name == "Personal" })
+        }
+
+    @Test
+    fun `commitCsvImport creates new account when not found in snapshot`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val rowsToImport =
+                listOf(
+                    ReviewableRow(
+                        2,
+                        "1,,2025-10-09 10:00:00,Groceries,200.0,expense,Food,NewWallet,,false,".split(','),
+                        CsvRowStatus.VALID,
+                        "",
+                    ),
+                )
+            setCsvValidationReport(
+                viewModel,
+                CsvValidationReport(
+                    header = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags".split(','),
+                    reviewableRows = rowsToImport,
+                ),
+            )
+
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
+            `when`(categoryRepository.findByName("Food")).thenReturn(Category(1, "Food", "", ""))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "OtherBank", "Bank")))
+            `when`(accountRepository.insert(Account(name = "NewWallet", type = "Imported"))).thenReturn(2L)
+            `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+
+            // Act
+            viewModel.commitCsvImport(rowsToImport)
+            advanceUntilIdle()
+
+            // Assert
+            verify(accountRepository, org.mockito.Mockito.timeout(5000)).insert(Account(name = "NewWallet", type = "Imported"))
+            val transactionCaptor = argumentCaptor<Transaction>()
+            verify(
+                transactionRepository,
+                org.mockito.Mockito.timeout(5000),
+            ).insertTransactionWithTags(capture(transactionCaptor), anyObject())
+
+            assertEquals(2, transactionCaptor.value.accountId)
         }
 
     @Test
@@ -593,6 +647,23 @@ class SettingsViewModelTest : BaseViewModelTest() {
             verify(settingsRepository).saveAppLockEnabled(true)
         }
 
+    @Test
+    fun `appLockEnabled emits from repository flow`() =
+        runTest {
+            val appLockFlow = kotlinx.coroutines.flow.MutableStateFlow(true)
+            `when`(settingsRepository.getAppLockEnabled()).thenReturn(appLockFlow)
+            initializeViewModel()
+
+            val values = mutableListOf<Boolean?>()
+            val job =
+                launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) {
+                    viewModel.appLockEnabled.collect { values.add(it) }
+                }
+
+            assertTrue("appLockEnabled should reflect repository emission", values.contains(true))
+            job.cancel()
+        }
+
     // --- UPDATED: Test for backup success dialog ---
     @Test
     fun `createBackupSnapshot success sets showBackupSuccessDialog to true`() =
@@ -659,6 +730,40 @@ class SettingsViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @Test
+    fun `restoreFromBackupSnapshot success sends success message to uiEvent channel`() =
+        runTest {
+            val expectedMessage = "Data restored successfully from snapshot! Please restart the app."
+            mockkObject(DataExportService)
+            coEvery { DataExportService.restoreFromBackupSnapshot(applicationContext) } returns true
+
+            initializeViewModel()
+
+            viewModel.uiEvent.test {
+                viewModel.restoreFromBackupSnapshot()
+                advanceUntilIdle()
+                assertEquals(expectedMessage, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot failure sends failure message to uiEvent channel`() =
+        runTest {
+            val expectedMessage = "No backup snapshot found or restore failed."
+            mockkObject(DataExportService)
+            coEvery { DataExportService.restoreFromBackupSnapshot(applicationContext) } returns false
+
+            initializeViewModel()
+
+            viewModel.uiEvent.test {
+                viewModel.restoreFromBackupSnapshot()
+                advanceUntilIdle()
+                assertEquals(expectedMessage, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     // --- NEW: Tests for the objective ---
 
     @Test
@@ -668,7 +773,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
             val parsedTxn = PotentialTransaction(1L, "SENDER", 100.0, "expense", "Store", "spent Rs 100", null, "hash123")
 
-            `when`(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList())) // No existing hashes
 
@@ -1198,7 +1303,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
-            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull())).thenReturn(emptyList())
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(emptyList())
 
             initializeViewModel()
 
@@ -1248,7 +1353,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(smsClassifier.classify("Your account credited with Rs 500")).thenReturn(0.9f)
             `when`(smsClassifier.classify("Check out our latest deals!")).thenReturn(0.05f)
 
-            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            whenever(smsRepository.fetchAllSms(anyOrNull()))
                 .thenReturn(listOf(transactionalSms, nonTransactionalSms))
 
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
@@ -1301,7 +1406,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val sms1 = SmsMessage(1, "BANK", "Transaction 1", 1L)
             val sms2 = SmsMessage(2, "BANK", "Transaction 2", 2L)
 
-            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            whenever(smsRepository.fetchAllSms(anyOrNull()))
                 .thenReturn(listOf(sms1, sms2))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
@@ -1345,7 +1450,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `startSmsScanAndIdentifyMappings resets state after completion`() =
         runTest {
             // Arrange
-            `when`(smsRepository.fetchAllSms(org.mockito.ArgumentMatchers.isNull()))
+            whenever(smsRepository.fetchAllSms(anyOrNull()))
                 .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
             `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))

@@ -21,6 +21,7 @@ import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
+import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -34,6 +35,7 @@ class AccountViewModel(
     private val repository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
+    private val mergeAccountsUseCase: MergeAccountsUseCase,
 ) : AndroidViewModel(application) {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
@@ -197,7 +199,7 @@ class AccountViewModel(
 
             // 2. If validation passes, proceed with the operation inside a try-finally.
             try {
-                repository.mergeAccounts(destinationAccountId, sourceAccountIds)
+                mergeAccountsUseCase(destinationAccountId, sourceAccountIds)
                 _uiEvent.send("Accounts merged successfully.")
             } catch (e: Exception) {
                 _uiEvent.send("Error merging accounts: ${e.message}")
@@ -222,9 +224,9 @@ class AccountViewModel(
 
     suspend fun checkAccountName(
         name: String,
-        excludeAccountId: Int? = null
+        excludeAccountId: Int? = null,
     ): AccountMatch {
-        val accounts = repository.allAccounts.first()
+        val accounts = repository.getAllAccountsSnapshot()
         val normalizedInput = normalizeAccountName(name)
 
         val exactMatch = accounts.find { it.name.equals(name, ignoreCase = true) && it.id != excludeAccountId }
@@ -246,11 +248,11 @@ class AccountViewModel(
     fun mergeAccounts(
         destinationAccountId: Int,
         sourceAccountIds: List<Int>,
-        onComplete: (Boolean) -> Unit = {}
+        onComplete: (Boolean) -> Unit = {},
     ) {
         viewModelScope.launch {
             try {
-                repository.mergeAccounts(destinationAccountId, sourceAccountIds)
+                mergeAccountsUseCase(destinationAccountId, sourceAccountIds)
                 _uiEvent.send("Accounts merged successfully.")
                 onComplete(true)
             } catch (e: Exception) {
@@ -263,11 +265,11 @@ class AccountViewModel(
     fun addAccount(
         name: String,
         type: String,
-        onComplete: (Boolean) -> Unit = {}
+        onComplete: (Boolean) -> Unit = {},
     ) = viewModelScope.launch {
         try {
             if (name.isNotBlank() && type.isNotBlank()) {
-                val existingAccount = repository.allAccounts.first().find { it.name.equals(name, ignoreCase = true) }
+                val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(name, ignoreCase = true) }
                 if (existingAccount != null) {
                     _uiEvent.send("An account named '$name' already exists.")
                     onComplete(false)
@@ -287,10 +289,10 @@ class AccountViewModel(
 
     fun updateAccount(
         account: Account,
-        onComplete: (Boolean) -> Unit = {}
+        onComplete: (Boolean) -> Unit = {},
     ) = viewModelScope.launch {
         try {
-            val existingAccount = repository.allAccounts.first().find { it.name.equals(account.name, ignoreCase = true) && it.id != account.id }
+            val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(account.name, ignoreCase = true) && it.id != account.id }
             if (existingAccount != null) {
                 _uiEvent.send("An account named '${account.name}' already exists.")
                 onComplete(false)
@@ -310,7 +312,7 @@ class AccountViewModel(
     ) {
         if (newName.isBlank()) return
         viewModelScope.launch {
-            val accountToUpdate = repository.getAccountById(accountId).firstOrNull()
+            val accountToUpdate = repository.getAccountByIdSync(accountId)
             accountToUpdate?.let {
                 updateAccount(it.copy(name = newName))
             }

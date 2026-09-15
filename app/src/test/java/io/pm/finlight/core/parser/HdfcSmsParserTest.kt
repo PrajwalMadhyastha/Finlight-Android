@@ -735,4 +735,58 @@ class HdfcSmsParserTest : BaseSmsParserTest() {
             assertEquals("income", result?.transactionType)
             assertEquals("District Dining", result?.merchantName)
         }
+
+    @Test
+    fun `test ignores HDFC Debit Card issuance and PIN setup message`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Your HDFC Bank Debit Card 1234 was issued on 31/08/2026 and will reach you soon. On receipt, set PIN and controls by searching HDFC Bank MyCards in a browser."
+            val mockSms =
+                SmsMessage(
+                    id = 9021L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Parser should ignore debit card issuance and PIN setup message", result)
+        }
+
+    @Test
+    fun `test ignores HDFC Debit Card issuance message with random card number`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Your HDFC Bank Debit Card 5501 was issued on 31/08/2026 and will reach you soon. On receipt, set PIN and controls by searching HDFC Bank MyCards in a browser."
+            val mockSms =
+                SmsMessage(
+                    id = 9022L,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNull("Parser should ignore debit card issuance message regardless of card number", result)
+        }
 }

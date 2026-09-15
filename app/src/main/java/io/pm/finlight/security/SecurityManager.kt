@@ -12,6 +12,7 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.util.Log
 import java.io.File
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -26,6 +27,7 @@ import javax.crypto.spec.GCMParameterSpec
  */
 open class SecurityManager(private val context: Context) {
     companion object {
+        private const val TAG = "SecurityManager"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         internal const val KEY_ALIAS = "finlight_db_key" // Made internal for test access
         private const val LEGACY_PREFS_NAME = "finlight_secure_prefs"
@@ -44,12 +46,48 @@ open class SecurityManager(private val context: Context) {
      */
     fun getPassphrase(): ByteArray {
         var encryptedPassphrase = getEncryptedPassphrase()
-        if (encryptedPassphrase == null) {
-            val newPassphrase = generateRandomPassphrase()
-            encryptedPassphrase = encrypt(newPassphrase)
-            saveEncryptedPassphrase(encryptedPassphrase)
+        if (encryptedPassphrase != null) {
+            try {
+                return decrypt(encryptedPassphrase)
+            } catch (e: Exception) {
+                // If the key in Keystore cannot decrypt the data (e.g. after a device transfer,
+                // backup restore on a different device, or key invalidation), defensively clean
+                // up the unreadable file, stale Keystore entry, and delete any database file
+                // that cannot be opened with the foreign key.
+                Log.w(
+                    TAG,
+                    "Failed to decrypt existing passphrase. Possible device transfer or key invalidation. Resetting secure storage.",
+                    e,
+                )
+                val fileDeleted = getStorageFile().delete()
+                if (!fileDeleted) {
+                    Log.w(TAG, "Failed to delete secure storage file during reset.")
+                }
+                try {
+                    deleteKeyEntry()
+                } catch (deleteEntryException: Exception) {
+                    Log.w(TAG, "Failed to delete key alias from Keystore", deleteEntryException)
+                }
+                if (!context.deleteDatabase("finance_database")) {
+                    Log.w(TAG, "Failed to delete foreign database during reset.")
+                }
+            }
         }
-        return decrypt(encryptedPassphrase)
+
+        val dbFile = context.getDatabasePath("finance_database")
+        if (dbFile.exists()) {
+            Log.w(
+                TAG,
+                "Database exists but encryption key file is missing (possible partial restore or transfer). Deleting orphaned database.",
+            )
+            if (!context.deleteDatabase("finance_database")) {
+                Log.w(TAG, "Failed to delete orphaned database.")
+            }
+        }
+        val newPassphrase = generateRandomPassphrase()
+        val newEncryptedPassphrase = encrypt(newPassphrase)
+        saveEncryptedPassphrase(newEncryptedPassphrase)
+        return decrypt(newEncryptedPassphrase)
     }
 
     /**
@@ -127,7 +165,11 @@ open class SecurityManager(private val context: Context) {
         return cipher.doFinal(data)
     }
 
-    private fun getStorageFile(): File = File(context.filesDir, SECURE_STORAGE_FILE)
+    internal open fun getStorageFile(): File = File(context.filesDir, SECURE_STORAGE_FILE)
+
+    internal open fun deleteKeyEntry() {
+        keyStore.deleteEntry(KEY_ALIAS)
+    }
 
     /**
      * Saves the encrypted passphrase and its IV to a private file.

@@ -47,6 +47,8 @@ Always output valid JSON only, matching this schema:
 }
 """
 
+MODEL_NAME = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+
 def setup_gemini():
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -67,7 +69,7 @@ def get_next_action(client, goal: str, ui_state: str, history: list, app_map_jso
     for attempt in range(5):
         try:
             response = client.models.generate_content(
-                model='gemini-3.1-flash-lite',
+                model=MODEL_NAME,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
@@ -153,7 +155,7 @@ Return ONLY valid JSON. If there are no new items for a category, omit the key o
 """
     try:
         response = client.models.generate_content(
-            model='gemini-3.1-flash-lite',
+            model=MODEL_NAME,
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.0)
         )

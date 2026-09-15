@@ -12,6 +12,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -136,5 +137,48 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
             val repo = BudgetSettingsRepository(mockDataStore)
 
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetForMonth(2026, 1).first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetsForYear(2026) }
+        }
+
+    @Test
+    fun `getOverallBudgetsForYear propagates CancellationException`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw kotlinx.coroutines.CancellationException("Cancelled") }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> {
+                repo.getOverallBudgetsForYear(2026)
+            }
+        }
+
+    @Test
+    fun `cancelling coroutine during getOverallBudgetsForYear throws CancellationException`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns
+                kotlinx.coroutines.flow.flow {
+                    kotlinx.coroutines.awaitCancellation()
+                }
+            val repo = BudgetSettingsRepository(mockDataStore)
+
+            var caughtException: Throwable? = null
+            val job =
+                launch {
+                    try {
+                        repo.getOverallBudgetsForYear(2026)
+                    } catch (t: Throwable) {
+                        caughtException = t
+                        throw t
+                    }
+                }
+            testScheduler.advanceUntilIdle()
+            kotlin.test.assertTrue(job.isActive)
+
+            job.cancel()
+            testScheduler.advanceUntilIdle()
+
+            kotlin.test.assertTrue(job.isCancelled)
+            kotlin.test.assertTrue(caughtException is kotlinx.coroutines.CancellationException)
         }
 }

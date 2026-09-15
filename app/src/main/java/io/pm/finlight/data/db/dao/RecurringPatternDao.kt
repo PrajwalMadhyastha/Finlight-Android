@@ -64,4 +64,13 @@ interface RecurringPatternDao {
      */
     @Query("UPDATE recurring_patterns SET isDismissed = 1 WHERE smsSignature = :signature")
     suspend fun dismissBySignature(signature: String)
+
+    /**
+     * Reassigns suggested recurring patterns from source accounts to the destination account.
+     */
+    @Query("UPDATE recurring_patterns SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
+    suspend fun reassignRecurringPatterns(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int
+    )
 }

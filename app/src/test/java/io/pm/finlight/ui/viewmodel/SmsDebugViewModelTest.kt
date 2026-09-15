@@ -36,6 +36,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -91,6 +93,10 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
 
         `when`(application.applicationContext).thenReturn(application)
+
+        runTest {
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(emptyList())
+        }
     }
 
     private fun setupDefaultDaoBehaviors() =
@@ -127,7 +133,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             val sms3 = SmsMessage(3, "Sender3", "Not parsed", 3L)
             val successTxnRule = CustomSmsRule(1, "spent Rs", "on (.+)", "spent Rs ([\\d,.]+)", null, null, null, null, 10, "")
 
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2, sms3))
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2, sms3))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.05f) // Should be ignored
             `when`(smsClassifier.classify(sms3.body)).thenReturn(0.9f)
@@ -164,7 +170,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             val sms2 = SmsMessage(2, "S2", "Problem", 2L)
             val successTxnRule = CustomSmsRule(1, "spent Rs", null, "spent Rs ([\\d,.]+)", null, null, null, null, 10, "")
 
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2))
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.9f)
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // Will parse sms1
@@ -199,7 +205,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             setupDefaultDaoBehaviors()
             val initialSms = List(100) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
             val moreSms = List(200) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(initialSms).thenReturn(moreSms)
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(initialSms, moreSms)
             `when`(smsClassifier.classify(anyString())).thenReturn(0.0f) // Ignore all for simplicity
             initializeViewModel()
 
@@ -217,7 +223,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 assertEquals(200, finalState.loadCount) // Assert updated count
 
                 // Verify that fetchAllSms was called twice (once in init, once in loadMore)
-                verify(smsRepository, times(2)).fetchAllSms(null)
+                org.mockito.kotlin.verify(smsRepository, times(2)).fetchAllSms(null)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -249,7 +255,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             var capturedSource: String? = null
 
             // Mocks for the INITIAL scan (no custom rules)
-            `when`(smsRepository.fetchAllSms(any())).thenReturn(listOf(sms1))
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
@@ -315,7 +321,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     sourceSmsBody = sms.body,
                 )
 
-            `when`(smsRepository.fetchAllSms(anyObject())).thenReturn(listOf(sms))
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(sms.body)).thenReturn(0.9f)
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
             // Mocks for failure
@@ -337,27 +343,47 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `onCleared closes dependencies`() {
-        initializeViewModel()
+    fun `runAutoImportAndRefresh handles empty sms inbox gracefully`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(emptyList())
 
-        // Find onCleared in the hierarchy
-        var clazz: Class<*>? = viewModel.javaClass
-        var method: java.lang.reflect.Method? = null
-        while (clazz != null && method == null) {
-            try {
-                method = clazz.getDeclaredMethod("onCleared")
-            } catch (e: NoSuchMethodException) {
-                clazz = clazz.superclass
-            }
+            initializeViewModel()
+            advanceUntilIdle()
+
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            val finalState = viewModel.uiState.value
+            assertFalse("Should not be loading after empty runAutoImportAndRefresh", finalState.isLoading)
+            assertTrue("Debug results should be empty", finalState.debugResults.isEmpty())
         }
 
-        assertNotNull("onCleared method not found", method)
-        method!!.isAccessible = true
-        method.invoke(viewModel)
+    @Test
+    fun `onCleared closes dependencies`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            initializeViewModel()
 
-        verify(smsClassifier).close()
-        verify(nerExtractor).close()
-    }
+            // Find onCleared in the hierarchy
+            var clazz: Class<*>? = viewModel.javaClass
+            var method: java.lang.reflect.Method? = null
+            while (clazz != null && method == null) {
+                try {
+                    method = clazz.getDeclaredMethod("onCleared")
+                } catch (e: NoSuchMethodException) {
+                    clazz = clazz.superclass
+                }
+            }
+
+            assertNotNull("onCleared method not found", method)
+            method!!.isAccessible = true
+            method.invoke(viewModel)
+
+            verify(smsClassifier).close()
+            verify(nerExtractor).close()
+        }
 
     @Test
     fun `refreshScan uses categoryFinderProvider for keyword lookup`() =
@@ -366,7 +392,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // "Swiggy" matches "Food & Drinks" (ID 4)
             // Adding "Spent" and a period to trigger merchant extraction via regex
             val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
-            `when`(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
             `when`(nerExtractor.extract(anyString())).thenReturn(emptyMap())
             `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)

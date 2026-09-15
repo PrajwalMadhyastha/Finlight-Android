@@ -49,6 +49,15 @@ interface RecurringTransactionDao {
     @Query("UPDATE recurring_transactions SET skipCount = :skipCount WHERE id = :id")
     suspend fun updateSkipCount(
         id: Int,
-        skipCount: Int
+        skipCount: Int,
+    )
+
+    /**
+     * Reassigns recurring transactions from source accounts to a destination account.
+     */
+    @Query("UPDATE recurring_transactions SET accountId = :destinationAccountId WHERE accountId IN (:sourceAccountIds)")
+    suspend fun reassignRecurringTransactions(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int,
     )
 }

@@ -57,7 +57,7 @@ class BudgetSettingsRepository(
         val preferences =
             try {
                 dataStore.data.first()
-            } catch (e: Exception) {
+            } catch (e: IOException) {
                 emptyPreferences()
             }
         for (month in 1..12) {

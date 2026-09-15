@@ -10,19 +10,21 @@
 <full-backup-content>
     <!-- Include the shared preferences file -->
     <include domain="sharedpref" path="."/>
-    <!-- Include the entire database -->
-    <include domain="database" path="."/>
-    <!--
-    NEW: Include all files in the app's internal storage directory.
-    This is necessary so we can then exclude a specific subdirectory from it.
-    -->
-    <include domain="file" path="."/>
+    <!-- Exclude the file with the legacy encrypted key and internal lifecycle state -->
+    <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
+    <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
 
-    <!--
-    Exclude the 'attachments' directory. This directory contains user-uploaded
-    images like profile pictures, which can be large and are not critical to back up.
-    The primary database snapshot is the most important part of the backup.
-    -->
+    <!-- Note: DO NOT include the 'database' domain. -->
+    <!-- Android Keystore keys are hardware-bound and never transfer across devices. -->
+    <!-- Database restoration is handled seamlessly via backup_snapshot.gz. -->
+
+    <!-- Include all files in the app's internal storage directory (backup_snapshot.gz, preferences) -->
+    <include domain="file" path="."/>
+    <!-- Exclude secure database passphrase storage file encrypted with device-bound Keystore key -->
+    <exclude domain="file" path="finlight_secure.dat" />
+    <!-- Exclude large image attachments -->
     <exclude domain="file" path="attachments/" />
+    <!-- Exclude internal lifecycle state file so is_first_launch_complete is not preserved across devices -->
+    <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
 
 </full-backup-content>

@@ -4,9 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import io.pm.finlight.SmsRepository
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -21,16 +20,8 @@ class MergeActionReceiver : BroadcastReceiver() {
         val notificationId = childTxnId + 10000
 
         val db = AppDatabase.getInstance(context)
-        val dispatcherProvider = io.pm.finlight.di.ServiceLocator.provideDispatcherProvider(context)
-        val transactionRepository =
-            TransactionRepository(
-                transactionWriteDao = db.transactionWriteDao(),
-                transactionQueryDao = db.transactionQueryDao(),
-                transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                transactionReimbursementDao = db.transactionReimbursementDao(),
-                db = db,
-                dispatcherProvider = dispatcherProvider,
-            )
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        val transactionRepository = ServiceLocator.provideTransactionRepository(context)
         val mergeTransactionsUseCase =
             io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
                 transactionQueryDao = db.transactionQueryDao(),
@@ -49,7 +40,7 @@ class MergeActionReceiver : BroadcastReceiver() {
                     var childSmsBody: String? = null
                     var childSmsDate: Long? = null
                     if (childTxn?.sourceSmsId != null) {
-                        val smsRepository = SmsRepository(context)
+                        val smsRepository = ServiceLocator.provideSmsRepository(context)
                         val sms = smsRepository.getSmsDetailsById(childTxn.sourceSmsId)
                         if (sms != null) {
                             childSmsBody = sms.body

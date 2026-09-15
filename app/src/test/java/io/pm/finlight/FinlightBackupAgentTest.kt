@@ -44,6 +44,9 @@ class FinlightBackupAgentTest {
         // Use Robolectric to build the agent, which correctly handles the lifecycle and context attachment
         agent = Robolectric.buildBackupAgent(FinlightBackupAgent::class.java).create().get()
 
+        mockkObject(io.pm.finlight.data.DataExportService)
+        coEvery { io.pm.finlight.data.DataExportService.createBackupSnapshot(any()) } returns true
+
         mockBackupSettingsRepository = mockk(relaxed = true)
         coEvery { mockBackupSettingsRepository.saveLastBackupTimestamp(any()) } just runs
         ServiceLocator.setBackupSettingsRepository(mockBackupSettingsRepository)
@@ -75,6 +78,7 @@ class FinlightBackupAgentTest {
             }
 
             // Assert
+            coVerify(atLeast = 1) { io.pm.finlight.data.DataExportService.createBackupSnapshot(any()) }
             coVerify(exactly = 1) { mockBackupSettingsRepository.saveLastBackupTimestamp(capture(timestampCaptor)) }
 
             // Verify that the captured timestamp is very close to the time the test was run
@@ -107,6 +111,17 @@ class FinlightBackupAgentTest {
 
             verify(exactly = 0) { io.pm.finlight.utils.NotificationHelper.showAutoBackupNotification(any(), any()) }
             unmockkObject(io.pm.finlight.utils.NotificationHelper)
+        }
+
+    @Test
+    fun `onBackup catches exception and continues when createBackupSnapshot fails`() =
+        runTest {
+            coEvery { io.pm.finlight.data.DataExportService.createBackupSnapshot(any()) } throws RuntimeException("Snapshot failed")
+
+            agent.onBackup(null, null, null)
+
+            coVerify(exactly = 1) { io.pm.finlight.data.DataExportService.createBackupSnapshot(any()) }
+            coVerify(exactly = 1) { mockBackupSettingsRepository.saveLastBackupTimestamp(any()) }
         }
 
     @Test

@@ -1,7 +1,12 @@
 package io.pm.finlight
 
 interface ISmsRepository {
-    fun fetchAllSms(startDate: Long?): List<SmsMessage>
+    suspend fun fetchAllSms(startDate: Long? = null): List<SmsMessage>
 
-    fun getSmsDetailsById(lookupValue: Long): SmsMessage?
+    suspend fun fetchAllSms(
+        startDate: Long?,
+        endDate: Long?,
+    ): List<SmsMessage>
+
+    suspend fun getSmsDetailsById(lookupValue: Long): SmsMessage?
 }

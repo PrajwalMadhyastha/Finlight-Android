@@ -33,6 +33,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
     private lateinit var accountDao: AccountDao
     private lateinit var accountAliasDao: AccountAliasDao
     private lateinit var transactionWriteDao: TransactionWriteDao
+    private lateinit var transactionQueryDao: TransactionQueryDao
     private lateinit var tagDao: TagDao
     private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
     private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
@@ -55,10 +56,13 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
         merchantRenameRuleDao = mockk(relaxed = true)
         merchantCategoryMappingDao = mockk(relaxed = true)
 
+        transactionQueryDao = mockk(relaxed = true)
+        coEvery { transactionQueryDao.existsBySmsHash(any()) } returns false
+
         every { db.accountDao() } returns accountDao
         every { db.accountAliasDao() } returns accountAliasDao
         every { db.transactionWriteDao() } returns transactionWriteDao
-        every { db.transactionQueryDao() } returns mockk(relaxed = true)
+        every { db.transactionQueryDao() } returns transactionQueryDao
         every { db.tagDao() } returns tagDao
         every { db.merchantRenameRuleDao() } returns merchantRenameRuleDao
         every { db.merchantCategoryMappingDao() } returns merchantCategoryMappingDao
@@ -130,7 +134,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias(any()) } returns null
             coEvery { accountDao.findByName(any()) } returns null
             coEvery { accountDao.insert(any()) } returns 15L
-            coEvery { accountDao.getAccountByIdBlocking(15) } returns Account(15, "HDFC Bank - X1234", "Bank Account")
+            coEvery { accountDao.getAccountByIdSync(15) } returns Account(15, "HDFC Bank - X1234", "Bank Account")
 
             val id = saver.resolveAndSaveTransaction(makeTxn())
 
@@ -184,7 +188,7 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coEvery { accountAliasDao.findByAlias("Unknown Account") } returns null
             coEvery { accountDao.findByName("Unknown Account") } returns null
             coEvery { accountDao.insert(any()) } returns 5L
-            coEvery { accountDao.getAccountByIdBlocking(5) } returns Account(5, "Unknown Account", "General")
+            coEvery { accountDao.getAccountByIdSync(5) } returns Account(5, "Unknown Account", "General")
 
             val id = saver.resolveAndSaveTransaction(makeTxn(account = null))
 
@@ -287,5 +291,31 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
 
             assert(captor.captured.transactionType == TransactionType.INCOME)
             assert(captor.captured.amount == 100.0)
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null when sourceSmsHash already exists in database`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash("testhash") } returns true
+
+            val id = saver.resolveAndSaveTransaction(makeTxn())
+
+            assertNull(id)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null when insertTransactionWithTags returns -1L`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash(any()) } returns false
+            coEvery { transactionWriteDao.insert(any()) } returns -1L
+
+            val id = saver.resolveAndSaveTransaction(makeTxn())
+
+            assertNull(id)
         }
 }

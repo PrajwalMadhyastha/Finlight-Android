@@ -29,7 +29,6 @@ import io.pm.finlight.MerchantRenameRule
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
-import io.pm.finlight.TagRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
 import kotlinx.coroutines.flow.first
@@ -68,9 +67,9 @@ class SmsProcessorWorker(
 
         val db = AppDatabase.getInstance(context)
         val settingsRepository = ServiceLocator.provideSettingsRepository(context)
-        val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+        val tagRepository = ServiceLocator.provideTagRepository(context)
         val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
-        val saver = SmsTransactionSaver(db, resolveTravelModeTagUseCase)
+        val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
@@ -147,7 +146,7 @@ class SmsProcessorWorker(
 
         // --- Duplicate guard ---
         val hash = potentialTxn.sourceSmsHash
-        if (hash == null || hash in existingSmsHashes || hash in deletedHashes) {
+        if (hash == null || hash in existingSmsHashes || hash in deletedHashes || db.transactionQueryDao().existsBySmsHash(hash)) {
             Log.d(tag, "SMS already processed or intentionally deleted (hash match). Skipping.")
             return Result.success()
         }

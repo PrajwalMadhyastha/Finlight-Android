@@ -13,19 +13,20 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.AccountAliasDao
 import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
 import kotlinx.coroutines.test.runTest
 import org.junit.After
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
-import org.mockito.kotlin.eq
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -38,13 +39,10 @@ class AccountRepositoryTest : BaseViewModelTest() {
     private lateinit var accountDao: AccountDao
 
     @Mock
-    private lateinit var goalDao: GoalDao
-
-    @Mock
-    private lateinit var transactionWriteDao: io.pm.finlight.data.db.dao.TransactionWriteDao
-
-    @Mock
     private lateinit var accountAliasDao: AccountAliasDao
+
+    @Mock
+    private lateinit var mergeAccountsUseCase: MergeAccountsUseCase
 
     // Mocks for dependencies of withTransaction
     @Mock
@@ -60,8 +58,6 @@ class AccountRepositoryTest : BaseViewModelTest() {
         super.setup()
         // Stub the database to return mocked DAOs
         `when`(db.accountDao()).thenReturn(accountDao)
-        `when`(db.goalDao()).thenReturn(goalDao)
-        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
         `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
 
         // Mock the underlying components that `withTransaction` uses.
@@ -71,7 +67,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
         `when`(openHelper.writableDatabase).thenReturn(writableDb)
         `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor())
 
-        repository = AccountRepository(db)
+        repository = AccountRepository(accountDao, accountAliasDao, db, mergeAccountsUseCase)
     }
 
     @After
@@ -96,10 +92,30 @@ class AccountRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `getAllAccountsSnapshot calls DAO`() =
+        runTest {
+            val accounts = listOf(Account(name = "Test", type = "Bank"))
+            `when`(accountDao.getAllAccountsSnapshot()).thenReturn(accounts)
+            val result = repository.getAllAccountsSnapshot()
+            verify(accountDao).getAllAccountsSnapshot()
+            assertEquals(accounts, result)
+        }
+
+    @Test
     fun `getAccountById calls DAO`() =
         runTest {
             repository.getAccountById(1)
             verify(accountDao).getAccountById(1)
+        }
+
+    @Test
+    fun `getAccountByIdSync calls DAO`() =
+        runTest {
+            val account = Account(id = 1, name = "Test", type = "Bank")
+            `when`(accountDao.getAccountByIdSync(1)).thenReturn(account)
+            val result = repository.getAccountByIdSync(1)
+            verify(accountDao).getAccountByIdSync(1)
+            assertEquals(account, result)
         }
 
     @Test
@@ -116,7 +132,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
             val oldAccount = Account(id = 1, name = "Old Name", type = "Bank")
             val newAccount = Account(id = 1, name = "New Name", type = "Bank")
 
-            `when`(accountDao.getAccountByIdBlocking(1)).thenReturn(oldAccount)
+            `when`(accountDao.getAccountByIdSync(1)).thenReturn(oldAccount)
 
             mockkStatic("androidx.room.RoomDatabaseKt")
             coEvery { db.withTransaction<Any?>(any()) } coAnswers {
@@ -138,7 +154,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
 
             val inOrder = inOrder(accountDao, accountAliasDao, writableDb)
             inOrder.verify(writableDb).beginTransaction()
-            inOrder.verify(accountDao).getAccountByIdBlocking(1)
+            inOrder.verify(accountDao).getAccountByIdSync(1)
             inOrder.verify(accountAliasDao).insertAll(capture(aliasCaptor))
             inOrder.verify(accountDao).update(newAccount)
             inOrder.verify(writableDb).setTransactionSuccessful()
@@ -154,7 +170,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
         runTest {
             val account = Account(id = 1, name = "Same Name", type = "Bank")
 
-            `when`(accountDao.getAccountByIdBlocking(1)).thenReturn(account)
+            `when`(accountDao.getAccountByIdSync(1)).thenReturn(account)
 
             mockkStatic("androidx.room.RoomDatabaseKt")
             coEvery { db.withTransaction<Any?>(any()) } coAnswers {
@@ -175,7 +191,7 @@ class AccountRepositoryTest : BaseViewModelTest() {
 
             val inOrder = inOrder(accountDao, accountAliasDao, writableDb)
             inOrder.verify(writableDb).beginTransaction()
-            inOrder.verify(accountDao).getAccountByIdBlocking(1)
+            inOrder.verify(accountDao).getAccountByIdSync(1)
             inOrder.verify(accountDao).update(account)
             inOrder.verify(writableDb).setTransactionSuccessful()
             inOrder.verify(writableDb).endTransaction()
@@ -191,63 +207,30 @@ class AccountRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `mergeAccounts performs all steps in correct order`() =
+    fun `mergeAccounts delegates to MergeAccountsUseCase`() =
         runTest {
-            // Arrange
             val destinationId = 1
             val sourceIds = listOf(2, 3)
-            val sourceAccount2 = Account(id = 2, name = "Source Account 2", type = "Bank")
-            val sourceAccount3 = Account(id = 3, name = "Source Account 3", type = "Card")
 
-            `when`(accountDao.getAccountByIdBlocking(2)).thenReturn(sourceAccount2)
-            `when`(accountDao.getAccountByIdBlocking(3)).thenReturn(sourceAccount3)
-
-            // Mock the withTransaction extension function to avoid the hang.
-            // We manually call the transaction methods on writableDb to satisfy the test's verification logic.
-            mockkStatic("androidx.room.RoomDatabaseKt")
-            coEvery { db.withTransaction<Any?>(any()) } coAnswers {
-                writableDb.beginTransaction()
-                try {
-                    @Suppress("UNCHECKED_CAST")
-                    val block = it.invocation.args[1] as suspend () -> Any?
-                    val result = block()
-                    writableDb.setTransactionSuccessful()
-                    result
-                } finally {
-                    writableDb.endTransaction()
-                }
-            }
-
-            val aliasCaptor = argumentCaptor<List<AccountAlias>>()
-
-            // Act
             repository.mergeAccounts(destinationId, sourceIds)
 
-            // Assert
-            // Use inOrder to verify the sequence of operations within the transaction
-            val inOrder = inOrder(goalDao, transactionWriteDao, accountAliasDao, accountDao, writableDb)
+            verify(mergeAccountsUseCase).invoke(destinationId, sourceIds)
+        }
 
-            // Verify transaction block execution
-            inOrder.verify(writableDb).beginTransaction()
+    @Test
+    fun `constructor with db creates instance successfully without coupling to other DAOs`() {
+        val repoFromDb = AccountRepository(db)
+        assertNotNull(repoFromDb)
+    }
 
-            // 1. Verify aliases are created first
-            inOrder.verify(accountAliasDao).insertAll(capture(aliasCaptor))
-            val capturedAliases = aliasCaptor.value
-            assertEquals(2, capturedAliases.size)
-            assertTrue(capturedAliases.any { it.aliasName == "Source Account 2" && it.destinationAccountId == destinationId })
-            assertTrue(capturedAliases.any { it.aliasName == "Source Account 3" && it.destinationAccountId == destinationId })
-
-            // 2. Verify goals are reassigned
-            inOrder.verify(goalDao).reassignGoals(eq(sourceIds), eq(destinationId))
-
-            // 3. Verify transactions are reassigned
-            inOrder.verify(transactionWriteDao).reassignTransactions(eq(sourceIds), eq(destinationId))
-
-            // 4. Verify source accounts are deleted last
-            inOrder.verify(accountDao).deleteByIds(eq(sourceIds))
-
-            // Verify transaction block completion
-            inOrder.verify(writableDb).setTransactionSuccessful()
-            inOrder.verify(writableDb).endTransaction()
+    @Test
+    fun `mergeAccounts throws IllegalStateException when mergeAccountsUseCase is null`() =
+        runTest {
+            val repoWithoutUseCase = AccountRepository(accountDao, accountAliasDao, db, mergeAccountsUseCase = null)
+            val exception =
+                assertFailsWith<IllegalStateException> {
+                    repoWithoutUseCase.mergeAccounts(1, listOf(2))
+                }
+            assertEquals("MergeAccountsUseCase must be provided to call mergeAccounts on AccountRepository", exception.message)
         }
 }

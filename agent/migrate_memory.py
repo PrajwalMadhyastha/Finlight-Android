@@ -73,8 +73,9 @@ Extract and reorganize the information into the following JSON schema. Try to in
 Return ONLY valid JSON. If there are no bugs, return an empty list for Known_Bugs.
 """
 
+    model_name = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
     response = client.models.generate_content(
-        model='gemini-3.1-flash-lite',
+        model=model_name,
         contents=prompt,
         config=types.GenerateContentConfig(
             temperature=0.0

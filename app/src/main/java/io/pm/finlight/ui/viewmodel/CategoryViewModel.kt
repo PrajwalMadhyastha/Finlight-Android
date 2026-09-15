@@ -13,14 +13,12 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class CategoryViewModel(
     private val categoryRepository: ICategoryRepository,
     private val transactionRepository: ITransactionRepository,
-    private val categoryDao: CategoryDao? = null,
 ) : ViewModel() {
     val allCategories: Flow<List<Category>>
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
@@ -37,13 +35,13 @@ class CategoryViewModel(
     ) = viewModelScope.launch {
         try {
             // Check if a category with this name already exists
-            val existingCategory = categoryDao?.findByName(name) ?: categoryRepository.findByName(name)
+            val existingCategory = categoryRepository.findByName(name)
             if (existingCategory != null) {
                 _uiEvent.send("A category named '$name' already exists.")
                 return@launch
             }
 
-            val usedColorKeys = allCategories.firstOrNull()?.map { it.colorKey } ?: emptyList()
+            val usedColorKeys = categoryRepository.getAllCategoriesSnapshot().map { it.colorKey }
             val finalIconKey = if (iconKey == "category") "letter_default" else iconKey
             val finalColorKey =
                 if (colorKey == "gray_light") {

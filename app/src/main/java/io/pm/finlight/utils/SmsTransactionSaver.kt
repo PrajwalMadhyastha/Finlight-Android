@@ -8,14 +8,18 @@
 // =================================================================================
 package io.pm.finlight.utils
 
+import android.content.Context
 import android.util.Log
 import io.pm.finlight.Account
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.DetectSelfTransferUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 
 /**
@@ -34,7 +38,43 @@ import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 class SmsTransactionSaver(
     private val db: AppDatabase,
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+    private val transactionRepository: ITransactionRepository,
+    private val detectSelfTransferUseCase: DetectSelfTransferUseCase =
+        DetectSelfTransferUseCase(
+            transactionRepository = transactionRepository,
+            accountDao = db.accountDao(),
+            accountAliasDao = db.accountAliasDao(),
+        ),
 ) {
+    constructor(
+        context: Context,
+        resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+        db: AppDatabase = AppDatabase.getInstance(context),
+    ) : this(
+        db = db,
+        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        transactionRepository = ServiceLocator.provideTransactionRepository(context),
+    )
+
+    constructor(
+        db: AppDatabase,
+        resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+        detectSelfTransferUseCase: DetectSelfTransferUseCase = DetectSelfTransferUseCase(db),
+    ) : this(
+        db = db,
+        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        transactionRepository =
+            TransactionRepository(
+                transactionWriteDao = db.transactionWriteDao(),
+                transactionQueryDao = db.transactionQueryDao(),
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                transactionReimbursementDao = db.transactionReimbursementDao(),
+                db = db,
+                dispatcherProvider = DefaultDispatcherProvider(),
+            ),
+        detectSelfTransferUseCase = detectSelfTransferUseCase,
+    )
+
     private val tag = "SmsTransactionSaver"
 
     /**
@@ -54,15 +94,6 @@ class SmsTransactionSaver(
     ): Long? {
         val accountDao = db.accountDao()
         val accountAliasDao = db.accountAliasDao()
-        val transactionRepository =
-            TransactionRepository(
-                transactionWriteDao = db.transactionWriteDao(),
-                transactionQueryDao = db.transactionQueryDao(),
-                transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                transactionReimbursementDao = db.transactionReimbursementDao(),
-                db = db,
-                dispatcherProvider = DefaultDispatcherProvider(),
-            )
 
         val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
@@ -85,7 +116,7 @@ class SmsTransactionSaver(
                         // getAccountById which would always return null.
                         account =
                             if (newId != -1L) {
-                                accountDao.getAccountByIdBlocking(newId.toInt())
+                                accountDao.getAccountByIdSync(newId.toInt())
                             } else {
                                 Log.d(tag, "Account '$accountName' already existed (IGNORE conflict). Fetching by name.")
                                 accountDao.findByName(accountName)
@@ -143,12 +174,24 @@ class SmsTransactionSaver(
                 )
             }
 
+        // --- Pre-save duplicate guard ---
+        potentialTxn.sourceSmsHash?.let { hash ->
+            if (db.transactionQueryDao().existsBySmsHash(hash)) {
+                Log.d(tag, "Transaction with sourceSmsHash '$hash' already exists. Dropping duplicate save.")
+                return null
+            }
+        }
+
         val finalTags = resolveTravelModeTagUseCase.getFinalTags(potentialTxn.date, emptySet(), travelSettings)
         val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+        if (newId <= 0L) {
+            Log.d(tag, "Transaction insert ignored due to unique constraint conflict on sourceSmsHash.")
+            return null
+        }
 
-        // --- NEW: Attempt to detect and link self-transfers ---
+        // --- Attempt to detect and link self-transfers ---
         val savedTransaction = transactionToSave.copy(id = newId.toInt())
-        transactionRepository.detectAndLinkSelfTransfer(savedTransaction)
+        detectSelfTransferUseCase(savedTransaction)
 
         return newId
     }

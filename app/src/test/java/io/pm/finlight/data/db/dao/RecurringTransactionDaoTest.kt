@@ -246,4 +246,31 @@ class RecurringTransactionDaoTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `reassignRecurringTransactions updates accountId for matching rules`() =
+        runTest {
+            // Arrange
+            accountDao.insert(Account(id = 2, name = "Target Account", type = "Bank"))
+            val rule =
+                RecurringTransaction(
+                    description = "Gym",
+                    amount = 50.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = null,
+                )
+            val ruleId = recurringTransactionDao.insert(rule).toInt()
+
+            // Act
+            recurringTransactionDao.reassignRecurringTransactions(listOf(1), 2)
+
+            // Assert
+            val allRules = recurringTransactionDao.getAllRulesList()
+            val updatedRule = allRules.find { it.id == ruleId }
+            assertNotNull(updatedRule)
+            assertEquals(2, updatedRule?.accountId)
+        }
 }

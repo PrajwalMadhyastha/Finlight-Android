@@ -18,7 +18,7 @@ import io.pm.finlight.TransactionType
 
 @Dao
 interface TransactionWriteDao {
-    @Insert
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(transaction: Transaction): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

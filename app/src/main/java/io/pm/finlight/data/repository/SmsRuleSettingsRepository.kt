@@ -64,7 +64,7 @@ class SmsRuleSettingsRepository(
     override suspend fun getIgnoreRulesChecksum(): Int {
         return try {
             dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
-        } catch (e: Exception) {
+        } catch (e: IOException) {
             0
         }
     }

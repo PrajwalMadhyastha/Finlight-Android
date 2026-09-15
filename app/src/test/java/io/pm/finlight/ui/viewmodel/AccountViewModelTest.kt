@@ -8,6 +8,7 @@ import io.pm.finlight.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -36,6 +37,9 @@ class AccountViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var settingsRepository: SettingsRepository
 
+    @Mock
+    private lateinit var mergeAccountsUseCase: io.pm.finlight.domain.usecase.MergeAccountsUseCase
+
     private lateinit var viewModel: AccountViewModel
 
     @Captor
@@ -49,6 +53,9 @@ class AccountViewModelTest : BaseViewModelTest() {
         `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
         `when`(settingsRepository.getDismissedMergeSuggestions()).thenReturn(flowOf(emptySet()))
         `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+        runBlocking {
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(emptyList())
+        }
 
         viewModel =
             AccountViewModel(
@@ -56,6 +63,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                 accountRepository,
                 transactionRepository,
                 settingsRepository,
+                mergeAccountsUseCase,
             )
     }
 
@@ -77,6 +85,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                     accountRepository,
                     transactionRepository,
                     settingsRepository,
+                    mergeAccountsUseCase,
                 )
             val result = viewModel.accountsWithBalance.first()
 
@@ -138,7 +147,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             viewModel.uiEvent.test {
                 assertEquals("Accounts merged successfully.", awaitItem())
             }
-            verify(accountRepository).mergeAccounts(destinationId, sourceIds)
+            verify(mergeAccountsUseCase).invoke(destinationId, sourceIds)
             assertEquals(false, viewModel.isSelectionModeActive.value)
             assertTrue(viewModel.selectedAccountIds.value.isEmpty())
         }
@@ -162,6 +171,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                     accountRepository,
                     transactionRepository,
                     settingsRepository,
+                    mergeAccountsUseCase,
                 )
             // Ensure all coroutines launched in init complete before we assert
             advanceUntilIdle()
@@ -184,7 +194,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             // Arrange
             val accountName = "Existing Account"
             val existingAccount = Account(1, accountName, "Bank")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(existingAccount)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(existingAccount))
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -201,7 +211,7 @@ class AccountViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val errorMessage = "DB Error"
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(emptyList())
             `when`(accountRepository.insert(anyObject())).thenThrow(RuntimeException(errorMessage))
 
             // Act & Assert
@@ -258,7 +268,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
 
                 assertEquals("Error: Invalid selection for merge.", awaitItem())
-                verify(accountRepository, never()).mergeAccounts(anyInt(), anyObject())
+                verify(mergeAccountsUseCase, never()).invoke(anyInt(), anyList())
             }
         }
 
@@ -269,7 +279,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             val destinationId = 1
             val sourceIds = listOf(2)
             val errorMessage = "DB Error"
-            `when`(accountRepository.mergeAccounts(destinationId, sourceIds)).thenThrow(RuntimeException(errorMessage))
+            `when`(mergeAccountsUseCase.invoke(destinationId, sourceIds)).thenThrow(RuntimeException(errorMessage))
 
             viewModel.enterSelectionMode(null)
             viewModel.toggleAccountSelection(destinationId)
@@ -433,7 +443,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             val accountId = 1
             val originalAccount = Account(id = accountId, name = "Old Name", type = "Bank")
             val newName = "New Name"
-            `when`(accountRepository.getAccountById(accountId)).thenReturn(flowOf(originalAccount))
+            `when`(accountRepository.getAccountByIdSync(accountId)).thenReturn(originalAccount)
 
             // Act
             viewModel.renameAccount(accountId, newName)
@@ -502,7 +512,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     fun `checkAccountName returns EXACT for exact match`() =
         runTest {
             val account = Account(id = 1, name = "Exact Name", type = "Bank")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(account))
 
             val match = viewModel.checkAccountName("exact name", null)
 
@@ -514,7 +524,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     fun `checkAccountName returns SIMILAR for similar match`() =
         runTest {
             val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(account))
 
             val match = viewModel.checkAccountName("Amazon Pays", null)
 
@@ -526,7 +536,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     fun `checkAccountName returns NONE for no match`() =
         runTest {
             val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(account))
 
             val match = viewModel.checkAccountName("Google Pay", null)
 
@@ -537,7 +547,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     fun `checkAccountName excludes given account ID`() =
         runTest {
             val account = Account(id = 1, name = "Amazon Pay", type = "Wallet")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(account)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(account))
 
             val match = viewModel.checkAccountName("Amazon Pay", excludeAccountId = 1)
 
@@ -556,7 +566,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             }
             advanceUntilIdle()
 
-            verify(accountRepository).mergeAccounts(1, listOf(2))
+            verify(mergeAccountsUseCase).invoke(1, listOf(2))
             assertTrue(callbackTriggered)
             assertTrue(successResult)
         }
@@ -565,7 +575,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     fun `mergeAccounts overload triggers error callback on exception`() =
         runTest {
             val errorMessage = "Merge Error"
-            `when`(accountRepository.mergeAccounts(anyInt(), anyList())).thenThrow(RuntimeException(errorMessage))
+            `when`(mergeAccountsUseCase.invoke(anyInt(), anyList())).thenThrow(RuntimeException(errorMessage))
 
             var callbackTriggered = false
             var successResult = true
@@ -585,7 +595,7 @@ class AccountViewModelTest : BaseViewModelTest() {
         runTest {
             val account = Account(id = 1, name = "Duplicate", type = "Bank")
             val existing = Account(id = 2, name = "Duplicate", type = "Bank")
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(listOf(existing)))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(existing))
 
             var callbackTriggered = false
             var successResult = true
@@ -604,7 +614,7 @@ class AccountViewModelTest : BaseViewModelTest() {
     @Test
     fun `addAccount success triggers callback`() =
         runTest {
-            `when`(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(emptyList())
 
             var callbackTriggered = false
             var successResult = false
@@ -616,6 +626,69 @@ class AccountViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             verify(accountRepository).insert(anyObject())
+            assertTrue(callbackTriggered)
+            assertTrue(successResult)
+        }
+
+    @Test
+    fun `checkAccountName with default excludeAccountId parameter finds match`() =
+        runTest {
+            val account = Account(id = 1, name = "HDFC", type = "Bank")
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(account))
+
+            val match = viewModel.checkAccountName("HDFC")
+
+            assertEquals(MatchType.EXACT, match.matchType)
+            assertEquals(account, match.account)
+        }
+
+    @Test
+    fun `mergeAccounts with default callback executes successfully`() =
+        runTest {
+            viewModel.mergeAccounts(1, listOf(2))
+            advanceUntilIdle()
+
+            verify(mergeAccountsUseCase).invoke(1, listOf(2))
+        }
+
+    @Test
+    fun `addAccount success when existing accounts have different names`() =
+        runTest {
+            val existing = Account(id = 1, name = "Different Name", type = "Bank")
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(existing))
+
+            var callbackTriggered = false
+            var successResult = false
+
+            viewModel.addAccount("New Unique Account", "Bank") { success ->
+                callbackTriggered = true
+                successResult = success
+            }
+            advanceUntilIdle()
+
+            verify(accountRepository).insert(Account(name = "New Unique Account", type = "Bank"))
+            assertTrue(callbackTriggered)
+            assertTrue(successResult)
+        }
+
+    @Test
+    fun `updateAccount succeeds when existing account has same id and same name`() =
+        runTest {
+            val account = Account(id = 1, name = "My Account", type = "Card")
+            val sameAccountInDb = Account(id = 1, name = "My Account", type = "Bank")
+            val otherAccountInDb = Account(id = 2, name = "Other Account", type = "Bank")
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(sameAccountInDb, otherAccountInDb))
+
+            var callbackTriggered = false
+            var successResult = false
+
+            viewModel.updateAccount(account) { success ->
+                callbackTriggered = true
+                successResult = success
+            }
+            advanceUntilIdle()
+
+            verify(accountRepository).update(account)
             assertTrue(callbackTriggered)
             assertTrue(successResult)
         }

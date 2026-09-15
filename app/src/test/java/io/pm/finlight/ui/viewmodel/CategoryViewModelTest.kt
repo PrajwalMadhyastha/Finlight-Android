@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,16 +28,16 @@ class CategoryViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var transactionRepository: TransactionRepository
 
-    @Mock
-    private lateinit var categoryDao: CategoryDao
-
     private lateinit var viewModel: CategoryViewModel
 
     @Before
     override fun setup() {
         super.setup()
         `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-        viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+        runTest {
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
+        }
+        viewModel = CategoryViewModel(categoryRepository, transactionRepository)
     }
 
     @Test
@@ -44,7 +46,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             // ARRANGE
             val categories = listOf(Category(1, "Food", "icon", "color"))
             `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
 
             // ACT & ASSERT
             viewModel.allCategories.test {
@@ -58,10 +60,10 @@ class CategoryViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val categoryName = "New Category"
-            `when`(categoryDao.findByName(categoryName)).thenReturn(null)
-            `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList())) // For getNextAvailableColor
+            `when`(categoryRepository.findByName(categoryName)).thenReturn(null)
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList()) // For getNextAvailableColor
             val categoryCaptor = argumentCaptor<Category>()
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -82,7 +84,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             // ARRANGE
             val categoryToUpdate = Category(1, "Updated Name", "icon", "color")
             `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
 
             // ACT
             viewModel.updateCategory(categoryToUpdate)
@@ -99,7 +101,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             val category = Category(1, "Deletable Category", "icon", "color")
             `when`(transactionRepository.countTransactionsForCategory(category.id)).thenReturn(0)
             `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(category)))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
 
             // ACT
             viewModel.deleteCategory(category)
@@ -120,7 +122,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             val transactionCount = 3
             `when`(transactionRepository.countTransactionsForCategory(category.id)).thenReturn(transactionCount)
             `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(category)))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository, categoryDao)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
 
             // ACT
             viewModel.deleteCategory(category)
@@ -138,7 +140,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val categoryName = "Food"
-            `when`(categoryDao.findByName(categoryName)).thenReturn(Category(1, categoryName, "", ""))
+            `when`(categoryRepository.findByName(categoryName)).thenReturn(Category(1, categoryName, "", ""))
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -156,7 +158,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             // Arrange
             val categoryName = "New Category"
             val errorMessage = "DB Error"
-            `when`(categoryDao.findByName(categoryName)).thenReturn(null)
+            `when`(categoryRepository.findByName(categoryName)).thenReturn(null)
             `when`(categoryRepository.insert(anyObject())).thenThrow(RuntimeException(errorMessage))
 
             // Act & Assert
@@ -216,5 +218,23 @@ class CategoryViewModelTest : BaseViewModelTest() {
 
                 assertEquals("Error deleting category: $errorMessage", awaitItem())
             }
+        }
+
+    @Test
+    fun `addCategory with gray_light color assigns next available color using snapshot`() =
+        runTest {
+            val categoryName = "Utilities"
+            `when`(categoryRepository.findByName(categoryName)).thenReturn(null)
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(
+                listOf(Category(1, "Food", "icon", "color_1")),
+            )
+            val categoryCaptor = argumentCaptor<Category>()
+
+            viewModel.addCategory(categoryName, "test_icon", "gray_light")
+            advanceUntilIdle()
+
+            verify(categoryRepository).insert(capture(categoryCaptor))
+            assertNotNull(categoryCaptor.value.colorKey)
+            assertTrue(categoryCaptor.value.colorKey != "gray_light")
         }
 }

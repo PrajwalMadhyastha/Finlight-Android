@@ -18,6 +18,7 @@ import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
+import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
@@ -129,6 +130,14 @@ class TransactionViewModel(
             db = db,
         ),
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val manageReimbursementUseCase: ManageReimbursementUseCase =
+        ManageReimbursementUseCase(
+            transactionQueryDao = db.transactionQueryDao(),
+            transactionWriteDao = db.transactionWriteDao(),
+            transactionReimbursementDao = db.transactionReimbursementDao(),
+            db = db,
+            dispatcherProvider = dispatcherProvider,
+        ),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -342,7 +351,7 @@ class TransactionViewModel(
             .flatMapLatest { (description, manualSelect) ->
                 if (description.length > 2 && !manualSelect) {
                     flow {
-                        val allCategoriesList = allCategories.first()
+                        val allCategoriesList = categoryRepository.getAllCategoriesSnapshot()
                         emit(HeuristicCategorizer.findCategoryForDescription(description, allCategoriesList))
                     }
                 } else {
@@ -631,14 +640,14 @@ class TransactionViewModel(
         expenseId: Int
     ) {
         viewModelScope.launch {
-            transactionRepository.linkReimbursement(incomeId, expenseId)
+            manageReimbursementUseCase.linkReimbursement(incomeId, expenseId)
             _showReimbursementPicker.value = false
         }
     }
 
     fun unlinkReimbursement(incomeId: Int) {
         viewModelScope.launch {
-            transactionRepository.unlinkReimbursement(incomeId)
+            manageReimbursementUseCase.unlinkReimbursement(incomeId)
         }
     }
 
@@ -713,7 +722,7 @@ class TransactionViewModel(
             }
             val expenseId = expenses.first().transaction.id
             incomes.forEach { income ->
-                transactionRepository.linkReimbursement(income.transaction.id, expenseId)
+                manageReimbursementUseCase.linkReimbursement(income.transaction.id, expenseId)
             }
             _uiEvent.send("${incomes.size} repayment(s) linked.")
             clearSelectionMode()
@@ -1002,14 +1011,12 @@ class TransactionViewModel(
         // This logic is best handled by the UI observing the state changes, or we can look them up here
         // For simplicity, we assume the UI will re-resolve the ID to the object
         viewModelScope.launch {
-            val categories = allCategories.first()
-            val accounts = allAccounts.first()
+            val category = transactionDetails.transaction.categoryId?.let { categoryRepository.getCategoryById(it) }
+            val account = accountRepository.getAccountByIdSync(transactionDetails.transaction.accountId)
 
-            val category = categories.find { it.id == transactionDetails.transaction.categoryId }
             _addTransactionCategory.value = category
             _userManuallySelectedCategory.value = true // Prevent auto-categorizer from overwriting
 
-            val account = accounts.find { it.id == transactionDetails.transaction.accountId }
             _addTransactionAccount.value = account
 
             // Load tags
@@ -1212,9 +1219,7 @@ class TransactionViewModel(
     }
 
     suspend fun getOriginalSmsMessage(smsId: Long): SmsMessage? {
-        return withContext(dispatcherProvider.io) {
-            smsRepository.getSmsDetailsById(smsId)
-        }
+        return smsRepository.getSmsDetailsById(smsId)
     }
 
     fun reparseTransactionFromSms(transactionId: Int) {
@@ -1310,13 +1315,13 @@ class TransactionViewModel(
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
-                    val currentAccount = accountRepository.getAccountById(transaction.accountId).first()
+                    val currentAccount = accountRepository.getAccountByIdSync(transaction.accountId)
                     if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
                         var account = db.accountDao().findByName(parsedAccount.formattedName)
                         if (account == null) {
                             val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
-                            account = db.accountDao().getAccountById(newId.toInt()).first()
+                            account = accountRepository.getAccountByIdSync(newId.toInt())
                         }
                         if (account != null) {
                             transactionRepository.updateAccountId(transactionId, account.id)
@@ -1374,7 +1379,7 @@ class TransactionViewModel(
             }
 
             val newAccountId = accountRepository.insert(Account(name = name, type = type))
-            accountRepository.getAccountById(newAccountId.toInt()).first()?.let { newAccount ->
+            accountRepository.getAccountByIdSync(newAccountId.toInt())?.let { newAccount ->
                 onAccountCreated(newAccount)
             }
         }
@@ -1388,13 +1393,13 @@ class TransactionViewModel(
     ) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            val existingCategory = db.categoryDao().findByName(name)
+            val existingCategory = categoryRepository.findByName(name)
             if (existingCategory != null) {
                 _validationError.value = "A category named '$name' already exists."
                 return@launch
             }
 
-            val usedColorKeys = allCategories.first().map { it.colorKey }
+            val usedColorKeys = categoryRepository.getAllCategoriesSnapshot().map { it.colorKey }
             val finalIconKey = if (iconKey == "category") "letter_default" else iconKey
             val finalColorKey = if (colorKey == "gray_light") CategoryIconHelper.getNextAvailableColor(usedColorKeys) else colorKey
 
@@ -1716,6 +1721,13 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
+                potentialTxn.sourceSmsHash?.let { hash ->
+                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
+                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping approve.")
+                        return@withContext false
+                    }
+                }
+
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
@@ -1771,7 +1783,11 @@ class TransactionViewModel(
                     }
 
                 val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, tags, currentTravelSettings)
-                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                if (newId <= 0L) {
+                    Log.d(TAG, "Transaction insert ignored or failed (newId: $newId).")
+                    return@withContext false
+                }
 
                 val merchantName = potentialTxn.merchantName
                 if (categoryId != null && merchantName != null) {
@@ -1797,6 +1813,13 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
+                potentialTxn.sourceSmsHash?.let { hash ->
+                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
+                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping auto-save.")
+                        return@withContext false
+                    }
+                }
+
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
@@ -1819,7 +1842,7 @@ class TransactionViewModel(
                         // null, silently dropping the transaction. Fall back to findByName instead.
                         account =
                             if (newId != -1L) {
-                                db.accountDao().getAccountById(newId.toInt()).first()
+                                accountRepository.getAccountByIdSync(newId.toInt())
                             } else {
                                 Log.d(TAG, "Account '$accountName' already existed (IGNORE conflict). Fetching by name.")
                                 db.accountDao().findByName(accountName)
@@ -1850,7 +1873,11 @@ class TransactionViewModel(
                     )
 
                 val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet(), travelModeSettings.value)
-                transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
+                if (newId <= 0L) {
+                    Log.d(TAG, "Auto-save ignored or failed due to conflict (newId: $newId).")
+                    return@withContext false
+                }
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to auto-save SMS transaction", e)

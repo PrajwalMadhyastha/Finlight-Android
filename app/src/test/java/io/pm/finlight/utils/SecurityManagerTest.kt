@@ -161,6 +161,59 @@ class SecurityManagerTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `handles decryption failure (mismatched device transfer key) by self-healing and generating new passphrase`() {
+        // Create an unopenable database file as well
+        val dbFile = context.getDatabasePath("finance_database")
+        dbFile.parentFile?.mkdirs()
+        dbFile.writeText("corrupt_or_foreign_database_content")
+        assertTrue("Database file should exist before test", dbFile.exists())
+
+        // Arrange: Generate ciphertext encrypted with a different key (simulating Phone A's ciphertext on Phone B)
+        val foreignKeyGenerator = KeyGenerator.getInstance("AES", "BC")
+        foreignKeyGenerator.init(256)
+        val foreignKey = foreignKeyGenerator.generateKey()
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, foreignKey)
+        val foreignEncrypted = cipher.doFinal("secret_passphrase".toByteArray())
+        val foreignDataB64 = android.util.Base64.encodeToString(foreignEncrypted, android.util.Base64.NO_WRAP)
+        val foreignIvB64 = android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)
+
+        val secureFile = File(context.filesDir, "finlight_secure.dat")
+        secureFile.writeText("$foreignDataB64,$foreignIvB64")
+
+        // Act: instantiate new manager with standard testKeyStore (which has its own different key)
+        val newManager = createTestSecurityManager()
+        val passphrase = newManager.getPassphrase()
+
+        // Assert: decryption should fail defensively, wipe foreign file & db, and return a valid new passphrase
+        assertNotNull("Passphrase should be generated despite decryption failure", passphrase)
+        assertTrue("Passphrase should not be empty", passphrase.isNotEmpty())
+        assertTrue("Secure file should be re-created with new valid data", secureFile.exists())
+        org.junit.Assert.assertFalse("Orphaned foreign database should be deleted", dbFile.exists())
+
+        // Verify that the new passphrase can be cleanly retrieved again
+        val subsequentPassphrase = newManager.getPassphrase()
+        assertArrayEquals("Subsequent call should return the newly healed passphrase", passphrase, subsequentPassphrase)
+    }
+
+    @Test
+    fun `deletes orphaned database when encryption key file is missing`() {
+        val dbFile = context.getDatabasePath("finance_database")
+        dbFile.parentFile?.mkdirs()
+        dbFile.writeText("orphaned_db_content")
+        assertTrue("Database file should exist before test", dbFile.exists())
+
+        val secureFile = File(context.filesDir, "finlight_secure.dat")
+        secureFile.delete()
+
+        val newManager = createTestSecurityManager()
+        val passphrase = newManager.getPassphrase()
+
+        assertNotNull("Passphrase should be generated", passphrase)
+        org.junit.Assert.assertFalse("Orphaned database without keyfile should be deleted", dbFile.exists())
+    }
+
+    @Test
     fun `default SecurityManager properties and secret key generation`() {
         val defaultManager = SecurityManager(context)
         org.junit.Assert.assertEquals("AndroidKeyStore", defaultManager.keyStoreProvider)
@@ -171,5 +224,145 @@ class SecurityManagerTest : BaseViewModelTest() {
         } catch (e: Exception) {
             // AndroidKeyStore may not be fully backed by real hardware in Robolectric, but generateSecretKey code path executes
         }
+    }
+
+    private fun writeForeignEncryptedData() {
+        val foreignKeyGenerator = KeyGenerator.getInstance("AES", "BC")
+        foreignKeyGenerator.init(256)
+        val foreignKey = foreignKeyGenerator.generateKey()
+        val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, foreignKey)
+        val foreignEncrypted = cipher.doFinal("secret_passphrase".toByteArray())
+        val foreignDataB64 = android.util.Base64.encodeToString(foreignEncrypted, android.util.Base64.NO_WRAP)
+        val foreignIvB64 = android.util.Base64.encodeToString(cipher.iv, android.util.Base64.NO_WRAP)
+        val secureFile = File(context.filesDir, "finlight_secure.dat")
+        secureFile.writeText("$foreignDataB64,$foreignIvB64")
+    }
+
+    @Test
+    fun `handles decryption failure when secure file deletion fails`() {
+        writeForeignEncryptedData()
+        var deleteCallCount = 0
+        val customFile =
+            object : File(context.filesDir, "finlight_secure.dat") {
+                override fun delete(): Boolean {
+                    deleteCallCount++
+                    return false
+                }
+            }
+
+        val manager =
+            object : SecurityManager(context) {
+                override val keyStoreProvider: String = "BC"
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun getKeyStore(): KeyStore = testKeyStore
+
+                override fun getStorageFile(): File = customFile
+
+                override fun generateSecretKey(): SecretKey {
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    val secretKey = keyGenerator.generateKey()
+                    testKeyStore.setEntry(KEY_ALIAS, KeyStore.SecretKeyEntry(secretKey), protectionParameter)
+                    return secretKey
+                }
+            }
+
+        val passphrase = manager.getPassphrase()
+        assertNotNull(passphrase)
+        assertTrue("Secure file delete should have been attempted", deleteCallCount > 0)
+    }
+
+    @Test
+    fun `handles decryption failure when keystore deleteEntry throws exception`() {
+        writeForeignEncryptedData()
+
+        val manager =
+            object : SecurityManager(context) {
+                override val keyStoreProvider: String = "BC"
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun getKeyStore(): KeyStore = testKeyStore
+
+                override fun deleteKeyEntry() {
+                    throw java.security.KeyStoreException("Keystore delete failed")
+                }
+
+                override fun generateSecretKey(): SecretKey {
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    val secretKey = keyGenerator.generateKey()
+                    testKeyStore.setEntry(KEY_ALIAS, KeyStore.SecretKeyEntry(secretKey), protectionParameter)
+                    return secretKey
+                }
+            }
+
+        val passphrase = manager.getPassphrase()
+        assertNotNull(passphrase)
+    }
+
+    @Test
+    fun `handles decryption failure when foreign database deletion returns false`() {
+        writeForeignEncryptedData()
+        val mockContext = io.mockk.spyk(context)
+        io.mockk.every { mockContext.deleteDatabase("finance_database") } returns false
+
+        val manager =
+            object : SecurityManager(mockContext) {
+                override val keyStoreProvider: String = "BC"
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun getKeyStore(): KeyStore = testKeyStore
+
+                override fun generateSecretKey(): SecretKey {
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    val secretKey = keyGenerator.generateKey()
+                    testKeyStore.setEntry(KEY_ALIAS, KeyStore.SecretKeyEntry(secretKey), protectionParameter)
+                    return secretKey
+                }
+            }
+
+        val passphrase = manager.getPassphrase()
+        assertNotNull(passphrase)
+        io.mockk.verify { mockContext.deleteDatabase("finance_database") }
+    }
+
+    @Test
+    fun `handles orphaned database when database deletion returns false`() {
+        val dbFile = context.getDatabasePath("finance_database")
+        dbFile.parentFile?.mkdirs()
+        dbFile.writeText("orphaned_db_content")
+
+        val secureFile = File(context.filesDir, "finlight_secure.dat")
+        secureFile.delete()
+
+        val mockContext = io.mockk.spyk(context)
+        io.mockk.every { mockContext.deleteDatabase("finance_database") } returns false
+
+        val manager =
+            object : SecurityManager(mockContext) {
+                override val keyStoreProvider: String = "BC"
+                override val protectionParameter: KeyStore.ProtectionParameter =
+                    KeyStore.PasswordProtection("test_password".toCharArray())
+
+                override fun getKeyStore(): KeyStore = testKeyStore
+
+                override fun generateSecretKey(): SecretKey {
+                    val keyGenerator = KeyGenerator.getInstance("AES", "BC")
+                    keyGenerator.init(256)
+                    val secretKey = keyGenerator.generateKey()
+                    testKeyStore.setEntry(KEY_ALIAS, KeyStore.SecretKeyEntry(secretKey), protectionParameter)
+                    return secretKey
+                }
+            }
+
+        val passphrase = manager.getPassphrase()
+        assertNotNull(passphrase)
+        io.mockk.verify { mockContext.deleteDatabase("finance_database") }
     }
 }

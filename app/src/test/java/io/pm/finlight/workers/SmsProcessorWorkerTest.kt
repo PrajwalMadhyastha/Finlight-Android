@@ -130,7 +130,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         coEvery { accountAliasDao.findByAlias(any()) } returns null
         coEvery { accountDao.findByName(any()) } returns Account(1, "Test", "Bank Account")
         coEvery { accountDao.insert(any()) } returns 1L
-        coEvery { accountDao.getAccountByIdBlocking(any()) } returns Account(1, "Test", "Bank Account")
+        coEvery { accountDao.getAccountByIdSync(any()) } returns Account(1, "Test", "Bank Account")
         coEvery { tagDao.findByName(any()) } returns null
         coEvery { tagDao.insert(any()) } returns 1L
 
@@ -241,6 +241,30 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `skips duplicate when existsBySmsHash returns true in dynamic DB check`() =
+        runTest {
+            val hash = "dynamic_duplicate_hash"
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
+                    transactionType = "expense", merchantName = "Swiggy",
+                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = hash,
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            // Initial snapshot was empty
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+            // Dynamic check finds hash in DB
+            coEvery { transactionQueryDao.existsBySmsHash(hash) } returns true
 
             val result = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy").doWork()
 

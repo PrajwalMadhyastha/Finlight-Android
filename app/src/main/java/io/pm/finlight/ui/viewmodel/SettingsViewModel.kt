@@ -97,11 +97,11 @@ class SettingsViewModel(
             initialValue = true,
         )
 
-    val appLockEnabled: StateFlow<Boolean> =
+    val appLockEnabled: StateFlow<Boolean?> =
         settingsRepository.getAppLockEnabled().stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = false,
+            initialValue = null,
         )
 
     val unknownTransactionPopupEnabled: StateFlow<Boolean> =
@@ -280,10 +280,7 @@ class SettingsViewModel(
             var newTransactionsFound = 0
             try {
                 val startDate = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -30) }.timeInMillis
-                val rawMessages =
-                    withContext(dispatchers.io) {
-                        smsRepository.fetchAllSms(startDate)
-                    }
+                val rawMessages = smsRepository.fetchAllSms(startDate)
 
                 val existingMappings =
                     withContext(dispatchers.io) {
@@ -386,7 +383,7 @@ class SettingsViewModel(
 
             try {
                 // 2. Fetch all messages
-                val rawMessages = withContext(dispatchers.io) { smsRepository.fetchAllSms(startDate) }
+                val rawMessages = smsRepository.fetchAllSms(startDate)
 
                 // 3. Update total count to show the UI
                 _totalSmsToScan.value = rawMessages.size
@@ -661,8 +658,8 @@ class SettingsViewModel(
         uri: Uri,
         initialData: List<ReviewableRow>? = null,
     ): CsvValidationReport {
-        val accountsMap = db.accountDao().getAllAccounts().first().associateBy { it.name }
-        val categoriesMap = db.categoryDao().getAllCategories().first().associateBy { it.name }
+        val accountsMap = accountRepository.getAllAccountsSnapshot().associateBy { it.name }
+        val categoriesMap = categoryRepository.getAllCategoriesSnapshot().associateBy { it.name }
 
         if (initialData != null) {
             val revalidatedRows =
@@ -767,8 +764,8 @@ class SettingsViewModel(
                 if (indexToUpdate != -1) {
                     val revalidatedRow =
                         withContext(dispatchers.io) {
-                            val accountsMap = db.accountDao().getAllAccounts().first().associateBy { it.name }
-                            val categoriesMap = db.categoryDao().getAllCategories().first().associateBy { it.name }
+                            val accountsMap = accountRepository.getAllAccountsSnapshot().associateBy { it.name }
+                            val categoriesMap = categoryRepository.getAllCategoriesSnapshot().associateBy { it.name }
                             createReviewableRow(lineNumber, correctedData, accountsMap, categoriesMap)
                         }
                     currentRows[indexToUpdate] = revalidatedRow
@@ -789,7 +786,7 @@ class SettingsViewModel(
             val isFinlightExport = header.contains("Id") && header.contains("ParentId")
 
             val learnedMappings = mutableMapOf<String, Int>()
-            val allCategories = db.categoryDao().getAllCategories().first()
+            val allCategories = categoryRepository.getAllCategoriesSnapshot()
             val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
             transactionRunner.run(db) {
@@ -942,7 +939,7 @@ class SettingsViewModel(
         name: String,
         usedColorKeys: MutableList<String>,
     ): Category {
-        var category = categoryRepository.allCategories.first().find { it.name.equals(name, ignoreCase = true) }
+        var category = categoryRepository.findByName(name)
         if (category == null) {
             val nextColor = CategoryIconHelper.getNextAvailableColor(usedColorKeys)
             usedColorKeys.add(nextColor)
@@ -953,7 +950,7 @@ class SettingsViewModel(
     }
 
     private suspend fun findOrCreateAccount(name: String): Account {
-        var account = accountRepository.allAccounts.first().find { it.name.equals(name, ignoreCase = true) }
+        var account = accountRepository.getAllAccountsSnapshot().find { it.name.equals(name, ignoreCase = true) }
         if (account == null) {
             val newId = accountRepository.insert(Account(name = name, type = "Imported"))
             account = Account(id = newId.toInt(), name = name, type = "Imported")
@@ -976,6 +973,20 @@ class SettingsViewModel(
                 _showBackupSuccessDialog.value = true
             } else {
                 _uiEvent.send("Failed to create snapshot.")
+            }
+        }
+    }
+
+    fun restoreFromBackupSnapshot() {
+        viewModelScope.launch {
+            val success =
+                withContext(dispatchers.io) {
+                    DataExportService.restoreFromBackupSnapshot(context)
+                }
+            if (success) {
+                _uiEvent.send("Data restored successfully from snapshot! Please restart the app.")
+            } else {
+                _uiEvent.send("No backup snapshot found or restore failed.")
             }
         }
     }

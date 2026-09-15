@@ -12,6 +12,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -98,5 +99,48 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
 
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getSmsScanStartDate().first() }
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getDismissedMergeSuggestions().first() }
+            kotlin.test.assertFailsWith<IllegalStateException> { repo.getIgnoreRulesChecksum() }
+        }
+
+    @Test
+    fun `getIgnoreRulesChecksum propagates CancellationException`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw kotlinx.coroutines.CancellationException("Cancelled") }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> {
+                repo.getIgnoreRulesChecksum()
+            }
+        }
+
+    @Test
+    fun `cancelling coroutine during getIgnoreRulesChecksum throws CancellationException`() =
+        runTest {
+            val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
+            io.mockk.every { mockDataStore.data } returns
+                kotlinx.coroutines.flow.flow {
+                    kotlinx.coroutines.awaitCancellation()
+                }
+            val repo = SmsRuleSettingsRepository(mockDataStore)
+
+            var caughtException: Throwable? = null
+            val job =
+                launch {
+                    try {
+                        repo.getIgnoreRulesChecksum()
+                    } catch (t: Throwable) {
+                        caughtException = t
+                        throw t
+                    }
+                }
+            testScheduler.advanceUntilIdle()
+            kotlin.test.assertTrue(job.isActive)
+
+            job.cancel()
+            testScheduler.advanceUntilIdle()
+
+            kotlin.test.assertTrue(job.isCancelled)
+            kotlin.test.assertTrue(caughtException is kotlinx.coroutines.CancellationException)
         }
 }

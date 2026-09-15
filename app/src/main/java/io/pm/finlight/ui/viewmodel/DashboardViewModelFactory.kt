@@ -25,16 +25,8 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                     transactionQueryDao = db.transactionQueryDao(),
                     dispatcherProvider = dispatcherProvider,
                 )
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = dispatcherProvider,
-                )
-            val accountRepository = AccountRepository(db)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val accountRepository = ServiceLocator.provideAccountRepository(application)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
             val mergeTransactionsUseCase =
                 MergeTransactionsUseCase(

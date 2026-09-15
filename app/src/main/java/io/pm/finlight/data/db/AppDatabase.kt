@@ -26,7 +26,6 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.security.SecurityManager
 import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 
@@ -56,7 +55,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 55,
+    version = 57,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -985,6 +984,87 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 55→56: Add linkedSurplusTxnId and heal over-repaid negative expenses ---
+        val MIGRATION_55_56 =
+            object : Migration(55, 56) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE `transactions` ADD COLUMN `linkedSurplusTxnId` INTEGER")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS `index_transactions_linkedSurplusTxnId` ON `transactions` (`linkedSurplusTxnId`)")
+
+                    val cursor = db.query("SELECT id, amount, date, accountId, categoryId, description FROM transactions WHERE transactionType = '${TransactionType.DB_EXPENSE}' AND amount < 0")
+                    while (cursor.moveToNext()) {
+                        val expenseId = cursor.getInt(0)
+                        val negativeAmount = cursor.getDouble(1)
+                        val date = cursor.getLong(2)
+                        val accountId = cursor.getInt(3)
+                        val categoryId = if (!cursor.isNull(4)) cursor.getInt(4) else null
+                        val desc = cursor.getString(5) ?: "Expense"
+                        val surplus = kotlin.math.abs(negativeAmount)
+
+                        // 1. Reset expense amount to 0.0
+                        db.execSQL("UPDATE transactions SET amount = 0.0 WHERE id = ?", arrayOf(expenseId))
+
+                        // 2. Check for linked reimbursement child
+                        val rCursor = db.query("SELECT id, description, accountId, categoryId, date FROM transactions WHERE parentReimbursementId = ? LIMIT 1", arrayOf(expenseId))
+                        val childId = if (rCursor.moveToNext()) rCursor.getInt(0) else null
+                        val childDesc = if (childId != null) rCursor.getString(1) ?: desc else desc
+                        val childAccId = if (childId != null) rCursor.getInt(2) else accountId
+                        val childCatId = if (childId != null && !rCursor.isNull(3)) rCursor.getInt(3) else categoryId
+                        val childDate = if (childId != null) rCursor.getLong(4) else date
+                        rCursor.close()
+
+                        // 3. Insert surplus active income transaction
+                        db.execSQL(
+                            """
+                            INSERT INTO transactions (description, amount, date, accountId, categoryId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, notes)
+                            VALUES (?, ?, ?, ?, ?, '${TransactionType.DB_INCOME}', 'Surplus Allocation', 0, 0, 0, 0, 'CONFIRMED', ?)
+                            """,
+                            arrayOf(
+                                "$childDesc (Surplus)",
+                                surplus,
+                                childDate,
+                                childAccId,
+                                childCatId,
+                                "Surplus from repayment for $desc",
+                            ),
+                        )
+
+                        val sCursor = db.query("SELECT last_insert_rowid()")
+                        if (sCursor.moveToNext()) {
+                            val surplusTxnId = sCursor.getInt(0)
+                            if (childId != null) {
+                                db.execSQL("UPDATE transactions SET linkedSurplusTxnId = ? WHERE id = ?", arrayOf(surplusTxnId, childId))
+                            }
+                        }
+                        sCursor.close()
+                    }
+                    cursor.close()
+                    Log.i("Migration_55_56", "Added linkedSurplusTxnId and healed over-repaid expenses.")
+                }
+            }
+
+        // --- Migration 56→57: Eliminate Duplicate SMS Capture with UNIQUE index on sourceSmsHash ---
+        val MIGRATION_56_57 =
+            object : Migration(56, 57) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    // Heal existing duplicate sourceSmsHash rows before index creation
+                    db.execSQL(
+                        """
+                        UPDATE transactions 
+                        SET sourceSmsHash = NULL 
+                        WHERE id NOT IN (
+                            SELECT MIN(id) 
+                            FROM transactions 
+                            WHERE sourceSmsHash IS NOT NULL 
+                            GROUP BY sourceSmsHash
+                        ) AND sourceSmsHash IS NOT NULL
+                        """,
+                    )
+                    db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_transactions_sourceSmsHash` ON `transactions` (`sourceSmsHash`)")
+                    Log.i("Migration_56_57", "Created UNIQUE index on sourceSmsHash after healing existing duplicate rows.")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -1027,6 +1107,8 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_52_53,
                             MIGRATION_53_54,
                             MIGRATION_54_55,
+                            MIGRATION_55_56,
+                            MIGRATION_56_57,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
@@ -1054,7 +1136,7 @@ abstract class AppDatabase : RoomDatabase() {
                     val smsRuleSettingsRepository = io.pm.finlight.di.ServiceLocator.provideSmsRuleSettingsRepository(context)
 
                     val categoryDao = database.categoryDao()
-                    val categoryCount = categoryDao.getAllCategories().first().size
+                    val categoryCount = categoryDao.getCategoryCount()
                     if (categoryCount == 0) {
                         Log.w("DatabaseCallback", "Categories table is empty. Repopulating default categories.")
                         categoryDao.insertAllIgnore(CategoryIconHelper.predefinedCategories)
@@ -1089,7 +1171,7 @@ abstract class AppDatabase : RoomDatabase() {
 
             private suspend fun repairCategoryIcons(db: AppDatabase) {
                 val categoryDao = db.categoryDao()
-                val allCategories = categoryDao.getAllCategories().first()
+                val allCategories = categoryDao.getAllCategoriesSnapshot()
                 val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
                 val categoriesToFix = allCategories.filter { it.iconKey == "category" }

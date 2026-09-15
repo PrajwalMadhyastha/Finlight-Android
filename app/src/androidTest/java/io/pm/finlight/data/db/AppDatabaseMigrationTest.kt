@@ -732,4 +732,145 @@ class AppDatabaseMigrationTest {
         org.junit.Assert.assertEquals("STARBUCKS", cursor5.getString(0))
         cursor5.close()
     }
+
+    @Test
+    fun migrate55To56_addsLinkedSurplusTxnIdAndHealsNegativeExpenses() {
+        val db = helper.createDatabase(testDbName, 55)
+
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank Account')")
+
+        // 1. Over-repaid expense: amount = -10.0
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (1, 'Dinner Expense', -10.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')",
+        )
+
+        // Linked reimbursement: amount = 2350.0, parentReimbursementId = 1
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, parentReimbursementId, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (2, 'Pragathi Madhya', 2350.0, 1000, 1, 'income', 1, 'manual', 1, 0, 0, 0, 'cleared')",
+        )
+
+        // 2. Normal positive expense
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status) " +
+                "VALUES (3, 'Coffee', 150.0, 1000, 1, 'expense', 'manual', 0, 0, 0, 0, 'cleared')",
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 56, true, AppDatabase.MIGRATION_55_56)
+
+        // 1. Verify linkedSurplusTxnId column exists
+        val pragmaCursor = migratedDb.query("PRAGMA table_info(transactions)")
+        var foundSurplusCol = false
+        while (pragmaCursor.moveToNext()) {
+            if (pragmaCursor.getString(pragmaCursor.getColumnIndexOrThrow("name")) == "linkedSurplusTxnId") {
+                foundSurplusCol = true
+            }
+        }
+        pragmaCursor.close()
+        assertTrue("Column 'linkedSurplusTxnId' should exist in transactions table", foundSurplusCol)
+
+        // 2. Verify expense was healed to 0.0
+        val cursor1 = migratedDb.query("SELECT amount, transactionType FROM transactions WHERE id = 1")
+        assertTrue(cursor1.moveToFirst())
+        assertEquals(0.0, cursor1.getDouble(0), 0.001)
+        assertEquals("expense", cursor1.getString(1))
+        cursor1.close()
+
+        // 3. Verify reimbursement child has linkedSurplusTxnId pointing to new surplus transaction
+        val cursor2 = migratedDb.query("SELECT linkedSurplusTxnId FROM transactions WHERE id = 2")
+        assertTrue(cursor2.moveToFirst())
+        val surplusId = cursor2.getInt(0)
+        assertTrue(surplusId > 0)
+        cursor2.close()
+
+        // 4. Verify surplus transaction exists with amount 10.0 and type income
+        val cursorSurplus = migratedDb.query("SELECT amount, transactionType, isExcluded FROM transactions WHERE id = ?", arrayOf(surplusId))
+        assertTrue(cursorSurplus.moveToFirst())
+        assertEquals(10.0, cursorSurplus.getDouble(0), 0.001)
+        assertEquals("income", cursorSurplus.getString(1))
+        assertEquals(0, cursorSurplus.getInt(2))
+        cursorSurplus.close()
+
+        // 5. Verify normal positive expense remains untouched
+        val cursor3 = migratedDb.query("SELECT amount FROM transactions WHERE id = 3")
+        assertTrue(cursor3.moveToFirst())
+        assertEquals(150.0, cursor3.getDouble(0), 0.001)
+        cursor3.close()
+    }
+
+    @Test
+    fun migrate56To57_healsDuplicateSmsHashesAndAddsUniqueIndex() {
+        val testDbName = "migration-56-57-test"
+        val db = helper.createDatabase(testDbName, 56)
+
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank Account')")
+
+        // 1. First transaction with sourceSmsHash = 'hash_duplicate' (lowest id: 1)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, sourceSmsHash) " +
+                "VALUES (1, 'Swiggy', 250.0, 1000, 1, 'expense', 'Auto-Captured', 0, 0, 0, 0, 'cleared', 'hash_duplicate')",
+        )
+
+        // 2. Duplicate transaction with identical sourceSmsHash = 'hash_duplicate' (higher id: 2)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, sourceSmsHash) " +
+                "VALUES (2, 'Swiggy', 250.0, 1000, 1, 'expense', 'Auto-Recovered', 0, 0, 0, 0, 'cleared', 'hash_duplicate')",
+        )
+
+        // 3. Unique transaction with distinct sourceSmsHash = 'hash_unique' (id: 3)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, sourceSmsHash) " +
+                "VALUES (3, 'Uber', 150.0, 1000, 1, 'expense', 'Auto-Captured', 0, 0, 0, 0, 'cleared', 'hash_unique')",
+        )
+
+        // 4. Transaction with sourceSmsHash = null (id: 4)
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, sourceSmsHash) " +
+                "VALUES (4, 'Cash Spend', 50.0, 1000, 1, 'expense', 'Manual Entry', 0, 0, 0, 0, 'cleared', NULL)",
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 57, true, AppDatabase.MIGRATION_56_57)
+
+        // 1. Verify unique index exists
+        val indexCursor = migratedDb.query("PRAGMA index_list(transactions)")
+        var foundUniqueHashIndex = false
+        while (indexCursor.moveToNext()) {
+            val nameIndex = indexCursor.getColumnIndexOrThrow("name")
+            val uniqueIndex = indexCursor.getColumnIndexOrThrow("unique")
+            if (indexCursor.getString(nameIndex) == "index_transactions_sourceSmsHash" && indexCursor.getInt(uniqueIndex) == 1) {
+                foundUniqueHashIndex = true
+            }
+        }
+        indexCursor.close()
+        assertTrue("UNIQUE index 'index_transactions_sourceSmsHash' should exist on transactions table", foundUniqueHashIndex)
+
+        // 2. Verify lowest ID retains its hash
+        val cursor1 = migratedDb.query("SELECT sourceSmsHash FROM transactions WHERE id = 1")
+        assertTrue(cursor1.moveToFirst())
+        assertEquals("hash_duplicate", cursor1.getString(0))
+        cursor1.close()
+
+        // 3. Verify duplicate ID has sourceSmsHash set to NULL
+        val cursor2 = migratedDb.query("SELECT sourceSmsHash FROM transactions WHERE id = 2")
+        assertTrue(cursor2.moveToFirst())
+        assertTrue(cursor2.isNull(0))
+        cursor2.close()
+
+        // 4. Verify unique transaction hash remains unchanged
+        val cursor3 = migratedDb.query("SELECT sourceSmsHash FROM transactions WHERE id = 3")
+        assertTrue(cursor3.moveToFirst())
+        assertEquals("hash_unique", cursor3.getString(0))
+        cursor3.close()
+
+        // 5. Verify null hash remains null
+        val cursor4 = migratedDb.query("SELECT sourceSmsHash FROM transactions WHERE id = 4")
+        assertTrue(cursor4.moveToFirst())
+        assertTrue(cursor4.isNull(0))
+        cursor4.close()
+    }
 }

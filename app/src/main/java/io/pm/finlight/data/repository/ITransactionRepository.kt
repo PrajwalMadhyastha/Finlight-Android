@@ -237,11 +237,19 @@ interface ITransactionRepository {
 
     fun getLinkedExpenseForReimbursement(incomeId: Int): Flow<TransactionDetails?>
 
+    @Deprecated(
+        message = "Use ManageReimbursementUseCase directly from presentation/domain layer.",
+        replaceWith = ReplaceWith("manageReimbursementUseCase.linkReimbursement(incomeId, expenseId)"),
+    )
     suspend fun linkReimbursement(
         incomeId: Int,
         expenseId: Int,
     )
 
+    @Deprecated(
+        message = "Use ManageReimbursementUseCase directly from presentation/domain layer.",
+        replaceWith = ReplaceWith("manageReimbursementUseCase.unlinkReimbursement(incomeId)"),
+    )
     suspend fun unlinkReimbursement(incomeId: Int)
 
     suspend fun findRecentTransactionForMerge(
@@ -254,5 +262,16 @@ interface ITransactionRepository {
 
     suspend fun dismissMerge(id: Int)
 
-    suspend fun detectAndLinkSelfTransfer(newTxn: Transaction)
+    suspend fun findPotentialTransfers(
+        amount: Double,
+        accountId: Int,
+        transactionType: TransactionType,
+        startTime: Long,
+        endTime: Long,
+    ): List<Transaction>
+
+    suspend fun linkTransfer(
+        primaryTxnId: Int,
+        secondaryTxnId: Int,
+    )
 }

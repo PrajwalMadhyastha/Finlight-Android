@@ -125,6 +125,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
             // Arrange
             val foodCategory = Category(1, "Food & Drinks", "icon", "color")
             whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
+            whenever(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(foodCategory))
             initializeViewModel()
 
             viewModel.suggestedCategory.test(timeout = 5.seconds) {

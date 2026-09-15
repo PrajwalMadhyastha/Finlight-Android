@@ -127,11 +127,39 @@ class AccountDaoTest : BaseDaoTest() {
     fun deleteAccount() =
         runBlocking {
             val id = accountDao.insert(Account(name = "To Delete", type = "Bank")).toInt()
-            val account = accountDao.getAccountById(id).first()!!
+            val account = accountDao.getAccountByIdSync(id)!!
 
             accountDao.delete(account)
 
-            val loaded = accountDao.getAccountById(id).first()
+            val loaded = accountDao.getAccountByIdSync(id)
             assertNull(loaded)
+        }
+
+    @Test
+    fun getAllAccountsSnapshot_returnsAccountsOrderedByNameAsc() =
+        runBlocking {
+            accountDao.insert(Account(name = "Zeta Bank", type = "Bank"))
+            accountDao.insert(Account(name = "Alpha Card", type = "Card"))
+            accountDao.insert(Account(name = "Beta Wallet", type = "Wallet"))
+
+            val accounts = accountDao.getAllAccountsSnapshot()
+            assertEquals(3, accounts.size)
+            assertEquals("Alpha Card", accounts[0].name)
+            assertEquals("Beta Wallet", accounts[1].name)
+            assertEquals("Zeta Bank", accounts[2].name)
+        }
+
+    @Test
+    fun getAccountByIdSync_returnsAccountSynchronously() =
+        runBlocking {
+            val id = accountDao.insert(Account(name = "HDFC Bank", type = "Bank")).toInt()
+
+            val account = accountDao.getAccountByIdSync(id)
+            assertNotNull(account)
+            assertEquals("HDFC Bank", account?.name)
+            assertEquals("Bank", account?.type)
+
+            val nonExistent = accountDao.getAccountByIdSync(99999)
+            assertNull(nonExistent)
         }
 }

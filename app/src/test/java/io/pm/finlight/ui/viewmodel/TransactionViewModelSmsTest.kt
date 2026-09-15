@@ -129,6 +129,41 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
+    fun `autoSaveSmsTransaction creates new account and uses getAccountByIdSync`() =
+        runTest {
+            // ARRANGE
+            val potentialTxn =
+                PotentialTransaction(
+                    1L,
+                    "Test",
+                    100.0,
+                    "expense",
+                    "Auto Merchant",
+                    "Msg",
+                    PotentialAccount("NewAccount", "Bank"),
+                    "hash",
+                    1,
+                )
+            val transactionCaptor = argumentCaptor<Transaction>()
+
+            whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            whenever(accountDao.findByName("NewAccount")).thenReturn(null)
+            whenever(accountRepository.insert(Account(name = "NewAccount", type = "Bank"))).thenReturn(5L)
+            whenever(accountRepository.getAccountByIdSync(5)).thenReturn(Account(5, "NewAccount", "Bank"))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            // ACT
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            // ASSERT
+            assertTrue(result)
+            verify(accountRepository).getAccountByIdSync(5)
+            verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+            assertEquals(5, transactionCaptor.firstValue.accountId)
+        }
+
+    @Test
     fun `reparseTransactionFromSms updates transaction with new parsed data`() =
         runTest {
             // ARRANGE
@@ -169,6 +204,67 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             // ASSERT
             verify(transactionRepository).updateDescription(1, "New Merchant")
             verify(transactionRepository).updateCategoryId(1, 2)
+
+            unmockkObject(SmsParser)
+        }
+
+    @Test
+    fun `reparseTransactionFromSms updates account when new parsed account is detected`() =
+        runTest {
+            // ARRANGE
+            mockkObject(SmsParser)
+            val originalTxn =
+                Transaction(
+                    id = 1,
+                    description = "Old",
+                    categoryId = 1,
+                    amount = 100.0,
+                    date = 0,
+                    accountId = 1,
+                    notes = null,
+                    sourceSmsId = 123L,
+                )
+            val sms = SmsMessage(123L, "Sender", "New Merchant spent 150 from HDFC", 0L)
+            val newParsedTxn =
+                PotentialTransaction(
+                    sourceSmsId = 123L,
+                    smsSender = "Sender",
+                    amount = 150.0,
+                    transactionType = "expense",
+                    merchantName = "New Merchant",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount("HDFC Bank", "Bank"),
+                    categoryId = 2,
+                )
+
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
+            whenever(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
+            whenever(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            whenever(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            whenever(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            whenever(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            whenever(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            whenever(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            whenever(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+
+            whenever(accountRepository.getAccountByIdSync(1)).thenReturn(Account(1, "Old Bank", "Bank"))
+            whenever(accountDao.findByName("HDFC Bank")).thenReturn(null)
+            whenever(accountRepository.insert(Account(name = "HDFC Bank", type = "Bank"))).thenReturn(2L)
+            whenever(accountRepository.getAccountByIdSync(2)).thenReturn(Account(2, "HDFC Bank", "Bank"))
+
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Success(newParsedTxn)
+
+            // ACT
+            viewModel.reparseTransactionFromSms(1)
+            advanceUntilIdle()
+
+            // ASSERT
+            verify(accountRepository).getAccountByIdSync(1)
+            verify(accountRepository).insert(Account(name = "HDFC Bank", type = "Bank"))
+            verify(accountRepository).getAccountByIdSync(2)
+            verify(transactionRepository).updateAccountId(1, 2)
 
             unmockkObject(SmsParser)
         }
@@ -312,5 +408,62 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             val captor = argumentCaptor<Transaction>()
             verify(transactionRepository).insertTransactionWithTags(captor.capture(), any())
             assertEquals(2, captor.firstValue.accountId)
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false when insertTransactionWithTags returns -1L`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "hash", 1)
+            whenever(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            whenever(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Wallet"))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(-1L)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false when existsBySmsHash returns true`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Auto Merchant", "Msg", PotentialAccount("Cash", "Wallet"), "existing_hash", 1)
+            whenever(transactionQueryDao.existsBySmsHash("existing_hash")).thenReturn(true)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false when insertTransactionWithTags returns -1L`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("Cash", "Bank"), "hash")
+            whenever(accountDao.findByName("Cash")).thenReturn(Account(1, "Cash", "Bank"))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(-1L)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false when existsBySmsHash returns true`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(1L, "Test", 100.0, "expense", "Test Merchant", "Msg", PotentialAccount("Cash", "Bank"), "existing_hash")
+            whenever(transactionQueryDao.existsBySmsHash("existing_hash")).thenReturn(true)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
         }
 }

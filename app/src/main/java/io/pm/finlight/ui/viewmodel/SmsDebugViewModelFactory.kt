@@ -10,9 +10,9 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.SmsDebugViewModel
-import io.pm.finlight.SmsRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 
@@ -22,7 +22,7 @@ class SmsDebugViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
-            val smsRepository = SmsRepository(application)
+            val smsRepository = ServiceLocator.provideSmsRepository(application)
             val db = AppDatabase.getInstance(application)
             val smsClassifier = SmsClassifier(application)
             val nerExtractor = NerExtractor(application)

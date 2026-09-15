@@ -3,18 +3,13 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.AccountRepository
-import io.pm.finlight.CategoryRepository
 import io.pm.finlight.MerchantMappingRepository
-import io.pm.finlight.SmsRepository
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
-import io.pm.finlight.utils.DefaultDispatcherProvider
 
 class SettingsViewModelFactory(
     private val application: Application,
@@ -24,20 +19,12 @@ class SettingsViewModelFactory(
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val dispatcherProvider = DefaultDispatcherProvider()
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = dispatcherProvider,
-                )
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-            val accountRepository = AccountRepository(db)
-            val categoryRepository = CategoryRepository(db.categoryDao())
-            val smsRepository = SmsRepository(application)
+            val accountRepository = ServiceLocator.provideAccountRepository(application)
+            val categoryRepository = ServiceLocator.provideCategoryRepository(application)
+            val smsRepository = ServiceLocator.provideSmsRepository(application)
             val smsClassifier = SmsClassifier(application)
             val nerExtractor = NerExtractor(application)
             val transactionRunner = RoomTransactionRunner()

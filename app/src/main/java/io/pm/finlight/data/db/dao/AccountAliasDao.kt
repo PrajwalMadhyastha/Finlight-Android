@@ -34,4 +34,13 @@ interface AccountAliasDao {
      */
     @Query("DELETE FROM account_aliases")
     suspend fun deleteAll()
+
+    /**
+     * Reassigns existing account aliases from source accounts to a destination account.
+     */
+    @Query("UPDATE account_aliases SET destinationAccountId = :destinationAccountId WHERE destinationAccountId IN (:sourceAccountIds)")
+    suspend fun reassignAliases(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int,
+    )
 }

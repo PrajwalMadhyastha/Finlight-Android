@@ -15,26 +15,36 @@
         <include domain="sharedpref" path="."/>
         <!-- Exclude the file with the now-unusable encrypted key -->
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
-        <!-- NEW: Exclude the internal state file that tracks first launch -->
+        <!-- Exclude the internal state file that tracks first launch -->
         <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
 
         <!-- DO NOT include the 'database' domain for cloud backup. -->
         <!-- The restored .db file would be encrypted and unusable without the Keystore key. -->
 
-        <!-- THIS IS THE FIX: Include the 'file' domain, which contains backup_snapshot.gz -->
+        <!-- Include the 'file' domain, which contains backup_snapshot.gz -->
         <include domain="file" path="." />
-        <!-- But, exclude the large, non-essential image attachments from the backup -->
+        <!-- Exclude secure database passphrase storage file encrypted with device-bound Keystore key -->
+        <exclude domain="file" path="finlight_secure.dat" />
+        <!-- Exclude internal lifecycle state file so is_first_launch_complete is not preserved across devices -->
+        <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
+        <!-- Exclude large, non-essential image attachments from the backup -->
         <exclude domain="file" path="attachments/" />
     </cloud-backup>
 
     <device-transfer>
-        <!-- For device-to-device transfers, we can include everything -->
+        <!-- Include standard preferences -->
         <include domain="sharedpref" path="."/>
         <exclude domain="sharedpref" path="finlight_secure_prefs.xml" />
-        <!-- NEW: Exclude the internal state file here as well for consistency -->
         <exclude domain="sharedpref" path="finlight_internal_state.xml"/>
-        <include domain="database" path="." />
+
+        <!-- DO NOT include the 'database' domain for device-to-device transfers. -->
+        <!-- Android Keystore keys are hardware-bound and never transfer across devices. -->
+        <!-- Database restoration is handled seamlessly via backup_snapshot.gz. -->
+
         <include domain="file" path="." />
+        <!-- Exclude secure database passphrase storage file encrypted with device-bound Keystore key -->
+        <exclude domain="file" path="finlight_secure.dat" />
+        <exclude domain="file" path="datastore/finlight_internal_state.preferences_pb" />
         <exclude domain="file" path="attachments/" />
     </device-transfer>
 </data-extraction-rules>

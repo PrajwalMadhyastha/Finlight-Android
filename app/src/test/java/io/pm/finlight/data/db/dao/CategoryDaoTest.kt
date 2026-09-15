@@ -71,6 +71,52 @@ class CategoryDaoTest {
         }
 
     @Test
+    fun `getAllCategoriesSnapshot returns categories ordered by name`() =
+        runTest {
+            // Arrange
+            categoryDao.insertAll(
+                listOf(
+                    Category(name = "Zoo", iconKey = "", colorKey = ""),
+                    Category(name = "Apple", iconKey = "", colorKey = ""),
+                    Category(name = "Microsoft", iconKey = "", colorKey = ""),
+                ),
+            )
+
+            // Act
+            val categories = categoryDao.getAllCategoriesSnapshot()
+
+            // Assert
+            assertEquals(3, categories.size)
+            assertEquals("Apple", categories[0].name)
+            assertEquals("Microsoft", categories[1].name)
+            assertEquals("Zoo", categories[2].name)
+        }
+
+    @Test
+    fun `getAllCategoriesSnapshot returns empty list when table is empty`() =
+        runTest {
+            // Act
+            val categories = categoryDao.getAllCategoriesSnapshot()
+
+            // Assert
+            assertTrue(categories.isEmpty())
+        }
+
+    @Test
+    fun `getCategoryCount returns correct count`() =
+        runTest {
+            // Assert initial count is 0
+            assertEquals(0, categoryDao.getCategoryCount())
+
+            // Act & Assert after inserting items
+            categoryDao.insert(Category(name = "Cat1", iconKey = "icon1", colorKey = "color1"))
+            assertEquals(1, categoryDao.getCategoryCount())
+
+            categoryDao.insert(Category(name = "Cat2", iconKey = "icon2", colorKey = "color2"))
+            assertEquals(2, categoryDao.getCategoryCount())
+        }
+
+    @Test
     fun `getCategoryById returns correct category`() =
         runTest {
             // Arrange

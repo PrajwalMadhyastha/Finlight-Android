@@ -1,8 +1,7 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/db/dao/AccountDao.kt
-// REASON: FEATURE - Added a new synchronous `getAccountByIdBlocking` function.
-// This is required by the AccountRepository's transactional merge logic to
-// retrieve source account names before they are deleted.
+// REASON: Synchronous `getAccountByIdSync` and `getAllAccountsSnapshot` functions.
+// Required for snapshot lookups and transactional merge logic without Room Flow observer churn.
 // =================================================================================
 package io.pm.finlight.data.db.dao
 
@@ -44,15 +43,17 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY name ASC")
     fun getAllAccounts(): Flow<List<Account>>
 
+    @Query("SELECT * FROM accounts ORDER BY name ASC")
+    suspend fun getAllAccountsSnapshot(): List<Account>
+
     @Query("SELECT * FROM accounts WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findByName(name: String): Account?
 
     @Query("SELECT * FROM accounts WHERE id = :accountId")
     fun getAccountById(accountId: Int): Flow<Account?>
 
-    // --- NEW: Synchronous version for use within transactions ---
     @Query("SELECT * FROM accounts WHERE id = :accountId")
-    suspend fun getAccountByIdBlocking(accountId: Int): Account?
+    suspend fun getAccountByIdSync(accountId: Int): Account?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(accounts: List<Account>)

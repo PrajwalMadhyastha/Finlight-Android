@@ -9,6 +9,7 @@ import android.app.backup.BackupDataOutput
 import android.app.backup.FileBackupHelper
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
 import kotlinx.coroutines.flow.first
@@ -21,7 +22,6 @@ class FinlightBackupAgent : BackupAgentHelper() {
 
         // Relative paths from filesDir for DataStore files
         private const val DATASTORE_PREFS_FILE = "datastore/finance_app_settings.preferences_pb"
-        private const val DATASTORE_INTERNAL_FILE = "datastore/finlight_internal_state.preferences_pb"
         private const val DATASTORE_BACKUP_KEY = "finlight_datastore_prefs"
 
         // The specific snapshot file we want to back up
@@ -33,8 +33,8 @@ class FinlightBackupAgent : BackupAgentHelper() {
         super.onCreate()
         Log.d(TAG, "onCreate: Initializing BackupAgentHelper...")
 
-        // Helper for backing up DataStore preferences
-        FileBackupHelper(this, DATASTORE_PREFS_FILE, DATASTORE_INTERNAL_FILE).also {
+        // Helper for backing up user DataStore preferences (internal lifecycle state is excluded)
+        FileBackupHelper(this, DATASTORE_PREFS_FILE).also {
             addHelper(DATASTORE_BACKUP_KEY, it)
             Log.d(TAG, "onCreate: FileBackupHelper added for DataStore files.")
         }
@@ -57,13 +57,23 @@ class FinlightBackupAgent : BackupAgentHelper() {
         // Capture timestamp to use for both saving and notification
         val backupTime = System.currentTimeMillis()
 
-        // 1. Save the timestamp
+        // 1. Force a fresh database snapshot right now before files are packed
+        try {
+            runBlocking {
+                DataExportService.createBackupSnapshot(applicationContext)
+            }
+            Log.i(TAG, "onBackup: Fresh backup snapshot created successfully.")
+        } catch (e: Exception) {
+            Log.e(TAG, "onBackup: Failed to create fresh backup snapshot", e)
+        }
+
+        // 2. Save the timestamp
         runBlocking {
             backupSettingsRepository.saveLastBackupTimestamp(backupTime)
         }
         Log.i(TAG, "onBackup: Last backup timestamp saved.")
 
-        // 2. Let the system helpers do their work
+        // 3. Let the system helpers do their work
         try {
             super.onBackup(oldState, data, newState)
         } catch (e: Exception) {

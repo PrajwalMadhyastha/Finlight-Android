@@ -88,4 +88,17 @@ class CategoryDaoTest : BaseDaoTest() {
             assertEquals("Transport", found?.name)
         }
     }
+
+    @Test
+    fun getAllCategoriesSnapshot_returnsOrderedCategories() {
+        runBlocking {
+            categoryDao.insert(Category(name = "Shopping", iconKey = "shop", colorKey = "blue"))
+            categoryDao.insert(Category(name = "Bills", iconKey = "bill", colorKey = "red"))
+
+            val snapshot = categoryDao.getAllCategoriesSnapshot()
+            assertEquals(2, snapshot.size)
+            assertEquals("Bills", snapshot[0].name)
+            assertEquals("Shopping", snapshot[1].name)
+        }
+    }
 }

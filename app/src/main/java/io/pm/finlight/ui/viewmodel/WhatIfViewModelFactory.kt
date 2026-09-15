@@ -3,25 +3,14 @@ package io.pm.finlight
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.SystemTimeProvider
 
 class WhatIfViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(WhatIfViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = DefaultDispatcherProvider(),
-                )
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return WhatIfViewModel(

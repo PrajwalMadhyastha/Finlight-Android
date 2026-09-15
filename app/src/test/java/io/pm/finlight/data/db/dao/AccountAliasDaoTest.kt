@@ -90,4 +90,26 @@ class AccountAliasDaoTest {
             val allAliases = accountAliasDao.getAll()
             assertTrue(allAliases.isEmpty())
         }
+
+    @Test
+    fun `reassignAliases updates destinationAccountId for matching source accounts`() =
+        runTest {
+            // Arrange
+            val sourceId1 = accountDao.insert(Account(name = "Source 1", type = "Bank")).toInt()
+            val sourceId2 = accountDao.insert(Account(name = "Source 2", type = "Bank")).toInt()
+            val targetId = accountDao.insert(Account(name = "Target", type = "Bank")).toInt()
+
+            val alias1 = AccountAlias(aliasName = "Legacy Source 1", destinationAccountId = sourceId1)
+            val alias2 = AccountAlias(aliasName = "Legacy Source 2", destinationAccountId = sourceId2)
+            accountAliasDao.insertAll(listOf(alias1, alias2))
+
+            // Act
+            accountAliasDao.reassignAliases(listOf(sourceId1, sourceId2), targetId)
+
+            // Assert
+            val updated1 = accountAliasDao.findByAlias("Legacy Source 1")
+            val updated2 = accountAliasDao.findByAlias("Legacy Source 2")
+            assertEquals(targetId, updated1?.destinationAccountId)
+            assertEquals(targetId, updated2?.destinationAccountId)
+        }
 }

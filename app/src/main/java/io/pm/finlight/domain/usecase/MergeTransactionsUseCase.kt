@@ -240,7 +240,7 @@ class MergeTransactionsUseCase(
         if (records.isEmpty()) return emptyList()
 
         val anchorTxn = transactionQueryDao.getTransactionByIdSync(parentTxnId) ?: return emptyList()
-        val anchorAccount = db.accountDao().getAccountByIdBlocking(anchorTxn.accountId)
+        val anchorAccount = db.accountDao().getAccountByIdSync(anchorTxn.accountId)
 
         val entries = mutableListOf<MergedTransactionItem>()
 
@@ -278,7 +278,7 @@ class MergeTransactionsUseCase(
         )
 
         for (r in records) {
-            val childAccount = db.accountDao().getAccountByIdBlocking(r.childAccountId)
+            val childAccount = db.accountDao().getAccountByIdSync(r.childAccountId)
             entries.add(
                 MergedTransactionItem(
                     accountId = r.childAccountId,

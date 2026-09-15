@@ -9,7 +9,6 @@ package io.pm.finlight
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 
 /**
@@ -18,8 +17,7 @@ import io.pm.finlight.di.ServiceLocator
 class OnboardingViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val categoryRepository = CategoryRepository(db.categoryDao())
+            val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
 
             @Suppress("UNCHECKED_CAST")

@@ -90,6 +90,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null)) // Default to null
         runTest {
             `when`(settingsRepository.getOverallBudgetsForYear(anyInt())).thenReturn(emptyMap())
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
         }
         `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
         `when`(budgetRepository.getActualSpendingForCategory(anyString(), anyInt(), anyInt())).thenReturn(flowOf(0.0))
@@ -626,6 +627,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
 
             val categories = listOf(Category(1, "Food", "icon1", "color1"))
             `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(categories)
 
             val existingCatBudgets = listOf(Budget(1, "Food", 500.0, 1, year))
             `when`(budgetRepository.getBudgetsForCategoryAndYear("Food", year)).thenReturn(existingCatBudgets)

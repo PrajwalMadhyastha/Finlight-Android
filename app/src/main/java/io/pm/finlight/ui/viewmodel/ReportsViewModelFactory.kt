@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.ReportsViewModel
-import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -22,15 +21,7 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
                     transactionQueryDao = db.transactionQueryDao(),
                     dispatcherProvider = dispatcherProvider,
                 )
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = dispatcherProvider,
-                )
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(

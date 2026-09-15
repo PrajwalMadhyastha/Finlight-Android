@@ -26,15 +26,7 @@ class TimePeriodReportViewModelFactory(
                     transactionQueryDao = db.transactionQueryDao(),
                     dispatcherProvider = dispatcherProvider,
                 )
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = dispatcherProvider,
-                )
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(

@@ -14,7 +14,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
         if (modelClass.isAssignableFrom(TransactionViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val tagRepository = TagRepository(db.tagDao(), db.transactionQueryDao())
+            val tagRepository = ServiceLocator.provideTagRepository(application)
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
             val mergeTransactionsUseCase =
                 MergeTransactionsUseCase(
@@ -26,26 +26,22 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                     db = db,
                 )
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            val transactionRepository =
-                TransactionRepository(
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    db = db,
-                    dispatcherProvider = dispatcherProvider,
-                )
+            val manageReimbursementUseCase = ServiceLocator.provideManageReimbursementUseCase(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val accountRepository = ServiceLocator.provideAccountRepository(application)
+            val categoryRepository = ServiceLocator.provideCategoryRepository(application)
+            val smsRepository = ServiceLocator.provideSmsRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return TransactionViewModel(
                 application = application,
                 db = db,
                 transactionRepository = transactionRepository,
-                accountRepository = AccountRepository(db),
-                categoryRepository = CategoryRepository(db.categoryDao()),
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
                 tagRepository = tagRepository,
                 settingsRepository = settingsRepository,
-                smsRepository = SmsRepository(application),
+                smsRepository = smsRepository,
                 merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao()),
                 merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao()),
                 merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao()),
@@ -54,6 +50,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 dispatcherProvider = dispatcherProvider,
+                manageReimbursementUseCase = manageReimbursementUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

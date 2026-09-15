@@ -43,7 +43,7 @@ import kotlin.math.roundToLong
 class BudgetViewModel(
     private val budgetRepository: IBudgetRepository,
     private val settingsRepository: ISettingsRepository,
-    categoryRepository: ICategoryRepository,
+    private val categoryRepository: ICategoryRepository,
     // --- NEW: Add TransactionRepository dependency ---
     transactionRepository: ITransactionRepository,
 ) : ViewModel() {
@@ -286,7 +286,7 @@ class BudgetViewModel(
                 )
 
             // Categories
-            val categories = allCategories.firstOrNull() ?: emptyList()
+            val categories = categoryRepository.getAllCategoriesSnapshot()
             val categorySummaries =
                 categories.map { category ->
                     val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)

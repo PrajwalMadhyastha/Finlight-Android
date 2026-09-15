@@ -86,6 +86,18 @@ interface MergeRecordDao {
     @Query("SELECT * FROM merge_records WHERE parentTxnId = :parentTxnId ORDER BY mergedAt ASC")
     suspend fun getAllForParentAnyType(parentTxnId: Int): List<MergeRecord>
 
+    // ─── Account reassignment support ───────────────────────────────────────
+
+    /**
+     * Reassigns childAccountId for merge records when source accounts are merged into a destination account.
+     * Prevents foreign key constraint violations when unmerging transactions after an account merge.
+     */
+    @Query("UPDATE merge_records SET childAccountId = :destinationAccountId WHERE childAccountId IN (:sourceAccountIds)")
+    suspend fun reassignChildAccount(
+        sourceAccountIds: List<Int>,
+        destinationAccountId: Int
+    )
+
     // ─── Backup / restore parity ────────────────────────────────────────────
 
     @Query("SELECT * FROM merge_records")
