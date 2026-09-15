@@ -214,9 +214,11 @@ object ServiceLocator {
     fun provideTransactionRepository(context: Context): ITransactionRepository {
         return transactionRepository ?: synchronized(this) {
             transactionRepository ?: run {
+                // Obtain db once and pass it into the use-case provider to avoid a
+                // redundant AppDatabase.getInstance() call inside that chain (R4).
                 val db = AppDatabase.getInstance(context.applicationContext)
                 val dispatcherProvider = provideDispatcherProvider(context)
-                val manageReimbursement = provideManageReimbursementUseCase(context)
+                val manageReimbursement = provideManageReimbursementUseCase(context, db)
                 TransactionRepository(
                     transactionWriteDao = db.transactionWriteDao(),
                     transactionQueryDao = db.transactionQueryDao(),
@@ -232,10 +234,18 @@ object ServiceLocator {
         }
     }
 
-    fun provideManageReimbursementUseCase(context: Context): ManageReimbursementUseCase {
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideManageReimbursementUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ManageReimbursementUseCase {
         return manageReimbursementUseCase ?: synchronized(this) {
             manageReimbursementUseCase ?: run {
-                val db = AppDatabase.getInstance(context.applicationContext)
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 val dispatcherProvider = provideDispatcherProvider(context)
                 ManageReimbursementUseCase(
                     transactionQueryDao = db.transactionQueryDao(),
@@ -250,10 +260,18 @@ object ServiceLocator {
         }
     }
 
-    fun provideMergeAccountsUseCase(context: Context): MergeAccountsUseCase {
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMergeAccountsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): MergeAccountsUseCase {
         return mergeAccountsUseCase ?: synchronized(this) {
             mergeAccountsUseCase ?: run {
-                val db = AppDatabase.getInstance(context.applicationContext)
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 MergeAccountsUseCase(
                     accountDao = db.accountDao(),
                     accountAliasDao = db.accountAliasDao(),
@@ -273,8 +291,10 @@ object ServiceLocator {
     fun provideAccountRepository(context: Context): IAccountRepository {
         return accountRepository ?: synchronized(this) {
             accountRepository ?: run {
+                // Obtain db once and pass it into the use-case provider to avoid a
+                // redundant AppDatabase.getInstance() call inside that chain (R4).
                 val db = AppDatabase.getInstance(context.applicationContext)
-                val mergeAccounts = provideMergeAccountsUseCase(context)
+                val mergeAccounts = provideMergeAccountsUseCase(context, db)
                 AccountRepository(
                     accountDao = db.accountDao(),
                     accountAliasDao = db.accountAliasDao(),
