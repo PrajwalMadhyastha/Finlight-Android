@@ -126,6 +126,12 @@ class ManageReimbursementUseCase(
                 transactionWriteDao.updateAmount(incomeId, totalIncomeToRestore)
                 transactionReimbursementDao.unlinkReimbursement(incomeId)
                 if (expenseTxn != null) {
+                    // Use incomeTxn.amount (read before any modification above) as the offset
+                    // to add back onto the expense. At link time, exactly incomeTxn.amount was
+                    // deducted from the expense (the "offset" portion). In an over-repayment
+                    // scenario the surplus was split into a separate transaction, so
+                    // incomeTxn.amount here already reflects just the offset — not the full
+                    // original income. Adding it back precisely reverses the original deduction.
                     val restoredExpenseAmount = expenseTxn.amount + incomeTxn.amount
                     transactionWriteDao.updateAmount(parentId, restoredExpenseAmount)
                 }
