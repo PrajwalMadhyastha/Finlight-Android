@@ -111,6 +111,7 @@ class SmsCatchupWorker(
 
                     // --- HIERARCHY STEP 3: NER + main parser ---
                     val nerEntities = nerExtractor.extract(sms.body)
+                    Log.d(tag, "NER extraction complete. Entity types found: ${nerEntities.keys}")
                     parseResult =
                         SmsParser.parseWithReason(
                             sms = sms,

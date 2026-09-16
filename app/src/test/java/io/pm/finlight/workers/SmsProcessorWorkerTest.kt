@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import io.pm.finlight.core.NerEntity
 import org.junit.Before
@@ -490,10 +491,11 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
                 buildWorker("AM-HDFCBK", "Sensitive SMS content 99999.00 XX9876 SecretMerchant").doWork()
 
-                assertTrue(
-                    "Must log NER entity keys",
-                    logMessages.any { it.contains("NER extraction complete. Entity types found: [AMOUNT, ACCOUNT, MERCHANT]") },
-                )
+                val nerLog = logMessages.firstOrNull { it.contains("Entity types found") }
+                assertNotNull("Must have NER entity types log message", nerLog)
+                listOf("AMOUNT", "ACCOUNT", "MERCHANT").forEach { key ->
+                    assertTrue("NER log must contain key '$key'", nerLog!!.contains(key))
+                }
                 assertFalse(
                     "Must not log sensitive amount value",
                     logMessages.any { it.contains("99999.00") },
