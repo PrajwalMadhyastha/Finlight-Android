@@ -111,7 +111,7 @@ class SmsProcessorWorker(
             val nerEntities = nerExtractor.extract(body)
             nerExtractor.close()
 
-            Log.d(tag, "NER entities: $nerEntities")
+            Log.d(tag, "NER extraction complete. Entity types found: ${nerEntities.keys}")
 
             parseResult =
                 SmsParser.parseWithReason(

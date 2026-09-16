@@ -458,14 +458,14 @@ object SmsParser {
                     if (nerAmountConf != null && nerAmountConf < NER_CONFIDENCE_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "NER model uncertainty: AMOUNT confidence was ${"%.0f".format(nerAmountConf * 100)}% (threshold ${"%.0f".format(NER_CONFIDENCE_THRESHOLD * 100)}%)."
-                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SMS: ${sms.body.take(80)}")
+                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SenderHash: ${sms.sender.hashCode()}, Amount: $amount")
                     }
 
                     // Option A: Hard upper-bound threshold (₹1,00,000 by default)
                     if (!needsReview && amount > SUSPICIOUS_AMOUNT_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "Amount (₹${"%.2f".format(amount)}) exceeds the auto-save threshold of ₹${"%.0f".format(SUSPICIOUS_AMOUNT_THRESHOLD)}."
-                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SMS: ${sms.body.take(80)}")
+                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SenderHash: ${sms.sender.hashCode()}")
                     }
                     // -------------------------------------------------------------------
 
@@ -850,7 +850,7 @@ object SmsParser {
                 date = originalSms.date
             )
         } catch (e: Exception) {
-            System.err.println("[SmsParser]: Error applying heuristic template: ${e.message}")
+            System.err.println("[SmsParser]: Error applying heuristic template: ${e.javaClass.simpleName}")
             return null
         }
     }
