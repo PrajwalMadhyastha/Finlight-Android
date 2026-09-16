@@ -28,6 +28,10 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
+import io.pm.finlight.core.NerEntity
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -465,5 +469,47 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             buildWorker("AMZ", "Bill").doWork()
 
             verify(exactly = 1) { NotificationHelper.showMergeTransactionNotification(context, savedTxn, recentTxn) }
+        }
+
+    @Test
+    fun `ner entities log outputs only entity type keys and no sensitive entity values`() =
+        runTest {
+            mockkStatic(Log::class)
+            val logMessages = mutableListOf<String>()
+            every { Log.d(any(), capture(logMessages)) } returns 0
+
+            try {
+                val nerEntities =
+                    mapOf(
+                        "AMOUNT" to NerEntity("99999.00", 0.95f),
+                        "ACCOUNT" to NerEntity("XX9876", 0.90f),
+                        "MERCHANT" to NerEntity("SecretMerchant", 0.85f),
+                    )
+                every { mockNerExtractor.extract(any()) } returns nerEntities
+                coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+                coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Ignored("Ignored for test")
+
+                buildWorker("AM-HDFCBK", "Sensitive SMS content 99999.00 XX9876 SecretMerchant").doWork()
+
+                val nerLog = logMessages.firstOrNull { it.contains("Entity types found") }
+                assertNotNull("Must have NER entity types log message", nerLog)
+                listOf("AMOUNT", "ACCOUNT", "MERCHANT").forEach { key ->
+                    assertTrue("NER log must contain key '$key'", nerLog!!.contains(key))
+                }
+                assertFalse(
+                    "Must not log sensitive amount value",
+                    logMessages.any { it.contains("99999.00") },
+                )
+                assertFalse(
+                    "Must not log sensitive account value",
+                    logMessages.any { it.contains("XX9876") },
+                )
+                assertFalse(
+                    "Must not log sensitive merchant value",
+                    logMessages.any { it.contains("SecretMerchant") },
+                )
+            } finally {
+                unmockkStatic(Log::class)
+            }
         }
 }
