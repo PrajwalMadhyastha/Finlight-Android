@@ -236,7 +236,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // --- TEST FIX: Removed "Txn" from the start of the message body ---
             val sms1Body = "Update from MyBank. Order 123 completed. Val: 20."
             val sms1 = SmsMessage(1, "SENDER1", sms1Body, 1L)
-            val sms1Hash = (sms1.sender.filter { it.isDigit() }.takeLast(10) + sms1.body.replace(Regex("\\s+"), " ").trim()).hashCode().toString()
+            val sms1Hash = SmsParser.computeSmsHash(sms1.sender, sms1.body.replace(Regex("\\s+"), " ").trim())
             val successTxnRule =
                 CustomSmsRule(
                     id = 1,

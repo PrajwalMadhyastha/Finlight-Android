@@ -29,6 +29,7 @@ import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
 import io.pm.finlight.core.NerEntity
 import io.pm.finlight.core.utils.MerchantCleaner
 import io.pm.finlight.core.utils.StringSimilarity
+import java.security.MessageDigest
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 import kotlin.math.min
@@ -626,7 +627,7 @@ object SmsParser {
             PotentialAccount(cleaned, "Auto-Detected")
         } ?: parseAccount(normalizedBody, sender)
 
-        val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
+        val smsHash = computeSmsHash(sender, normalizedBody)
         val smsSignature = generateSmsSignature(normalizedBody)
 
         return Triple(
@@ -648,6 +649,13 @@ object SmsParser {
 
 
     // --- Private Helper Functions ---
+
+    fun computeSmsHash(sender: String, normalizedBody: String): String {
+        val preimage = "${sender.trim().lowercase()}|$normalizedBody"
+        return MessageDigest.getInstance("SHA-256")
+            .digest(preimage.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+    }
 
     fun generateSmsSignature(body: String): String {
         var signature = body.lowercase()
