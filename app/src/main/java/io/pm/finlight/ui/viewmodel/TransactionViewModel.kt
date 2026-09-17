@@ -1712,6 +1712,31 @@ class TransactionViewModel(
         currentTxnIdForTags = null
     }
 
+    private suspend fun isDuplicateOrDeletedSms(
+        potentialTxn: PotentialTransaction,
+        actionName: String,
+    ): Boolean {
+        val hash = potentialTxn.sourceSmsHash ?: return false
+        if (db.transactionQueryDao().existsBySmsHash(hash)) {
+            Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping $actionName.")
+            return true
+        }
+        val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+        if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+            Log.d(TAG, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading and skipping $actionName.")
+            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+            return true
+        }
+        if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
+            Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping $actionName.")
+            if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
+                db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+            }
+            return true
+        }
+        return false
+    }
+
     suspend fun approveSmsTransaction(
         potentialTxn: PotentialTransaction,
         description: String,
@@ -1722,24 +1747,8 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
-                potentialTxn.sourceSmsHash?.let { hash ->
-                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping approve.")
-                        return@withContext false
-                    }
-                    val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
-                    if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
-                        Log.d(TAG, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading and skipping approve.")
-                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
-                        return@withContext false
-                    }
-                    if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping approve.")
-                        if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                            db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
-                        }
-                        return@withContext false
-                    }
+                if (isDuplicateOrDeletedSms(potentialTxn, "approve")) {
+                    return@withContext false
                 }
 
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
@@ -1827,24 +1836,8 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
-                potentialTxn.sourceSmsHash?.let { hash ->
-                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping auto-save.")
-                        return@withContext false
-                    }
-                    val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
-                    if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
-                        Log.d(TAG, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading and skipping auto-save.")
-                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
-                        return@withContext false
-                    }
-                    if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping auto-save.")
-                        if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                            db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
-                        }
-                        return@withContext false
-                    }
+                if (isDuplicateOrDeletedSms(potentialTxn, "auto-save")) {
+                    return@withContext false
                 }
 
                 val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"

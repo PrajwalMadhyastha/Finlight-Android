@@ -270,6 +270,38 @@ class SettingsViewModel(
         return autoImportedCount
     }
 
+    private suspend fun filterAndUpgradePotentialTransactions(
+        parsedList: List<Pair<PotentialTransaction, String>>,
+        existingSmsHashes: MutableSet<String>,
+        deletedSmsHashes: MutableSet<String>,
+    ): List<PotentialTransaction> {
+        return parsedList.filter { (potential, legacyHash) ->
+            val currentHash = potential.sourceSmsHash
+            val isExisting =
+                (currentHash != null && existingSmsHashes.contains(currentHash)) ||
+                    existingSmsHashes.contains(legacyHash)
+            val isDeleted =
+                (currentHash != null && deletedSmsHashes.contains(currentHash)) ||
+                    deletedSmsHashes.contains(legacyHash)
+            if (isExisting) {
+                if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
+                    db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                    existingSmsHashes.remove(legacyHash)
+                    existingSmsHashes.add(currentHash)
+                }
+                false
+            } else if (isDeleted) {
+                if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
+                    db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                    deletedSmsHashes.add(currentHash)
+                }
+                false
+            } else {
+                true
+            }
+        }.map { it.first }
+    }
+
     fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
             onComplete(0)
@@ -356,31 +388,7 @@ class SettingsViewModel(
                     }
 
                 val newPotentialTransactions =
-                    parsedList.filter { (potential, legacyHash) ->
-                        val currentHash = potential.sourceSmsHash
-                        val isExisting =
-                            (currentHash != null && existingSmsHashes.contains(currentHash)) ||
-                                existingSmsHashes.contains(legacyHash)
-                        val isDeleted =
-                            (currentHash != null && deletedSmsHashes.contains(currentHash)) ||
-                                deletedSmsHashes.contains(legacyHash)
-                        if (isExisting) {
-                            if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
-                                db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-                                existingSmsHashes.remove(legacyHash)
-                                existingSmsHashes.add(currentHash)
-                            }
-                            false
-                        } else if (isDeleted) {
-                            if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
-                                db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
-                                deletedSmsHashes.add(currentHash)
-                            }
-                            false
-                        } else {
-                            true
-                        }
-                    }.map { it.first }
+                    filterAndUpgradePotentialTransactions(parsedList, existingSmsHashes, deletedSmsHashes)
 
                 for (potentialTxn in newPotentialTransactions) {
                     val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
@@ -517,31 +525,7 @@ class SettingsViewModel(
 
                     // Filter and Save this chunk
                     val newPotentialTransactions =
-                        parsedList.filter { (potential, legacyHash) ->
-                            val currentHash = potential.sourceSmsHash
-                            val isExisting =
-                                (currentHash != null && existingSmsHashes.contains(currentHash)) ||
-                                    existingSmsHashes.contains(legacyHash)
-                            val isDeleted =
-                                (currentHash != null && deletedSmsHashes.contains(currentHash)) ||
-                                    deletedSmsHashes.contains(legacyHash)
-                            if (isExisting) {
-                                if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
-                                    db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-                                    existingSmsHashes.remove(legacyHash)
-                                    existingSmsHashes.add(currentHash)
-                                }
-                                false
-                            } else if (isDeleted) {
-                                if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
-                                    db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
-                                    deletedSmsHashes.add(currentHash)
-                                }
-                                false
-                            } else {
-                                true
-                            }
-                        }.map { it.first }
+                        filterAndUpgradePotentialTransactions(parsedList, existingSmsHashes, deletedSmsHashes)
 
                     for (potentialTxn in newPotentialTransactions) {
                         if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
