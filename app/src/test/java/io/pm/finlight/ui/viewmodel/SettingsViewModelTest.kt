@@ -897,6 +897,328 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `rescanSmsWithNewRule skips already existing transaction under current hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            initializeViewModel()
+
+            var newTransactionCount = -1
+            viewModel.rescanSmsWithNewRule { count ->
+                newTransactionCount = count
+            }
+            advanceUntilIdle()
+
+            assertEquals(0, newTransactionCount)
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `rescanSmsWithNewRule skips transaction in deleted_sms_hashes under current hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            initializeViewModel()
+
+            var newTransactionCount = -1
+            viewModel.rescanSmsWithNewRule { count ->
+                newTransactionCount = count
+            }
+            advanceUntilIdle()
+
+            assertEquals(0, newTransactionCount)
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings parses filters and auto-saves new transactions`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            var autoSaveCalled = false
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+                autoSaveCalled = true
+                true
+            }
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+            initializeViewModel()
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                var importedCount = -1
+                viewModel.startSmsScanAndIdentifyMappings(null) { count ->
+                    importedCount = count
+                }
+                advanceUntilIdle()
+
+                assertEquals(1, importedCount)
+                assertTrue(autoSaveCalled)
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings skips and upgrades transaction existing under legacy hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            var autoSaveCalled = false
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+                autoSaveCalled = true
+                true
+            }
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+            initializeViewModel()
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                var importedCount = -1
+                viewModel.startSmsScanAndIdentifyMappings(null) { count ->
+                    importedCount = count
+                }
+                advanceUntilIdle()
+
+                assertEquals(0, importedCount)
+                verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                assertFalse(autoSaveCalled)
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings skips already existing transaction under current hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            var autoSaveCalled = false
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+                autoSaveCalled = true
+                true
+            }
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+            initializeViewModel()
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                var importedCount = -1
+                viewModel.startSmsScanAndIdentifyMappings(null) { count ->
+                    importedCount = count
+                }
+                advanceUntilIdle()
+
+                assertEquals(0, importedCount)
+                assertFalse(autoSaveCalled)
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings skips and upgrades transaction in deleted_sms_hashes under legacy hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(legacyHash))
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            var autoSaveCalled = false
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+                autoSaveCalled = true
+                true
+            }
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+            initializeViewModel()
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                var importedCount = -1
+                viewModel.startSmsScanAndIdentifyMappings(null) { count ->
+                    importedCount = count
+                }
+                advanceUntilIdle()
+
+                assertEquals(0, importedCount)
+                verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+                assertFalse(autoSaveCalled)
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings skips transaction in deleted_sms_hashes under current hash`() =
+        runTest {
+            val sender = "VK-HDFCBK"
+            val body = "spent Rs 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val sms = SmsMessage(1, sender, body, 1L)
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+
+            var autoSaveCalled = false
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+                autoSaveCalled = true
+                true
+            }
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+            initializeViewModel()
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                var importedCount = -1
+                viewModel.startSmsScanAndIdentifyMappings(null) { count ->
+                    importedCount = count
+                }
+                advanceUntilIdle()
+
+                assertEquals(0, importedCount)
+                assertFalse(autoSaveCalled)
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
     fun `setAutoCaptureNotificationEnabled calls repository`() =
         runTest {
             // Arrange

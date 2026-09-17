@@ -364,4 +364,40 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
             coVerify(exactly = 1) { mockDeletedDao.insert(match { it.smsHash == potentialTxn.sourceSmsHash }) }
         }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null when current hash is in deleted deny-list`() =
+        runTest {
+            val potentialTxn = makeTxn()
+            val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+
+            val mockDeletedDao = mockk<DeletedSmsHashDao>(relaxed = true)
+            every { db.deletedSmsHashDao() } returns mockDeletedDao
+            coEvery { mockDeletedDao.existsByHash(potentialTxn.sourceSmsHash!!) } returns true
+            coEvery { mockDeletedDao.existsByHash(legacyHash) } returns false
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash(any()) } returns false
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNull(id)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockDeletedDao.insert(any()) }
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction succeeds when sourceSmsHash is null`() =
+        runTest {
+            val potentialTxn = makeTxn().copy(sourceSmsHash = null)
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNotNull(id)
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
+        }
 }
