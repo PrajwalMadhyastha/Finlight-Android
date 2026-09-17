@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.first
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
@@ -73,9 +74,9 @@ class SmsProcessorWorker(
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
+        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toMutableSet()
         // Permanently skipped hashes (user deliberately deleted these transactions).
-        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
+        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toMutableSet()
 
         // --- Build providers ---
         val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
@@ -146,8 +147,25 @@ class SmsProcessorWorker(
 
         // --- Duplicate guard ---
         val hash = potentialTxn.sourceSmsHash
-        if (hash == null || hash in existingSmsHashes || hash in deletedHashes || db.transactionQueryDao().existsBySmsHash(hash)) {
+        val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+        if (hash == null ||
+            hash in existingSmsHashes || legacyHash in existingSmsHashes ||
+            hash in deletedHashes || legacyHash in deletedHashes ||
+            db.transactionQueryDao().existsBySmsHash(hash) ||
+            db.transactionQueryDao().existsBySmsHash(legacyHash)
+        ) {
             Log.d(tag, "SMS already processed or intentionally deleted (hash match). Skipping.")
+            if (hash != null) {
+                if (legacyHash in existingSmsHashes || db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                    db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+                    existingSmsHashes.remove(legacyHash)
+                    existingSmsHashes.add(hash)
+                }
+                if (legacyHash in deletedHashes) {
+                    db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+                    deletedHashes.add(hash)
+                }
+            }
             return Result.success()
         }
 

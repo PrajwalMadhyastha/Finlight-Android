@@ -466,4 +466,130 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             assertFalse(result)
             verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
         }
+
+    @Test
+    fun `approveSmsTransaction returns false and updates hash when legacy sourceSmsHash exists in database`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false and updates hash when legacy sourceSmsHash exists in database`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false when current sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(true)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(false)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false and inserts upgraded hash when legacy sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false when current sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(true)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(false)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false and inserts upgraded hash when legacy sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
 }

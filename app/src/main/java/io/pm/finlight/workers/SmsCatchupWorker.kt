@@ -24,6 +24,7 @@ import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
@@ -68,7 +69,7 @@ class SmsCatchupWorker(
 
         // Load deleted hashes — transactions the user intentionally removed should
         // never be re-created by this worker, even if their SMS reappears in the inbox.
-        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
+        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toMutableSet()
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
@@ -129,15 +130,33 @@ class SmsCatchupWorker(
                 if (parseResult !is ParseResult.Success) continue
 
                 val potentialTxn = parseResult.transaction
-                val hash = potentialTxn.sourceSmsHash ?: continue
+                val currentHash = potentialTxn.sourceSmsHash ?: continue
+                val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
 
                 // Skip if already in DB, already saved during this run,
                 // or intentionally deleted by the user.
-                if (hash in existingSmsHashes || hash in deletedHashes || hash in savedHashesThisRun) continue
+                if (currentHash in existingSmsHashes || legacyHash in existingSmsHashes ||
+                    currentHash in deletedHashes || legacyHash in deletedHashes ||
+                    currentHash in savedHashesThisRun
+                ) {
+                    if (legacyHash in existingSmsHashes) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                        existingSmsHashes.remove(legacyHash)
+                        existingSmsHashes.add(currentHash)
+                    }
+                    if (legacyHash in deletedHashes) {
+                        db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                        deletedHashes.add(currentHash)
+                    }
+                    continue
+                }
 
                 // Dynamic TOCTOU check against DB in case real-time worker saved it concurrently
-                if (db.transactionQueryDao().existsBySmsHash(hash)) {
-                    existingSmsHashes.add(hash)
+                if (db.transactionQueryDao().existsBySmsHash(currentHash) || db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                    if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                    }
+                    existingSmsHashes.add(currentHash)
                     continue
                 }
 
@@ -150,8 +169,8 @@ class SmsCatchupWorker(
                     )
 
                 if (newId != null) {
-                    existingSmsHashes.add(hash)
-                    savedHashesThisRun.add(hash)
+                    existingSmsHashes.add(currentHash)
+                    savedHashesThisRun.add(currentHash)
                     savedCount++
                     Log.d(tag, "Recovered missed transaction: ${potentialTxn.merchantName} (₹${potentialTxn.amount})")
                 }

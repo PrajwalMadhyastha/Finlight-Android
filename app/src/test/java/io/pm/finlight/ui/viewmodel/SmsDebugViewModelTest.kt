@@ -75,6 +75,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
+    @Mock private lateinit var deletedSmsHashDao: DeletedSmsHashDao
+
     private lateinit var viewModel: SmsDebugViewModel
 
     @Before
@@ -91,6 +93,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
         `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
         `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
+        `when`(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         `when`(application.applicationContext).thenReturn(application)
 
@@ -108,6 +111,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // --- FIX: Add missing mock for getTemplatesBySignature to prevent NPE ---
             `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
             `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
             `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
         }
 

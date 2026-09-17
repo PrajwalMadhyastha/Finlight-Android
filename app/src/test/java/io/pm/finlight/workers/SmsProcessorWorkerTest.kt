@@ -60,6 +60,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     private lateinit var mockClassifier: SmsClassifier
     private lateinit var mockNerExtractor: NerExtractor
     private lateinit var recurringDao: RecurringTransactionDao
+    private lateinit var deletedSmsHashDao: DeletedSmsHashDao
     private lateinit var mockSettingsRepo: ISettingsRepository
 
     private fun buildWorker(
@@ -121,6 +122,10 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         every { db.tagDao() } returns tagDao
         every { db.recurringTransactionDao() } returns recurringDao
 
+        deletedSmsHashDao = mockk(relaxed = true)
+        every { db.deletedSmsHashDao() } returns deletedSmsHashDao
+        coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
+
         coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
         coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
         coEvery { customSmsRuleDao.getAllRules() } returns flowOf(emptyList())
@@ -164,6 +169,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         Shadows.shadowOf(context as Application).grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
 
         mockkObject(SmsParser)
+        every { SmsParser.computeLegacySmsHash(any(), any()) } answers { callOriginal() }
+        every { SmsParser.computeSmsHash(any(), any()) } answers { callOriginal() }
     }
 
     @After
@@ -511,5 +518,68 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             } finally {
                 unmockkStatic(Log::class)
             }
+        }
+
+    @Test
+    fun `skips and upgrades duplicate when legacy 32-bit hash exists in DB`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val body = "Spent Rs.100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = sender,
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Swiggy",
+                    originalMessage = body,
+                    sourceSmsHash = currentHash,
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            // Legacy hash exists in DB
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf(legacyHash))
+            coEvery { transactionWriteDao.updateSmsHashByLegacy(any(), any()) } just runs
+
+            val result = buildWorker(sender, body).doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) { transactionWriteDao.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash) }
+        }
+
+    @Test
+    fun `skips and auto-heals deleted record when legacy hash is in deleted deny-list`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val body = "Spent Rs.100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, body)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = sender,
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Swiggy",
+                    originalMessage = body,
+                    sourceSmsHash = currentHash,
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            coEvery { deletedSmsHashDao.getAllHashes() } returns listOf(legacyHash)
+            coEvery { deletedSmsHashDao.insert(any()) } just runs
+
+            val result = buildWorker(sender, body).doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) { deletedSmsHashDao.insert(match { it.smsHash == currentHash }) }
         }
 }

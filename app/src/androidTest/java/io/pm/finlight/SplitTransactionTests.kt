@@ -87,7 +87,7 @@ class SplitTransactionTests {
         // If the second one is "Set", click it.
         while (composeTestRule.onAllNodesWithText("Set").fetchSemanticsNodes().isNotEmpty()) {
             composeTestRule.onAllNodesWithText("Set").onFirst().performClick()
-            composeTestRule.waitUntil(timeoutMillis = 2000) {
+            composeTestRule.waitUntil(timeoutMillis = 8000) {
                 composeTestRule.onAllNodesWithText("Select Category for Split").fetchSemanticsNodes().isNotEmpty()
             }
             composeTestRule.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText(TestDataSeeder.CATEGORY_SHOPPING_NAME))

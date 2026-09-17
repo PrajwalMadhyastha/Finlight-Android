@@ -25,6 +25,7 @@
 // =================================================================================
 package io.pm.finlight
 
+import androidx.annotation.VisibleForTesting
 import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
 import io.pm.finlight.core.NerEntity
 import io.pm.finlight.core.utils.MerchantCleaner
@@ -650,11 +651,50 @@ object SmsParser {
 
     // --- Private Helper Functions ---
 
-    fun computeSmsHash(sender: String, normalizedBody: String): String {
-        val preimage = "${sender.trim().lowercase()}|$normalizedBody"
-        return MessageDigest.getInstance("SHA-256")
-            .digest(preimage.toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+    private val HEX_CHARS = "0123456789abcdef".toCharArray()
+    private val SHA_256_DIGEST =
+        object : ThreadLocal<MessageDigest>() {
+            override fun initialValue(): MessageDigest = MessageDigest.getInstance("SHA-256")
+        }
+
+    private fun bytesToHex(bytes: ByteArray): String {
+        val result = CharArray(bytes.size * 2)
+        var index = 0
+        for (b in bytes) {
+            val v = b.toInt() and 0xFF
+            result[index++] = HEX_CHARS[v ushr 4]
+            result[index++] = HEX_CHARS[v and 0x0F]
+        }
+        return String(result)
+    }
+
+    /**
+     * Computes legacy 32-bit `hashCode().toString()` string used by versions prior to Issue #304.
+     *
+     * Used exclusively for backward-compatibility lookup and in-flight SQLite migration
+     * (`updateSmsHashByLegacy`) to prevent duplicate transactions on existing user databases.
+     */
+    @VisibleForTesting
+    fun computeLegacySmsHash(sender: String, body: String): String {
+        val normalized = body.replace(Regex("\\s+"), " ").trim()
+        return (sender.filter { it.isDigit() }.takeLast(10) + normalized).hashCode().toString()
+    }
+
+    /**
+     * Computes a deterministic 64-character SHA-256 hex digest for an SMS message.
+     *
+     * Preimage structure: `"<cleanSenderLength>:<cleanSender>|<normalizedBody>"`
+     * Sender is trimmed and lowercased. Body whitespace is collapsed and trimmed.
+     * Delimiter length-prefixing guarantees boundary safety against delimiter injection.
+     */
+    @VisibleForTesting
+    fun computeSmsHash(sender: String, body: String): String {
+        val cleanSender = sender.trim().lowercase()
+        val normalized = body.replace(Regex("\\s+"), " ").trim()
+        val preimage = "${cleanSender.length}:$cleanSender|$normalized"
+        val digest = SHA_256_DIGEST.get()!!.apply { reset() }
+        val hashBytes = digest.digest(preimage.toByteArray(Charsets.UTF_8))
+        return bytesToHex(hashBytes)
     }
 
     fun generateSmsSignature(body: String): String {

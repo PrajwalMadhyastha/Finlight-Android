@@ -23,6 +23,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
@@ -288,7 +289,11 @@ class SettingsViewModel(
                     }
                 val existingSmsHashes =
                     withContext(dispatchers.io) {
-                        transactionRepository.getAllSmsHashes().first().toSet()
+                        transactionRepository.getAllSmsHashes().first().toMutableSet()
+                    }
+                val deletedSmsHashes =
+                    withContext(dispatchers.io) {
+                        db.deletedSmsHashDao().getAllHashes().toMutableSet()
                     }
 
                 val categoryFinderProvider =
@@ -328,30 +333,60 @@ class SettingsViewModel(
                     withContext(dispatchers.default) {
                         rawMessages.map { sms ->
                             async {
-                                SmsParser.parse(
-                                    sms,
-                                    existingMappings,
-                                    customSmsRuleProvider,
-                                    merchantRenameRuleProvider,
-                                    ignoreRuleProvider,
-                                    merchantCategoryMappingProvider,
-                                    categoryFinderProvider,
-                                    smsParseTemplateProvider,
-                                    nerEntities = nerExtractor.extract(sms.body),
-                                )
+                                val potential =
+                                    SmsParser.parse(
+                                        sms,
+                                        existingMappings,
+                                        customSmsRuleProvider,
+                                        merchantRenameRuleProvider,
+                                        ignoreRuleProvider,
+                                        merchantCategoryMappingProvider,
+                                        categoryFinderProvider,
+                                        smsParseTemplateProvider,
+                                        nerEntities = nerExtractor.extract(sms.body),
+                                    )
+                                if (potential != null) {
+                                    val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                                    Pair(potential, legacyHash)
+                                } else {
+                                    null
+                                }
                             }
                         }.awaitAll().filterNotNull()
                     }
 
                 val newPotentialTransactions =
-                    parsedList.filter { potential ->
-                        !existingSmsHashes.contains(potential.sourceSmsHash)
-                    }
+                    parsedList.filter { (potential, legacyHash) ->
+                        val currentHash = potential.sourceSmsHash
+                        val isExisting =
+                            (currentHash != null && existingSmsHashes.contains(currentHash)) ||
+                                existingSmsHashes.contains(legacyHash)
+                        val isDeleted =
+                            (currentHash != null && deletedSmsHashes.contains(currentHash)) ||
+                                deletedSmsHashes.contains(legacyHash)
+                        if (isExisting) {
+                            if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
+                                db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                                existingSmsHashes.remove(legacyHash)
+                                existingSmsHashes.add(currentHash)
+                            }
+                            false
+                        } else if (isDeleted) {
+                            if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
+                                db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                                deletedSmsHashes.add(currentHash)
+                            }
+                            false
+                        } else {
+                            true
+                        }
+                    }.map { it.first }
 
                 for (potentialTxn in newPotentialTransactions) {
                     val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
                     if (success) {
                         newTransactionsFound++
+                        potentialTxn.sourceSmsHash?.let { existingSmsHashes.add(it) }
                     }
                 }
             } catch (e: Exception) {
@@ -398,7 +433,8 @@ class SettingsViewModel(
                     withContext(
                         dispatchers.io,
                     ) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
-                val existingSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllSmsHashes().first().toSet() }
+                val existingSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllSmsHashes().first().toMutableSet() }
+                val deletedSmsHashes = withContext(dispatchers.io) { db.deletedSmsHashDao().getAllHashes().toMutableSet() }
 
                 val categoryFinderProvider =
                     object : CategoryFinderProvider {
@@ -468,17 +504,49 @@ class SettingsViewModel(
                                                 )
                                         }
                                     }
-                                    (parseResult as? ParseResult.Success)?.transaction
+                                    val txn = (parseResult as? ParseResult.Success)?.transaction
+                                    if (txn != null) {
+                                        val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                                        Pair(txn, legacyHash)
+                                    } else {
+                                        null
+                                    }
                                 }
                             }.awaitAll().filterNotNull()
                         }
 
                     // Filter and Save this chunk
-                    val newPotentialTransactions = parsedList.filter { !existingSmsHashes.contains(it.sourceSmsHash) }
+                    val newPotentialTransactions =
+                        parsedList.filter { (potential, legacyHash) ->
+                            val currentHash = potential.sourceSmsHash
+                            val isExisting =
+                                (currentHash != null && existingSmsHashes.contains(currentHash)) ||
+                                    existingSmsHashes.contains(legacyHash)
+                            val isDeleted =
+                                (currentHash != null && deletedSmsHashes.contains(currentHash)) ||
+                                    deletedSmsHashes.contains(legacyHash)
+                            if (isExisting) {
+                                if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
+                                    db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                                    existingSmsHashes.remove(legacyHash)
+                                    existingSmsHashes.add(currentHash)
+                                }
+                                false
+                            } else if (isDeleted) {
+                                if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
+                                    db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                                    deletedSmsHashes.add(currentHash)
+                                }
+                                false
+                            } else {
+                                true
+                            }
+                        }.map { it.first }
 
                     for (potentialTxn in newPotentialTransactions) {
                         if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
                             autoImportedCount++
+                            potentialTxn.sourceSmsHash?.let { existingSmsHashes.add(it) }
                         }
                     }
 
