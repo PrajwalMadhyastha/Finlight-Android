@@ -36,6 +36,12 @@ interface TransactionWriteDao {
     @Query("DELETE FROM transactions")
     suspend fun deleteAll()
 
+    @Query("UPDATE transactions SET sourceSmsHash = :newHash WHERE sourceSmsHash = :oldHash")
+    suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String
+    )
+
     @Query("UPDATE transactions SET description = :description WHERE id = :id")
     suspend fun updateDescription(
         id: Int,
