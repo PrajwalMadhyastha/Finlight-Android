@@ -22,6 +22,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -503,5 +504,52 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             assertNull(idNegInf)
             coVerify(exactly = 0) { accountDao.insert(any()) }
             coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `sub-60 multi-sentence account hallucination is truncated at sentence break`() =
+        runTest {
+            val multiSentenceAccount = "A/c debited. Do not share OTP."
+            val expectedCleanName = "A/c debited"
+
+            coEvery { accountAliasDao.findByAlias(expectedCleanName) } returns null
+            coEvery { accountDao.findByName(expectedCleanName) } returns null
+            coEvery { accountDao.insert(any()) } returns 45L
+            coEvery { accountDao.getAccountByIdSync(45) } returns Account(45, expectedCleanName, "Bank Account")
+
+            val id = saver.resolveAndSaveTransaction(makeTxn(account = multiSentenceAccount))
+
+            assertNotNull(id)
+            val insertedAccountSlot = slot<Account>()
+            coVerify { accountDao.insert(capture(insertedAccountSlot)) }
+            assertEquals(expectedCleanName, insertedAccountSlot.captured.name)
+        }
+
+    @Test
+    fun `foreign transaction with non-positive or invalid conversion rate falls back to 1_0`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            val captor = slot<Transaction>()
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 56L
+
+            val zeroRateSettings =
+                TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 0f,
+                )
+
+            saver.resolveAndSaveTransaction(makeTxn().copy(amount = 150.0), isForeign = true, travelSettings = zeroRateSettings)
+            assertEquals(150.0, captor.captured.amount, 0.001)
+            assertEquals(1.0, captor.captured.conversionRate ?: 0.0, 0.001)
+
+            val nanRateSettings =
+                TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = Float.NaN,
+                )
+            saver.resolveAndSaveTransaction(makeTxn().copy(amount = 200.0), isForeign = true, travelSettings = nanRateSettings)
+            assertEquals(200.0, captor.captured.amount, 0.001)
+            assertEquals(1.0, captor.captured.conversionRate ?: 0.0, 0.001)
         }
 }

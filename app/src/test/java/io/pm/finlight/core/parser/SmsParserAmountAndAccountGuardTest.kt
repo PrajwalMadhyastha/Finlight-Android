@@ -382,6 +382,30 @@ class SmsParserAmountAndAccountGuardTest : BaseSmsParserTest() {
     }
 
     @Test
+    fun `sanitizeAccountName converts newlines and tabs to spaces and collapses whitespace`() {
+        assertEquals("HDFC Bank", SmsParser.sanitizeAccountName("HDFC\nBank"))
+        assertEquals("ICICI Bank", SmsParser.sanitizeAccountName("ICICI\tBank"))
+        assertEquals("Axis Bank A/c 1234", SmsParser.sanitizeAccountName("Axis\n\r\tBank\n\nA/c\t1234"))
+        assertEquals("SBI Bank Card", SmsParser.sanitizeAccountName("  SBI   Bank \n\t Card  "))
+    }
+
+    @Test
+    fun `sanitizeAccountName truncates sub-60 multi-sentence string at sentence boundary`() {
+        assertEquals("A/c debited", SmsParser.sanitizeAccountName("A/c debited. Do not share OTP."))
+        assertEquals("Account debited", SmsParser.sanitizeAccountName("Account debited. Do not share OTP."))
+        assertEquals("Alert", SmsParser.sanitizeAccountName("Alert! Do not share OTP."))
+        assertEquals("Unknown query", SmsParser.sanitizeAccountName("Unknown query? Check later."))
+    }
+
+    @Test
+    fun `sanitizeAccountName preserves legitimate abbreviations followed by period`() {
+        assertEquals("Account No. X1234", SmsParser.sanitizeAccountName("Account No. X1234"))
+        assertEquals("Acc No. 1234", SmsParser.sanitizeAccountName("Acc No. 1234"))
+        assertEquals("Card no. XX1234", SmsParser.sanitizeAccountName("Card no. XX1234"))
+        assertEquals("HDFC Bank Ltd. A/c 1234", SmsParser.sanitizeAccountName("HDFC Bank Ltd. A/c 1234"))
+    }
+
+    @Test
     fun `NER hallucinated multi-sentence account entity is sanitized to max 60 chars`() =
         runBlocking {
             setupTest()
@@ -417,6 +441,44 @@ class SmsParserAmountAndAccountGuardTest : BaseSmsParserTest() {
             assertNotNull("potentialAccount must not be null", formattedName)
             assertTrue("Account name must not exceed 60 chars (was ${formattedName!!.length})", formattedName.length <= 60)
             assertTrue("Must not contain control characters", !formattedName.contains(Regex("[\\p{Cc}\\p{Cf}]")))
+            assertEquals("Your Account Ending In 1234 Has Been Debited By Rs 500 For A", formattedName)
+        }
+
+    @Test
+    fun `sub-60-character NER multi-sentence account entity is truncated at first sentence`() =
+        runBlocking {
+            setupTest()
+            val sub60Hallucination = "A/c debited. Do not share OTP."
+            val sms =
+                SmsMessage(
+                    id = 1L,
+                    sender = "VK-HDFCBK",
+                    body = "debited by Rs 500.00 for Coffee at Starbucks",
+                    date = System.currentTimeMillis(),
+                )
+            val nerEntities =
+                mapOf(
+                    "ACCOUNT" to NerEntity(value = sub60Hallucination, confidence = 0.9f),
+                )
+
+            val result =
+                SmsParser.parseWithReason(
+                    sms = sms,
+                    mappings = emptyMappings,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    ignoreRuleProvider = ignoreRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+
+            assertTrue("Expected ParseResult.Success but got $result", result is ParseResult.Success)
+            val success = result as ParseResult.Success
+            val formattedName = success.transaction.potentialAccount?.formattedName
+            assertNotNull("potentialAccount must not be null", formattedName)
+            assertEquals("A/c Debited", formattedName)
         }
 
     @Test
@@ -453,5 +515,121 @@ class SmsParserAmountAndAccountGuardTest : BaseSmsParserTest() {
             val formattedName = success.transaction.potentialAccount?.formattedName
             assertNotNull("Regex parser should have extracted account name as fallback", formattedName)
             assertEquals("HDFC Bank A/c X1234", formattedName)
+        }
+
+    @Test
+    fun `NER account entity with unprintable control characters falls back to regex account parser`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 1L,
+                    sender = "VK-HDFCBK",
+                    body = "debited by Rs 100.00 from your HDFC Bank A/c X1234 for Coffee at Starbucks",
+                    date = System.currentTimeMillis(),
+                )
+            val nerEntities =
+                mapOf(
+                    "ACCOUNT" to NerEntity(value = "\u0000\u0001\u001F\u200B", confidence = 0.9f),
+                )
+
+            val result =
+                SmsParser.parseWithReason(
+                    sms = sms,
+                    mappings = emptyMappings,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    ignoreRuleProvider = ignoreRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+
+            assertTrue("Expected ParseResult.Success but got $result", result is ParseResult.Success)
+            val success = result as ParseResult.Success
+            val formattedName = success.transaction.potentialAccount?.formattedName
+            assertNotNull("Regex parser should have extracted account name as fallback", formattedName)
+            assertEquals("HDFC Bank A/c X1234", formattedName)
+        }
+
+    @Test
+    fun `parseWithOnlyCustomRules sanitizes extracted account name`() =
+        runBlocking {
+            val rule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "custom debit",
+                    merchantRegex = "at (\\w+)",
+                    amountRegex = "custom debit (\\d+\\.\\d+)",
+                    accountRegex = "from (.*?) at",
+                    merchantNameExample = "merchant",
+                    amountExample = "100.00",
+                    accountNameExample = "HDFC\nBank",
+                    priority = 1,
+                    sourceSmsBody = "custom debit 100.00 from HDFC\nBank at merchant",
+                    transactionType = "expense",
+                )
+            setupTest(customRules = listOf(rule))
+            val sms =
+                SmsMessage(
+                    id = 1L,
+                    sender = "TEST",
+                    body = "custom debit 100.00 from HDFC\nBank at merchant",
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parseWithOnlyCustomRules(
+                    sms = sms,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                )
+
+            assertTrue("Expected ParseResult.Success but got $result", result is ParseResult.Success)
+            val success = result as ParseResult.Success
+            assertEquals("HDFC Bank", success.transaction.potentialAccount?.formattedName)
+        }
+
+    @Test
+    fun `parseWithOnlyCustomRules falls back to parseAccount when accountRegex extracts control characters`() =
+        runBlocking {
+            val rule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "custom debit",
+                    merchantRegex = "at (\\w+)",
+                    amountRegex = "custom debit (\\d+\\.\\d+)",
+                    accountRegex = "from (.*?) at",
+                    merchantNameExample = "merchant",
+                    amountExample = "100.00",
+                    accountNameExample = "\u0000",
+                    priority = 1,
+                    sourceSmsBody = "custom debit 100.00 from \u0000 at merchant from your HDFC Bank A/c X1234",
+                    transactionType = "expense",
+                )
+            setupTest(customRules = listOf(rule))
+            val sms =
+                SmsMessage(
+                    id = 1L,
+                    sender = "TEST",
+                    body = "custom debit 100.00 from \u0000 at merchant from your HDFC Bank A/c X1234",
+                    date = System.currentTimeMillis(),
+                )
+
+            val result =
+                SmsParser.parseWithOnlyCustomRules(
+                    sms = sms,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                )
+
+            assertTrue("Expected ParseResult.Success but got $result", result is ParseResult.Success)
+            val success = result as ParseResult.Success
+            assertEquals("HDFC Bank A/c X1234", success.transaction.potentialAccount?.formattedName)
         }
 }

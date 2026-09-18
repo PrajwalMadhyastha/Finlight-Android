@@ -50,19 +50,27 @@ sealed class ParseResult {
 object SmsParser {
 
     val ACCOUNT_CONTROL_CHARS_REGEX = Regex("[\\p{Cc}\\p{Cf}]")
+    private val SENTENCE_BREAK_REGEX = Regex("""(?<!\b(?:No|no|Acc|acc|Ltd|ltd))[.?!]\s+""")
 
     /**
-     * Sanitizes an account name string by stripping control characters and format characters,
-     * trimming whitespace, capping at 60 characters, and falling back to "Unknown Account"
-     * if empty or blank.
+     * Sanitizes an account name string by replacing line breaks and tabs with space,
+     * stripping control and format characters, collapsing whitespace, truncating at
+     * sentence-breaking punctuation, capping at 60 characters, and falling back to
+     * "Unknown Account" if empty or blank.
      */
     fun sanitizeAccountName(rawName: String?): String {
-        return (rawName ?: "Unknown Account")
+        if (rawName == null) return "Unknown Account"
+        return rawName
+            .replace(Regex("[\\r\\n\\t]"), " ")
             .replace(ACCOUNT_CONTROL_CHARS_REGEX, "")
-            .trim()
-            .take(60)
-            .trim()
-            .ifBlank { "Unknown Account" }
+            .replace(Regex("\\s+"), " ")
+            .split(SENTENCE_BREAK_REGEX)
+            .firstOrNull()
+            ?.trim()
+            ?.take(60)
+            ?.trim()
+            ?.ifBlank { "Unknown Account" }
+            ?: "Unknown Account"
     }
 
     /**
@@ -315,7 +323,11 @@ object SmsParser {
                         }
                     }
 
-                    var finalAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") }
+                    var finalAccount =
+                        customAccountStr?.let {
+                            val sanitized = sanitizeAccountName(it)
+                            if (sanitized == "Unknown Account") null else PotentialAccount(sanitized, "Unknown")
+                        }
                     if (finalAccount == null) {
                         finalAccount = parseAccount(normalizedBody, sms.sender)
                     }
@@ -636,18 +648,20 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value
-            ?.let { raw ->
-                val sanitized = sanitizeAccountName(raw)
-                if (sanitized == "Unknown Account" && raw.isBlank()) {
-                    null
-                } else {
-                    val cleaned = sanitized.split(" ").joinToString(" ") { word ->
-                        word.replaceFirstChar { it.uppercaseChar() }
+        val finalAccount =
+            txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value
+                ?.let { raw ->
+                    val sanitized = sanitizeAccountName(raw)
+                    if (sanitized == "Unknown Account") {
+                        null
+                    } else {
+                        val cleaned =
+                            sanitized.split(" ").joinToString(" ") { word ->
+                                word.replaceFirstChar { it.uppercaseChar() }
+                            }
+                        PotentialAccount(cleaned, "Auto-Detected")
                     }
-                    PotentialAccount(cleaned, "Auto-Detected")
-                }
-            } ?: parseAccount(normalizedBody, sender)
+                } ?: parseAccount(normalizedBody, sender)
 
         val smsHash = computeSmsHash(sender, normalizedBody)
         val smsSignature = generateSmsSignature(normalizedBody)

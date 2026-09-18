@@ -1316,11 +1316,12 @@ class TransactionViewModel(
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
+                    val sanitizedName = SmsParser.sanitizeAccountName(parsedAccount.formattedName)
                     val currentAccount = accountRepository.getAccountByIdSync(transaction.accountId)
-                    if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-                        var account = db.accountDao().findByName(parsedAccount.formattedName)
+                    if (currentAccount?.name?.equals(sanitizedName, ignoreCase = true) == false) {
+                        var account = db.accountDao().findByName(sanitizedName)
                         if (account == null) {
-                            val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
+                            val newAccount = Account(name = sanitizedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
                             account = accountRepository.getAccountByIdSync(newId.toInt())
                         }
@@ -1747,11 +1748,16 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
+                if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+                    Log.e(TAG, "Invalid transaction amount: ${potentialTxn.amount}. Approve dropped.")
+                    return@withContext false
+                }
+
                 if (isDuplicateOrDeletedSms(potentialTxn, "approve")) {
                     return@withContext false
                 }
 
-                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
                 var account = db.accountDao().findByName(accountName)
@@ -1771,12 +1777,19 @@ class TransactionViewModel(
                             Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                             return@withContext false
                         }
+                        val rawRate = travelSettings.conversionRate?.toDouble()
+                        val conversionRate =
+                            if (rawRate != null && rawRate > 0.0 && !rawRate.isNaN() && !rawRate.isInfinite()) {
+                                rawRate
+                            } else {
+                                1.0
+                            }
                         Transaction(
                             description = description,
                             // FIX: Use the raw pre-rename name for originalDescription.
                             originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                             categoryId = categoryId,
-                            amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
+                            amount = potentialTxn.amount * conversionRate,
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
@@ -1786,7 +1799,7 @@ class TransactionViewModel(
                             source = "Imported",
                             originalAmount = potentialTxn.amount,
                             currencyCode = travelSettings.currencyCode,
-                            conversionRate = travelSettings.conversionRate?.toDouble(),
+                            conversionRate = conversionRate,
                         )
                     } else {
                         Transaction(
@@ -1836,11 +1849,16 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
+                if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+                    Log.e(TAG, "Invalid transaction amount: ${potentialTxn.amount}. Auto-save dropped.")
+                    return@withContext false
+                }
+
                 if (isDuplicateOrDeletedSms(potentialTxn, "auto-save")) {
                     return@withContext false
                 }
 
-                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
                 var finalAccountId: Int? = null

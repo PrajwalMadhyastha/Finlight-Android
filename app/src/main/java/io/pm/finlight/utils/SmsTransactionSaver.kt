@@ -138,7 +138,13 @@ class SmsTransactionSaver(
             return null
         }
 
-        val conversionRate = travelSettings?.conversionRate?.toDouble() ?: 1.0
+        val rawRate = travelSettings?.conversionRate?.toDouble()
+        val conversionRate =
+            if (rawRate != null && rawRate > 0.0 && !rawRate.isNaN() && !rawRate.isInfinite()) {
+                rawRate
+            } else {
+                1.0
+            }
         val transactionToSave =
             if (isForeign && travelSettings != null) {
                 Transaction(
