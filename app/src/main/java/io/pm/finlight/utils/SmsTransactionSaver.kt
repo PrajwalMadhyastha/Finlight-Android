@@ -94,10 +94,15 @@ class SmsTransactionSaver(
         travelSettings: TravelModeSettings? = null,
         source: String = "Auto-Captured",
     ): Long? {
+        if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+            Log.e(tag, "Invalid transaction amount: ${potentialTxn.amount}. Transaction dropped.")
+            return null
+        }
+
         val accountDao = db.accountDao()
         val accountAliasDao = db.accountAliasDao()
 
-        val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+        val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
         // --- Account Resolution (with Bug #1 fix) ---

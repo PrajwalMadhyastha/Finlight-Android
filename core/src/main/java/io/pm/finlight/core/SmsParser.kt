@@ -49,6 +49,21 @@ sealed class ParseResult {
 
 object SmsParser {
 
+    val ACCOUNT_CONTROL_CHARS_REGEX = Regex("[\\p{Cc}\\p{Cf}]")
+
+    /**
+     * Sanitizes an account name string by stripping control characters and format characters,
+     * trimming whitespace, capping at 60 characters, and falling back to "Unknown Account"
+     * if empty or blank.
+     */
+    fun sanitizeAccountName(rawName: String?): String {
+        return (rawName ?: "Unknown Account")
+            .replace(ACCOUNT_CONTROL_CHARS_REGEX, "")
+            .trim()
+            .take(60)
+            .trim()
+            .ifBlank { "Unknown Account" }
+    }
 
     /**
      * Amounts above this threshold (in home currency) are considered suspicious
@@ -62,8 +77,8 @@ object SmsParser {
      */
     private const val NER_CONFIDENCE_THRESHOLD = 0.70f
 
-    private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
-    private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
+    private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?(-?[\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*(-?[\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
+    private val FALLBACK_AMOUNT_REGEX = "(-?[\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?(-?[\\d,]+\\.?\\d*)|(-?[\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     // --- FIX: Added 'Txn' and 'Dr'/'Dr.' to the list of expense keywords, and disambiguated 'debit' to prevent matching 'Debit Card' ---
     val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr|Dr\\.|Dr with|debit of|debit(?!\\s*(?:card|a/?c|account|pin)))\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|refunded by|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
@@ -254,7 +269,7 @@ object SmsParser {
                     } catch (e: PatternSyntaxException) { /* Ignore */ }
                 }
 
-                if (customAmount != null) {
+                if (customAmount != null && customAmount > 0.0 && !customAmount.isNaN() && !customAmount.isInfinite()) {
                     var customMerchant: String? = null
                     rule.merchantRegex?.let { regex ->
                         try {
@@ -415,7 +430,7 @@ object SmsParser {
             }
 
             val amount = extractedAmount
-            if (amount != null) {
+            if (amount != null && amount > 0.0 && !amount.isNaN() && !amount.isInfinite()) {
                 // Transaction type always comes from keywords (NER doesn't extract this)
                 val transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else if (INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "income" else null
                 if (transactionType != null) {
@@ -621,12 +636,18 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value?.let { accountStr ->
-            val cleaned = accountStr.split(" ").joinToString(" ") { word ->
-                word.replaceFirstChar { it.uppercaseChar() }
-            }
-            PotentialAccount(cleaned, "Auto-Detected")
-        } ?: parseAccount(normalizedBody, sender)
+        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value
+            ?.let { raw ->
+                val sanitized = sanitizeAccountName(raw)
+                if (sanitized == "Unknown Account" && raw.isBlank()) {
+                    null
+                } else {
+                    val cleaned = sanitized.split(" ").joinToString(" ") { word ->
+                        word.replaceFirstChar { it.uppercaseChar() }
+                    }
+                    PotentialAccount(cleaned, "Auto-Detected")
+                }
+            } ?: parseAccount(normalizedBody, sender)
 
         val smsHash = computeSmsHash(sender, normalizedBody)
         val smsSignature = generateSmsSignature(normalizedBody)
@@ -887,6 +908,7 @@ object SmsParser {
                 min(template.originalAmountEndIndex, newSmsBody.length)
             )
             val amount = amountStr.replace(",", "").toDoubleOrNull() ?: return null
+            if (amount <= 0.0 || amount.isNaN() || amount.isInfinite()) return null
 
             return PotentialTransaction(
                 sourceSmsId = originalSms.id,
