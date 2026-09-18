@@ -42,6 +42,14 @@ class NerExtractor private constructor(
     private var tokenizer: WordPieceTokenizer? = preloadedTokenizer
     private var idToLabel: Map<Int, String> = preloadedLabelMap ?: emptyMap()
 
+    @VisibleForTesting
+    internal val idToLabelMap: Map<Int, String>
+        get() = idToLabel
+
+    @VisibleForTesting
+    internal val tokenizerInstance: WordPieceTokenizer?
+        get() = tokenizer
+
     private var interpreterFactory: (ByteBuffer, Interpreter.Options) -> Interpreter = { buffer, options ->
         Interpreter(buffer, options)
     }
@@ -52,6 +60,10 @@ class NerExtractor private constructor(
      * Primary constructor for production use.
      * Loads the TFLite model, vocabulary, and label map from assets.
      */
+    @Deprecated(
+        message = "Use MlModelFactory.getNerExtractor(context) to benefit from cached vocabulary and label map",
+        replaceWith = ReplaceWith("MlModelFactory.getNerExtractor(context)", "io.pm.finlight.ml.MlModelFactory"),
+    )
     constructor(
         context: Context,
         modelName: String = DEFAULT_MODEL,
@@ -65,6 +77,30 @@ class NerExtractor private constructor(
         loadModel()
         loadVocabulary()
         loadLabelMap()
+    }
+
+    /**
+     * Constructor accepting pre-loaded vocabulary and label map.
+     */
+    constructor(
+        context: Context,
+        vocab: Map<String, Int>,
+        labelMap: Map<Int, String>,
+        modelName: String = DEFAULT_MODEL,
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
+    ) : this(
+        context = context,
+        modelName = modelName,
+        vocabName = "",
+        labelMapName = "",
+        preloadedTokenizer = WordPieceTokenizer(vocab),
+        preloadedInterpreter = null,
+        preloadedLabelMap = labelMap,
+    ) {
+        if (interpreterFactory != null) {
+            this.interpreterFactory = interpreterFactory
+        }
+        loadModel()
     }
 
     /**

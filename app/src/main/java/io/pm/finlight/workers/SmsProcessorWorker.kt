@@ -31,10 +31,12 @@ import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionNotificationWorker
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
@@ -59,221 +61,255 @@ class SmsProcessorWorker(
     private val tag = "SmsProcessorWorker"
 
     override suspend fun doWork(): Result {
-        val sender = inputData.getString(KEY_SENDER) ?: return Result.failure()
-        val body = inputData.getString(KEY_BODY) ?: return Result.failure()
-        val date = inputData.getLong(KEY_DATE, -1L).takeIf { it != -1L } ?: return Result.failure()
+        if (runAttemptCount >= 3) {
+            Log.w(tag, "SmsProcessorWorker exhausted 3 attempts. Failing permanently.")
+            return Result.failure()
+        }
 
-        val smsMessage = SmsMessage(id = date, sender = sender, body = body, date = date)
+        return try {
+            val sender = inputData.getString(KEY_SENDER) ?: return Result.failure()
+            val body = inputData.getString(KEY_BODY) ?: return Result.failure()
+            val date = inputData.getLong(KEY_DATE, -1L).takeIf { it != -1L } ?: return Result.failure()
 
-        val db = AppDatabase.getInstance(context)
-        val settingsRepository = ServiceLocator.provideSettingsRepository(context)
-        val tagRepository = ServiceLocator.provideTagRepository(context)
-        val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
-        val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
+            val smsMessage = SmsMessage(id = date, sender = sender, body = body, date = date)
 
-        val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-        val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
-        val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
-        // Permanently skipped hashes (user deliberately deleted these transactions).
-        val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
+            val db = AppDatabase.getInstance(context)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(context)
+            val tagRepository = ServiceLocator.provideTagRepository(context)
+            val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
+            val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
 
-        // --- Build providers ---
-        val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
-        val customSmsRuleProvider = SmsProviderHelper.getCustomSmsRuleProvider(db)
-        val merchantRenameRuleProvider = SmsProviderHelper.getMerchantRenameRuleProvider(db)
-        val ignoreRuleProvider = SmsProviderHelper.getIgnoreRuleProvider(db)
-        val merchantCategoryMappingProvider = SmsProviderHelper.getMerchantCategoryMappingProvider(db)
-        val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
+            val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
+            val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
+            val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toMutableSet()
+            // Permanently skipped hashes (user deliberately deleted these transactions).
+            val deletedHashes = db.deletedSmsHashDao().getAllHashes().toMutableSet()
 
-        // --- HIERARCHY STEP 1: Check custom rules ---
-        var parseResult =
-            SmsParser.parseWithOnlyCustomRules(
-                sms = smsMessage,
-                customSmsRuleProvider = customSmsRuleProvider,
-                merchantRenameRuleProvider = merchantRenameRuleProvider,
-                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                categoryFinderProvider = categoryFinderProvider,
-            )
+            // --- Build providers ---
+            val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
+            val customSmsRuleProvider = SmsProviderHelper.getCustomSmsRuleProvider(db)
+            val merchantRenameRuleProvider = SmsProviderHelper.getMerchantRenameRuleProvider(db)
+            val ignoreRuleProvider = SmsProviderHelper.getIgnoreRuleProvider(db)
+            val merchantCategoryMappingProvider = SmsProviderHelper.getMerchantCategoryMappingProvider(db)
+            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
 
-        // --- HIERARCHY STEP 2: ML pre-filter ---
-        if (parseResult == null) {
-            val classifier = MlModelFactory.getClassifier(context)
-            val confidence = classifier.classify(body)
-            classifier.close()
+            // --- HIERARCHY STEP 1: Check custom rules ---
+            var parseResult =
+                SmsParser.parseWithOnlyCustomRules(
+                    sms = smsMessage,
+                    customSmsRuleProvider = customSmsRuleProvider,
+                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                    categoryFinderProvider = categoryFinderProvider,
+                )
 
-            if (confidence < 0.1) {
-                Log.d(tag, "ML model ignored SMS (confidence=${1 - confidence}). Sender: $sender")
+            // --- HIERARCHY STEP 2: ML pre-filter ---
+            if (parseResult == null) {
+                val confidence =
+                    MlModelFactory.getClassifier(context).use { classifier ->
+                        classifier.classify(body)
+                    }
+
+                if (confidence < 0.1) {
+                    Log.d(tag, "ML model ignored SMS (confidence=${1 - confidence}). Sender: $sender")
+                    return Result.success()
+                }
+
+                // --- HIERARCHY STEP 3: NER + main parser ---
+                val nerEntities =
+                    MlModelFactory.getNerExtractor(context).use { nerExtractor ->
+                        nerExtractor.extract(body)
+                    }
+
+                Log.d(tag, "NER extraction complete. Entity types found: ${nerEntities.keys}")
+
+                parseResult =
+                    SmsParser.parseWithReason(
+                        sms = smsMessage,
+                        mappings = existingMappings,
+                        customSmsRuleProvider = customSmsRuleProvider,
+                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                        ignoreRuleProvider = ignoreRuleProvider,
+                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                        categoryFinderProvider = categoryFinderProvider,
+                        smsParseTemplateProvider = smsParseTemplateProvider,
+                        nerEntities = nerEntities,
+                    )
+            }
+
+            if (parseResult !is ParseResult.Success) {
+                Log.d(tag, "SMS not parsed as a transaction. Result: $parseResult")
                 return Result.success()
             }
 
-            // --- HIERARCHY STEP 3: NER + main parser ---
-            val nerExtractor = MlModelFactory.getNerExtractor(context)
-            val nerEntities = nerExtractor.extract(body)
-            nerExtractor.close()
+            // --- Auto-healing: persist newly discovered rename/category aliases ---
+            parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
+                Log.d(tag, "Auto-healing rename rule: $oldName → $newName")
+                db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
+            }
+            parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
+                Log.d(tag, "Auto-healing category rule: $merchant → $catId")
+                db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
+            }
 
-            Log.d(tag, "NER entities: $nerEntities")
+            val potentialTxn = parseResult.transaction
 
-            parseResult =
-                SmsParser.parseWithReason(
-                    sms = smsMessage,
-                    mappings = existingMappings,
-                    customSmsRuleProvider = customSmsRuleProvider,
-                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                    ignoreRuleProvider = ignoreRuleProvider,
-                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                    categoryFinderProvider = categoryFinderProvider,
-                    smsParseTemplateProvider = smsParseTemplateProvider,
-                    nerEntities = nerEntities,
-                )
-        }
-
-        if (parseResult !is ParseResult.Success) {
-            Log.d(tag, "SMS not parsed as a transaction. Result: $parseResult")
-            return Result.success()
-        }
-
-        // --- Auto-healing: persist newly discovered rename/category aliases ---
-        parseResult.newlyDiscoveredRenameAlias?.let { (oldName, newName) ->
-            Log.d(tag, "Auto-healing rename rule: $oldName → $newName")
-            db.merchantRenameRuleDao().insert(MerchantRenameRule(oldName, newName))
-        }
-        parseResult.newlyDiscoveredCategoryAlias?.let { (merchant, catId) ->
-            Log.d(tag, "Auto-healing category rule: $merchant → $catId")
-            db.merchantCategoryMappingDao().insert(MerchantCategoryMapping(merchant, catId))
-        }
-
-        val potentialTxn = parseResult.transaction
-
-        // --- Duplicate guard ---
-        val hash = potentialTxn.sourceSmsHash
-        if (hash == null || hash in existingSmsHashes || hash in deletedHashes || db.transactionQueryDao().existsBySmsHash(hash)) {
-            Log.d(tag, "SMS already processed or intentionally deleted (hash match). Skipping.")
-            return Result.success()
-        }
-
-        // --- Travel mode routing ---
-        val travelSettings = settingsRepository.getCurrentTravelModeSettings()
-        val homeCurrency = settingsRepository.getHomeCurrency().first()
-        val isTravelModeActive =
-            travelSettings?.isEnabled == true &&
-                Date().time in travelSettings.startDate..travelSettings.endDate
-
-        val newTransactionId: Long? =
-            if (isTravelModeActive &&
-                travelSettings.tripType == TripType.INTERNATIONAL
+            // --- Duplicate guard ---
+            val hash = potentialTxn.sourceSmsHash
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
+            if (hash == null ||
+                hash in existingSmsHashes || legacyHash in existingSmsHashes ||
+                hash in deletedHashes || legacyHash in deletedHashes ||
+                db.transactionQueryDao().existsBySmsHash(hash) ||
+                db.transactionQueryDao().existsBySmsHash(legacyHash)
             ) {
-                when (potentialTxn.detectedCurrencyCode) {
-                    travelSettings.currencyCode ->
-                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
-                    homeCurrency ->
-                        saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
-                    else -> {
-                        NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
-                        null
+                Log.d(tag, "SMS already processed or intentionally deleted (hash match). Skipping.")
+                if (hash != null) {
+                    if (legacyHash in existingSmsHashes || db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+                        existingSmsHashes.remove(legacyHash)
+                        existingSmsHashes.add(hash)
+                    }
+                    if (legacyHash in deletedHashes) {
+                        db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+                        deletedHashes.add(hash)
                     }
                 }
-            } else {
-                saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
+                return Result.success()
             }
 
-        newTransactionId ?: return Result.success()
+            // --- Travel mode routing ---
+            val travelSettings = settingsRepository.getCurrentTravelModeSettings()
+            val homeCurrency = settingsRepository.getHomeCurrency().first()
+            val isTravelModeActive =
+                travelSettings?.isEnabled == true &&
+                    Date().time in travelSettings.startDate..travelSettings.endDate
 
-        // --- NEW: Recurring transaction auto-linking ---
-        val recurringDao = db.recurringTransactionDao()
-        val transactionQueryDao = db.transactionQueryDao()
-        val transactionWriteDao = db.transactionWriteDao()
-        val savedTxn = transactionQueryDao.getTransactionByIdSync(newTransactionId.toInt())
-
-        if (savedTxn != null) {
-            // --- NEW: Smart Transaction Merge Check ---
-            val timeWindowStart = savedTxn.date - (3 * 60 * 60 * 1000L) // 3 hours ago
-            val recentTxn =
-                transactionQueryDao.findRecentTransactionForMerge(
-                    merchant = savedTxn.description,
-                    accountId = savedTxn.accountId,
-                    transactionType = savedTxn.transactionType,
-                    timeWindowStart = timeWindowStart,
-                    newTxnId = savedTxn.id
-                )
-
-            if (recentTxn != null) {
-                NotificationHelper.showMergeTransactionNotification(context, savedTxn, recentTxn)
-            }
-
-            val senderRule = recurringDao.getRuleBySmsSenderId(sender)
-            if (senderRule != null) {
-                // It's a variable bill match
-                val isAnomaly = Math.abs(savedTxn.amount - senderRule.amount) > senderRule.amount * 0.3
-
-                transactionWriteDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
-                recurringDao.updateLastRunDate(senderRule.id, savedTxn.date)
-
-                if (isAnomaly) {
-                    NotificationHelper.showVariableBillAnomalyNotification(context, senderRule, savedTxn.amount, senderRule.amount)
-                }
-            } else {
-                // Check if pending drafts exist
-                val pendingDrafts = transactionQueryDao.getPendingTransactionsSync()
-                val match =
-                    pendingDrafts.find {
-                        it.description == savedTxn.description &&
-                            Math.abs(it.amount - savedTxn.amount) < 1.0 &&
-                            Math.abs(it.date - savedTxn.date) < 4 * 24 * 60 * 60 * 1000L
+            val newTransactionId: Long? =
+                if (isTravelModeActive &&
+                    travelSettings.tripType == TripType.INTERNATIONAL
+                ) {
+                    when (potentialTxn.detectedCurrencyCode) {
+                        travelSettings.currencyCode ->
+                            saver.resolveAndSaveTransaction(potentialTxn, isForeign = true, travelSettings = travelSettings)
+                        homeCurrency ->
+                            saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
+                        else -> {
+                            NotificationHelper.showTravelModeSmsNotification(context, potentialTxn, travelSettings)
+                            null
+                        }
                     }
-
-                if (match != null) {
-                    // Auto-link fixed bill
-                    transactionWriteDao.delete(match)
-                    match.recurringRuleId?.let { ruleId ->
-                        transactionWriteDao.updateRecurringRuleId(savedTxn.id, ruleId)
-                        recurringDao.updateLastRunDate(ruleId, savedTxn.date)
-                    }
+                } else {
+                    saver.resolveAndSaveTransaction(potentialTxn, isForeign = false, travelSettings = travelSettings)
                 }
-            }
-        }
 
-        // --- Notifications ---
-        val canNotify =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
-                    PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+            newTransactionId ?: return Result.success()
 
-        if (canNotify) {
-            if (potentialTxn.needsReview) {
-                val savedTxn =
-                    Transaction(
-                        id = newTransactionId.toInt(),
-                        description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        // FIX: Use the raw pre-rename name for originalDescription.
-                        originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
-                        amount = potentialTxn.amount,
-                        date = potentialTxn.date,
-                        // placeholder, not used in the notification
-                        accountId = 0,
-                        categoryId = potentialTxn.categoryId,
-                        notes = "",
-                        transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
+            // --- NEW: Recurring transaction auto-linking ---
+            val recurringDao = db.recurringTransactionDao()
+            val transactionQueryDao = db.transactionQueryDao()
+            val transactionWriteDao = db.transactionWriteDao()
+            val savedTxn = transactionQueryDao.getTransactionByIdSync(newTransactionId.toInt())
+
+            if (savedTxn != null) {
+                // --- NEW: Smart Transaction Merge Check ---
+                val timeWindowStart = savedTxn.date - (3 * 60 * 60 * 1000L) // 3 hours ago
+                val recentTxn =
+                    transactionQueryDao.findRecentTransactionForMerge(
+                        merchant = savedTxn.description,
+                        accountId = savedTxn.accountId,
+                        transactionType = savedTxn.transactionType,
+                        timeWindowStart = timeWindowStart,
+                        newTxnId = savedTxn.id
                     )
-                NotificationHelper.showSuspiciousAmountNotification(
-                    context,
-                    savedTxn,
-                    potentialTxn.suspicionReason ?: "Amount flagged for review.",
-                )
-            } else if (settingsRepository.getAutoCaptureNotificationEnabled().first()) {
-                val workRequest =
-                    OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
-                        .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
-                        .build()
-                WorkManager.getInstance(context).enqueue(workRequest)
-            }
-        }
 
-        Log.d(tag, "Transaction saved successfully. ID: $newTransactionId, Merchant: ${potentialTxn.merchantName}")
-        return Result.success()
+                if (recentTxn != null) {
+                    NotificationHelper.showMergeTransactionNotification(context, savedTxn, recentTxn)
+                }
+
+                val senderRule = recurringDao.getRuleBySmsSenderId(sender)
+                if (senderRule != null) {
+                    // It's a variable bill match
+                    val isAnomaly = Math.abs(savedTxn.amount - senderRule.amount) > senderRule.amount * 0.3
+
+                    transactionWriteDao.updateRecurringRuleId(savedTxn.id, senderRule.id)
+                    recurringDao.updateLastRunDate(senderRule.id, savedTxn.date)
+
+                    if (isAnomaly) {
+                        NotificationHelper.showVariableBillAnomalyNotification(context, senderRule, savedTxn.amount, senderRule.amount)
+                    }
+                } else {
+                    // Check if pending drafts exist
+                    val pendingDrafts = transactionQueryDao.getPendingTransactionsSync()
+                    val match =
+                        pendingDrafts.find {
+                            it.description == savedTxn.description &&
+                                Math.abs(it.amount - savedTxn.amount) < 1.0 &&
+                                Math.abs(it.date - savedTxn.date) < 4 * 24 * 60 * 60 * 1000L
+                        }
+
+                    if (match != null) {
+                        // Auto-link fixed bill
+                        transactionWriteDao.delete(match)
+                        match.recurringRuleId?.let { ruleId ->
+                            transactionWriteDao.updateRecurringRuleId(savedTxn.id, ruleId)
+                            recurringDao.updateLastRunDate(ruleId, savedTxn.date)
+                        }
+                    }
+                }
+            }
+
+            // --- Notifications ---
+            val canNotify =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                        PackageManager.PERMISSION_GRANTED
+                } else {
+                    true
+                }
+
+            if (canNotify) {
+                if (potentialTxn.needsReview) {
+                    val savedTxn =
+                        Transaction(
+                            id = newTransactionId.toInt(),
+                            description = potentialTxn.merchantName ?: "Unknown Merchant",
+                            // FIX: Use the raw pre-rename name for originalDescription.
+                            originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
+                            amount = potentialTxn.amount,
+                            date = potentialTxn.date,
+                            // placeholder, not used in the notification
+                            accountId = 0,
+                            categoryId = potentialTxn.categoryId,
+                            notes = "",
+                            transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
+                            sourceSmsId = potentialTxn.sourceSmsId,
+                            sourceSmsHash = potentialTxn.sourceSmsHash,
+                        )
+                    NotificationHelper.showSuspiciousAmountNotification(
+                        context,
+                        savedTxn,
+                        potentialTxn.suspicionReason ?: "Amount flagged for review.",
+                    )
+                } else if (settingsRepository.getAutoCaptureNotificationEnabled().first()) {
+                    val workRequest =
+                        OneTimeWorkRequestBuilder<TransactionNotificationWorker>()
+                            .setInputData(workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to newTransactionId.toInt()))
+                            .build()
+                    WorkManager.getInstance(context).enqueue(workRequest)
+                }
+            }
+
+            Log.d(tag, "Transaction saved successfully. ID: $newTransactionId, Merchant: ${potentialTxn.merchantName}")
+            Result.success()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (oom: OutOfMemoryError) {
+            Log.e(tag, "SmsProcessorWorker encountered OOM on attempt $runAttemptCount. Failing permanently.", oom)
+            Result.failure()
+        } catch (e: Exception) {
+            Log.e(tag, "SmsProcessorWorker failed (attempt $runAttemptCount): ${e.message}", e)
+            if (runAttemptCount >= 2) Result.failure() else Result.retry()
+        }
     }
 }

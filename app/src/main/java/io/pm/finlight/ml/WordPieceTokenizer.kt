@@ -1,5 +1,7 @@
 package io.pm.finlight.ml
 
+import androidx.annotation.VisibleForTesting
+
 /**
  * BERT-compatible WordPiece tokenizer for MobileBERT NER inference.
  *
@@ -14,6 +16,10 @@ package io.pm.finlight.ml
  * correct NER predictions on-device.
  */
 class WordPieceTokenizer(private val vocab: Map<String, Int>) {
+    @VisibleForTesting
+    internal val vocabMap: Map<String, Int>
+        get() = vocab
+
     companion object {
         const val MAX_SEQ_LENGTH = 128
 

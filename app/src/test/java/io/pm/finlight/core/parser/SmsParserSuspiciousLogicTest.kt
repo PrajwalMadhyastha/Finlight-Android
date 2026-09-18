@@ -1,12 +1,17 @@
 package io.pm.finlight.core.parser
 
 import io.pm.finlight.SmsMessage
+import io.pm.finlight.SmsParseTemplate
 import io.pm.finlight.SmsParser
 import io.pm.finlight.core.NerEntity
+import java.io.ByteArrayOutputStream
+import java.io.PrintStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.`when`
+import org.mockito.Mockito.anyString
 import org.mockito.junit.MockitoJUnitRunner
 
 @RunWith(MockitoJUnitRunner.Silent::class)
@@ -203,5 +208,144 @@ class SmsParserSuspiciousLogicTest : BaseSmsParserTest() {
             assertFalse("Transaction should NOT be flagged for review", transaction!!.needsReview)
             assertNull("Suspicion reason should be null", transaction.suspicionReason)
             assertEquals(250.0, transaction.amount, 0.001)
+        }
+
+    @Test
+    fun `Option A - amount exceeding 100,000 does not print SMS body to System err`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 1,
+                    sender = "AM-HDFCBK",
+                    body = "Rs 150000.00 debited from a/c **4321 on 12-07-25 to VPA swiggy@hdfcbank.",
+                    date = System.currentTimeMillis(),
+                )
+
+            val nerEntities =
+                mapOf(
+                    "AMOUNT" to NerEntity("150000.00", 0.95f),
+                    "MERCHANT" to NerEntity("swiggy@hdfcbank", 0.90f),
+                )
+
+            val originalErr = System.err
+            val baos = ByteArrayOutputStream()
+            try {
+                System.setErr(PrintStream(baos))
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+            } finally {
+                System.setErr(originalErr)
+            }
+
+            val errOutput = baos.toString()
+            assertTrue("System.err should contain sender hash", errOutput.contains("SenderHash: ${sms.sender.hashCode()}"))
+            assertTrue("System.err should contain large amount message", errOutput.contains("Large amount 150000.0 exceeds threshold"))
+            assertFalse("System.err must not contain SMS body", errOutput.contains(sms.body))
+            assertFalse("System.err must not contain sensitive account substring", errOutput.contains("**4321"))
+            assertFalse("System.err must not contain sensitive merchant substring", errOutput.contains("swiggy@hdfcbank"))
+        }
+
+    @Test
+    fun `Option D - NER confidence below threshold does not print SMS body to System err`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 3,
+                    sender = "AM-AXIS",
+                    body = "INR 450.00 sent from Axis Bank A/C XX6789 to VPA zomato@icici.",
+                    date = System.currentTimeMillis(),
+                )
+
+            val nerEntities =
+                mapOf(
+                    "AMOUNT" to NerEntity("450.00", 0.65f),
+                    "MERCHANT" to NerEntity("zomato@icici", 0.90f),
+                )
+
+            val originalErr = System.err
+            val baos = ByteArrayOutputStream()
+            try {
+                System.setErr(PrintStream(baos))
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+            } finally {
+                System.setErr(originalErr)
+            }
+
+            val errOutput = baos.toString()
+            assertTrue("System.err should contain sender hash", errOutput.contains("SenderHash: ${sms.sender.hashCode()}"))
+            assertTrue("System.err should contain amount", errOutput.contains("Amount: 450.0"))
+            assertTrue("System.err should contain NER confidence", errOutput.contains("Low NER confidence for AMOUNT (0.65)"))
+            assertFalse("System.err must not contain SMS body", errOutput.contains(sms.body))
+            assertFalse("System.err must not contain sensitive account substring", errOutput.contains("XX6789"))
+            assertFalse("System.err must not contain sensitive merchant substring", errOutput.contains("zomato@icici"))
+        }
+
+    @Test
+    fun `Template error logs exception class name and does not print SMS body or exception message`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Short body"
+            val sms =
+                SmsMessage(
+                    id = 5,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val sig = SmsParser.generateSmsSignature(smsBody)
+            val template =
+                SmsParseTemplate(
+                    templateSignature = sig,
+                    correctedMerchantName = "TargetMerchant",
+                    originalSmsBody = "Some template body",
+                    originalAmountStartIndex = 100,
+                    originalAmountEndIndex = 200,
+                )
+            `when`(mockSmsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(listOf(template))
+
+            val originalErr = System.err
+            val baos = ByteArrayOutputStream()
+            try {
+                System.setErr(PrintStream(baos))
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+            } finally {
+                System.setErr(originalErr)
+            }
+
+            val errOutput = baos.toString()
+            assertTrue("Should log sanitized template error with exception class", errOutput.contains("[SmsParser]: Error applying heuristic template: StringIndexOutOfBoundsException"))
+            assertFalse("Should not log SMS body in error", errOutput.contains(smsBody))
+            assertFalse("Should not log template body in error", errOutput.contains("Some template body"))
         }
 }
