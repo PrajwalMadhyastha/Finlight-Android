@@ -37,7 +37,10 @@ class SmsReceiver : BroadcastReceiver() {
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
         if (messages.isNullOrEmpty()) return
 
-        val messagesBySender = messages.groupBy { it.originatingAddress }
+        val nonNullMessages = messages.filterNotNull()
+        if (nonNullMessages.isEmpty()) return
+
+        val messagesBySender = nonNullMessages.groupBy { it.originatingAddress }
         dispatchMessages(context, messagesBySender)
     }
 
@@ -47,9 +50,10 @@ class SmsReceiver : BroadcastReceiver() {
         messagesBySender: Map<String?, List<SmsMessage>>,
     ) {
         for ((sender, parts) in messagesBySender) {
-            if (sender == null || parts.isEmpty()) continue
-            val body = parts.joinToString("") { it.messageBody }
-            val date = parts.first().timestampMillis
+            if (sender.isNullOrBlank() || parts.isEmpty()) continue
+            val body = parts.joinToString("") { it.messageBody.orEmpty() }
+            if (body.isBlank()) continue
+            val date = parts.firstOrNull()?.timestampMillis?.takeIf { it > 0L } ?: System.currentTimeMillis()
 
             Log.d(tag, "SMS received from $sender. Enqueuing SmsProcessorWorker.")
 

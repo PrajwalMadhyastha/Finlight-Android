@@ -18,8 +18,12 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
-import io.mockk.*
-import io.pm.finlight.BaseViewModelTest
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.slot
+import io.mockk.unmockkAll
+import io.mockk.verify
 import io.pm.finlight.SmsReceiver
 import io.pm.finlight.TestApplication
 import io.pm.finlight.workers.SmsProcessorWorker
@@ -37,23 +41,22 @@ import org.robolectric.annotation.Implements
     application = TestApplication::class,
     shadows = [SmsReceiverTest.ShadowTelephonyIntents::class],
 )
-class SmsReceiverTest : BaseViewModelTest() {
+class SmsReceiverTest {
     private lateinit var context: Context
     private lateinit var receiver: SmsReceiver
     private lateinit var mockWorkManager: WorkManager
 
     @Implements(Telephony.Sms.Intents::class)
     object ShadowTelephonyIntents {
-        var mockSmsMessages: Array<AndroidSmsMessage>? = emptyArray()
+        var mockSmsMessages: Array<AndroidSmsMessage?>? = emptyArray()
 
         @JvmStatic
         @Implementation
-        fun getMessagesFromIntent(intent: Intent?): Array<AndroidSmsMessage>? = mockSmsMessages
+        fun getMessagesFromIntent(intent: Intent?): Array<AndroidSmsMessage?>? = mockSmsMessages
     }
 
     @Before
-    override fun setup() {
-        super.setup()
+    fun setup() {
         context = ApplicationProvider.getApplicationContext()
         receiver = SmsReceiver()
 
@@ -63,15 +66,14 @@ class SmsReceiverTest : BaseViewModelTest() {
     }
 
     @After
-    override fun tearDown() {
+    fun tearDown() {
         ShadowTelephonyIntents.mockSmsMessages = emptyArray()
         unmockkAll()
-        super.tearDown()
     }
 
     private fun createSmsIntent(
         sender: String,
-        body: String
+        body: String,
     ): Intent {
         val mockMessage = mockk<AndroidSmsMessage>()
         every { mockMessage.originatingAddress } returns sender
@@ -108,6 +110,97 @@ class SmsReceiverTest : BaseViewModelTest() {
         ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
 
         receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `SMS with empty sender is skipped`() {
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns ""
+        every { mockMessage.messageBody } returns "Spent Rs.100"
+        every { mockMessage.timestampMillis } returns 1L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+
+        receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `SMS with whitespace sender is skipped`() {
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns "   "
+        every { mockMessage.messageBody } returns "Spent Rs.100"
+        every { mockMessage.timestampMillis } returns 1L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+
+        receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `SMS with null message body is skipped`() {
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns "AM-HDFCBK"
+        every { mockMessage.messageBody } returns null
+        every { mockMessage.timestampMillis } returns 1L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+
+        receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `SMS with blank message body is skipped`() {
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns "AM-HDFCBK"
+        every { mockMessage.messageBody } returns "   "
+        every { mockMessage.timestampMillis } returns 1L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+
+        receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `SMS with non-positive timestamp falls back to system time`() {
+        val mockMessage = mockk<AndroidSmsMessage>()
+        every { mockMessage.originatingAddress } returns "AM-HDFCBK"
+        every { mockMessage.messageBody } returns "Spent Rs.100"
+        every { mockMessage.timestampMillis } returns 0L
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(mockMessage)
+
+        val beforeTime = System.currentTimeMillis()
+        val captor = slot<OneTimeWorkRequest>()
+        every { mockWorkManager.enqueue(capture(captor)) } returns mockk(relaxed = true)
+
+        receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
+        val afterTime = System.currentTimeMillis()
+
+        verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+        val date = captor.captured.workSpec.input.getLong(SmsProcessorWorker.KEY_DATE, -1L)
+        assert(date in beforeTime..afterTime)
+    }
+
+    @Test
+    fun `messages array containing null elements does not crash and processes valid elements`() {
+        val validMsg = mockk<AndroidSmsMessage>()
+        every { validMsg.originatingAddress } returns "AM-HDFCBK"
+        every { validMsg.messageBody } returns "Spent Rs.100"
+        every { validMsg.timestampMillis } returns 1000L
+
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(null, validMsg)
+        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+        receiver.onReceive(context, intent)
+
+        verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `messages array containing only null elements does nothing and does not crash`() {
+        ShadowTelephonyIntents.mockSmsMessages = arrayOf(null)
+        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+        receiver.onReceive(context, intent)
+
         verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
     }
 
