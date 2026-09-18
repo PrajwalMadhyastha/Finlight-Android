@@ -23,11 +23,13 @@ import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.NotificationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import kotlin.test.assertFailsWith
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -66,7 +68,8 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     private fun buildWorker(
         sender: String,
         body: String,
-        date: Long = 1L
+        date: Long = 1L,
+        runAttemptCount: Int = 0,
     ): SmsProcessorWorker {
         val inputData =
             workDataOf(
@@ -74,7 +77,9 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                 SmsProcessorWorker.KEY_BODY to body,
                 SmsProcessorWorker.KEY_DATE to date,
             )
-        return TestListenableWorkerBuilder<SmsProcessorWorker>(context, inputData).build()
+        return TestListenableWorkerBuilder<SmsProcessorWorker>(context, inputData)
+            .setRunAttemptCount(runAttemptCount)
+            .build()
     }
 
     @Before
@@ -707,5 +712,63 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.success(), result)
             coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `worker returns failure immediately when runAttemptCount is 3 or more`() =
+        runTest {
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 3)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 0) { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `unhandled exception on attempt 1 returns retry`() =
+        runTest {
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } throws RuntimeException("Database error")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 0)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+        }
+
+    @Test
+    fun `unhandled exception on attempt 2 returns retry`() =
+        runTest {
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } throws RuntimeException("TFLite error")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 1)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+        }
+
+    @Test
+    fun `unhandled exception on attempt 3 returns failure`() =
+        runTest {
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } throws RuntimeException("Poison pill SMS error")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 2)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `cancellation exception is rethrown and not caught by generic handler`() =
+        runTest {
+            coEvery {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            } throws CancellationException("Coroutine cancelled")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 0)
+
+            assertFailsWith<CancellationException> {
+                worker.doWork()
+            }
         }
 }
