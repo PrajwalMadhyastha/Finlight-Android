@@ -29,10 +29,11 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import kotlin.test.assertFailsWith
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import kotlin.test.assertFailsWith
 import io.pm.finlight.core.NerEntity
 import org.junit.Before
 import org.junit.Test
@@ -209,6 +210,27 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val worker = TestListenableWorkerBuilder<SmsProcessorWorker>(context, inputData).build()
             val result = worker.doWork()
             assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `returns failure when date is missing or invalid`() =
+        runTest {
+            val missingDateData =
+                workDataOf(
+                    SmsProcessorWorker.KEY_SENDER to "AM-HDFCBK",
+                    SmsProcessorWorker.KEY_BODY to "Spent Rs.100",
+                )
+            val workerMissing = TestListenableWorkerBuilder<SmsProcessorWorker>(context, missingDateData).build()
+            assertEquals(ListenableWorker.Result.failure(), workerMissing.doWork())
+
+            val invalidDateData =
+                workDataOf(
+                    SmsProcessorWorker.KEY_SENDER to "AM-HDFCBK",
+                    SmsProcessorWorker.KEY_BODY to "Spent Rs.100",
+                    SmsProcessorWorker.KEY_DATE to -1L,
+                )
+            val workerInvalid = TestListenableWorkerBuilder<SmsProcessorWorker>(context, invalidDateData).build()
+            assertEquals(ListenableWorker.Result.failure(), workerInvalid.doWork())
         }
 
     @Test
@@ -770,5 +792,256 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             assertFailsWith<CancellationException> {
                 worker.doWork()
             }
+        }
+
+    @Test
+    fun `OutOfMemoryError during processing returns failure immediately without retry`() =
+        runTest {
+            coEvery {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            } throws OutOfMemoryError("Native buffer allocation failed")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 0)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `exception during classifier inference closes classifier and returns retry`() =
+        runTest {
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            every { mockClassifier.classify(any()) } throws IllegalStateException("TFLite model crashed")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 0)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+            verify(atLeast = 1) { mockClassifier.close() }
+        }
+
+    @Test
+    fun `exception during nerExtractor extraction closes nerExtractor and returns retry`() =
+        runTest {
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            every { mockClassifier.classify(any()) } returns 0.9f
+            every { mockNerExtractor.extract(any()) } throws RuntimeException("NER tokenization crash")
+
+            val worker = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy", runAttemptCount = 0)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+            verify(atLeast = 1) { mockClassifier.close() }
+            verify(atLeast = 1) { mockNerExtractor.close() }
+        }
+
+    @Test
+    fun `travel mode with home currency saves non-foreign transaction`() =
+        runTest {
+            val travelSettings =
+                io.pm.finlight.TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Trip",
+                    tripType = io.pm.finlight.TripType.INTERNATIONAL,
+                    startDate = 0L,
+                    endDate = Long.MAX_VALUE,
+                    currencyCode = "USD",
+                    conversionRate = 80f,
+                )
+            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
+            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
+            every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent 100 INR at Starbucks",
+                    sourceSmsHash = "hashHomeCurrency",
+                    detectedCurrencyCode = "INR",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 100 INR at Starbucks").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            val captor = slot<Transaction>()
+            coVerify { transactionWriteDao.insert(capture(captor)) }
+            assertNull(captor.captured.currencyCode)
+            assertEquals(100.0, captor.captured.amount, 0.001)
+        }
+
+    @Test
+    fun `travel mode with unhandled currency shows notification and returns success without saving`() =
+        runTest {
+            val travelSettings =
+                io.pm.finlight.TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Trip",
+                    tripType = io.pm.finlight.TripType.INTERNATIONAL,
+                    startDate = 0L,
+                    endDate = Long.MAX_VALUE,
+                    currencyCode = "USD",
+                    conversionRate = 80f,
+                )
+            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
+            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
+            every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent 100 EUR at Starbucks",
+                    sourceSmsHash = "hashEUR",
+                    detectedCurrencyCode = "EUR",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 100 EUR at Starbucks").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            verify { NotificationHelper.showTravelModeSmsNotification(context, txn, travelSettings) }
+        }
+
+    @Test
+    fun `auto-link fixed bill with null recurringRuleId does not update rule`() =
+        runTest {
+            val savedTxn =
+                Transaction(
+                    id = 10,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = TransactionType.EXPENSE,
+                    date = 100L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
+            val draftWithoutRule =
+                Transaction(
+                    id = 20,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = TransactionType.EXPENSE,
+                    date = 99L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.PENDING,
+                    recurringRuleId = null,
+                )
+
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
+            coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
+            coEvery { transactionQueryDao.getPendingTransactionsSync() } returns listOf(draftWithoutRule)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "NETFLIX",
+                    amount = 149.0,
+                    transactionType = "expense",
+                    merchantName = "Netflix",
+                    originalMessage = "Sub",
+                    sourceSmsHash = "hash202NullRule",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            buildWorker("NETFLIX", "Sub").doWork()
+
+            coVerify { transactionWriteDao.delete(draftWithoutRule) }
+            coVerify(exactly = 0) { transactionWriteDao.updateRecurringRuleId(any(), any()) }
+            coVerify(exactly = 0) { recurringDao.updateLastRunDate(any(), any()) }
+        }
+
+    @Test
+    fun `post notifications permission denied prevents notification dispatch`() =
+        runTest {
+            Shadows.shadowOf(context as Application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 50000.0,
+                    transactionType = "expense",
+                    merchantName = "Jeweler",
+                    originalMessage = "Spent 50000 at Jeweler",
+                    sourceSmsHash = "hashPermissionDenied",
+                    needsReview = true,
+                    suspicionReason = "Very high amount",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 50000 at Jeweler").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) { NotificationHelper.showSuspiciousAmountNotification(any(), any(), any()) }
+        }
+
+    @Test
+    fun `suspicious transaction handles null fields safely`() =
+        runTest {
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 1000.0,
+                    transactionType = "invalid_type",
+                    merchantName = null,
+                    originalMerchantName = null,
+                    originalMessage = "Spent 1000",
+                    sourceSmsHash = "hashNullFields",
+                    needsReview = true,
+                    suspicionReason = null,
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 1000").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            val captor = slot<Transaction>()
+            verify {
+                NotificationHelper.showSuspiciousAmountNotification(
+                    context,
+                    capture(captor),
+                    "Amount flagged for review.",
+                )
+            }
+            assertEquals("Unknown Merchant", captor.captured.description)
+            assertNull(captor.captured.originalDescription)
+            assertEquals(TransactionType.EXPENSE, captor.captured.transactionType)
+        }
+
+    @Test
+    fun `null savedTxn skips merge check and recurring linking`() =
+        runTest {
+            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns null
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    merchantName = "Tea",
+                    originalMessage = "Spent 50",
+                    sourceSmsHash = "hashNullSavedTxn",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 50").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) }
+            coVerify(exactly = 0) { recurringDao.getRuleBySmsSenderId(any()) }
         }
 }

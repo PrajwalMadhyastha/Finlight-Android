@@ -105,9 +105,10 @@ class SmsProcessorWorker(
 
             // --- HIERARCHY STEP 2: ML pre-filter ---
             if (parseResult == null) {
-                val classifier = MlModelFactory.getClassifier(context)
-                val confidence = classifier.classify(body)
-                classifier.close()
+                val confidence =
+                    MlModelFactory.getClassifier(context).use { classifier ->
+                        classifier.classify(body)
+                    }
 
                 if (confidence < 0.1) {
                     Log.d(tag, "ML model ignored SMS (confidence=${1 - confidence}). Sender: $sender")
@@ -115,9 +116,10 @@ class SmsProcessorWorker(
                 }
 
                 // --- HIERARCHY STEP 3: NER + main parser ---
-                val nerExtractor = MlModelFactory.getNerExtractor(context)
-                val nerEntities = nerExtractor.extract(body)
-                nerExtractor.close()
+                val nerEntities =
+                    MlModelFactory.getNerExtractor(context).use { nerExtractor ->
+                        nerExtractor.extract(body)
+                    }
 
                 Log.d(tag, "NER extraction complete. Entity types found: ${nerEntities.keys}")
 
@@ -302,8 +304,11 @@ class SmsProcessorWorker(
             Result.success()
         } catch (e: CancellationException) {
             throw e
+        } catch (oom: OutOfMemoryError) {
+            Log.e(tag, "SmsProcessorWorker encountered OOM on attempt $runAttemptCount. Failing permanently.", oom)
+            Result.failure()
         } catch (e: Exception) {
-            Log.e(tag, "SmsProcessorWorker failed (attempt $runAttemptCount): ${e.javaClass.simpleName}")
+            Log.e(tag, "SmsProcessorWorker failed (attempt $runAttemptCount): ${e.message}", e)
             if (runAttemptCount >= 2) Result.failure() else Result.retry()
         }
     }
