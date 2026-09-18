@@ -44,11 +44,11 @@ class SmsReceiverTest : BaseViewModelTest() {
 
     @Implements(Telephony.Sms.Intents::class)
     object ShadowTelephonyIntents {
-        var mockSmsMessages: Array<AndroidSmsMessage> = emptyArray()
+        var mockSmsMessages: Array<AndroidSmsMessage>? = emptyArray()
 
         @JvmStatic
         @Implementation
-        fun getMessagesFromIntent(intent: Intent?): Array<AndroidSmsMessage> = mockSmsMessages
+        fun getMessagesFromIntent(intent: Intent?): Array<AndroidSmsMessage>? = mockSmsMessages
     }
 
     @Before
@@ -109,6 +109,48 @@ class SmsReceiverTest : BaseViewModelTest() {
 
         receiver.onReceive(context, Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION))
         verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `null messages array from intent does nothing and does not crash`() {
+        ShadowTelephonyIntents.mockSmsMessages = null
+        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+        receiver.onReceive(context, intent)
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `empty messages array from intent does nothing and does not crash`() {
+        ShadowTelephonyIntents.mockSmsMessages = emptyArray()
+        val intent = Intent(Telephony.Sms.Intents.SMS_RECEIVED_ACTION)
+        receiver.onReceive(context, intent)
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `empty parts list for sender does not throw NoSuchElementException and is skipped`() {
+        receiver.dispatchMessages(
+            context,
+            mapOf("AM-HDFCBK" to emptyList()),
+        )
+        verify(exactly = 0) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
+    }
+
+    @Test
+    fun `sender with empty parts is skipped while sender with valid parts is enqueued`() {
+        val validMsg = mockk<AndroidSmsMessage>()
+        every { validMsg.originatingAddress } returns "AM-ICICI"
+        every { validMsg.messageBody } returns "Spent Rs.200"
+        every { validMsg.timestampMillis } returns 2L
+
+        receiver.dispatchMessages(
+            context,
+            mapOf(
+                "AM-EMPTY" to emptyList(),
+                "AM-ICICI" to listOf(validMsg),
+            ),
+        )
+        verify(exactly = 1) { mockWorkManager.enqueue(any<OneTimeWorkRequest>()) }
     }
 
     @Test
