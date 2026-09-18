@@ -71,12 +71,13 @@ object MlModelFactory {
         }
     }
 
-    private fun loadClassifierVocab(
-        context: Context,
-        vocabName: String = "vocab.txt",
-    ): Map<String, Int> {
+    private const val CLASSIFIER_VOCAB_FILE = "vocab.txt"
+    private const val NER_VOCAB_FILE = "ner_vocab.txt"
+    private const val NER_LABEL_MAP_FILE = "ner_label_map.json"
+
+    private fun loadClassifierVocab(context: Context): Map<String, Int> {
         val map = mutableMapOf<String, Int>()
-        context.assets.open(vocabName).bufferedReader().useLines { lines ->
+        context.assets.open(CLASSIFIER_VOCAB_FILE).bufferedReader().useLines { lines ->
             lines.forEachIndexed { index, line ->
                 map[line] = index
             }
@@ -84,12 +85,9 @@ object MlModelFactory {
         return map
     }
 
-    private fun loadNerVocab(
-        context: Context,
-        vocabName: String = "ner_vocab.txt",
-    ): Map<String, Int> {
+    private fun loadNerVocab(context: Context): Map<String, Int> {
         val map = mutableMapOf<String, Int>()
-        context.assets.open(vocabName).bufferedReader().useLines { lines ->
+        context.assets.open(NER_VOCAB_FILE).bufferedReader().useLines { lines ->
             lines.forEachIndexed { index, line ->
                 map[line] = index
             }
@@ -97,11 +95,8 @@ object MlModelFactory {
         return map
     }
 
-    private fun loadNerLabelMap(
-        context: Context,
-        labelMapName: String = "ner_label_map.json",
-    ): Map<Int, String> {
-        val jsonStr = context.assets.open(labelMapName).bufferedReader().readText()
+    private fun loadNerLabelMap(context: Context): Map<Int, String> {
+        val jsonStr = context.assets.open(NER_LABEL_MAP_FILE).bufferedReader().readText()
         if (jsonStr.isBlank()) {
             return emptyMap()
         }

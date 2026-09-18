@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import io.pm.finlight.TestApplication
+import org.json.JSONException
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -15,10 +16,13 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import org.tensorflow.lite.Interpreter
 import java.io.ByteArrayInputStream
+import java.io.FileNotFoundException
+import java.io.IOException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
@@ -205,7 +209,8 @@ class MlModelFactoryTest {
             assertNotNull(classifier1)
             assertNotNull(classifier2)
             assertNotSame(classifier1, classifier2)
-            assertEquals(classifier1.vocab, classifier2.vocab)
+            assertSame(MlModelFactory.getClassifierVocab(context), classifier1.vocab)
+            assertSame(classifier1.vocab, classifier2.vocab)
             assertTrue(classifier1.vocab.isNotEmpty())
         } finally {
             classifier1.close()
@@ -225,9 +230,247 @@ class MlModelFactoryTest {
             assertNotNull(extractor1)
             assertNotNull(extractor2)
             assertNotSame(extractor1, extractor2)
+            assertSame(MlModelFactory.getNerVocab(context), extractor1.tokenizerInstance?.vocabMap)
+            assertSame(extractor1.tokenizerInstance?.vocabMap, extractor2.tokenizerInstance?.vocabMap)
+            assertSame(MlModelFactory.getNerLabelMap(context), extractor1.idToLabelMap)
+            assertSame(extractor1.idToLabelMap, extractor2.idToLabelMap)
         } finally {
             extractor1.close()
             extractor2.close()
+        }
+    }
+
+    @Test
+    fun `getNerLabelMap returns empty map when id_to_label key is missing`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("ner_label_map.json") } answers {
+            ByteArrayInputStream("{}".toByteArray())
+        }
+
+        val map = MlModelFactory.getNerLabelMap(mockContext)
+        assertTrue(map.isEmpty())
+    }
+
+    @Test
+    fun `inner double-checked lock branch reuses cached classifier vocab under contention`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+
+        val thread1InLock = CountDownLatch(1)
+        val thread1Release = CountDownLatch(1)
+
+        every { mockAssets.open("vocab.txt") } answers {
+            thread1InLock.countDown()
+            thread1Release.await(5, TimeUnit.SECONDS)
+            ByteArrayInputStream("token1\ntoken2".toByteArray())
+        }
+
+        val executor = Executors.newFixedThreadPool(2)
+        val future1 =
+            executor.submit<Map<String, Int>> {
+                MlModelFactory.getClassifierVocab(mockContext)
+            }
+
+        assertTrue(thread1InLock.await(5, TimeUnit.SECONDS))
+
+        val thread2Done = CountDownLatch(1)
+        var vocab2: Map<String, Int>? = null
+        executor.submit {
+            vocab2 = MlModelFactory.getClassifierVocab(mockContext)
+            thread2Done.countDown()
+        }
+
+        Thread.sleep(100)
+        thread1Release.countDown()
+
+        val vocab1 = future1.get(5, TimeUnit.SECONDS)
+        assertTrue(thread2Done.await(5, TimeUnit.SECONDS))
+        executor.shutdown()
+
+        assertSame(vocab1, vocab2)
+        verify(exactly = 1) { mockAssets.open("vocab.txt") }
+    }
+
+    @Test
+    fun `inner double-checked lock branch reuses cached ner vocab under contention`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+
+        val thread1InLock = CountDownLatch(1)
+        val thread1Release = CountDownLatch(1)
+
+        every { mockAssets.open("ner_vocab.txt") } answers {
+            thread1InLock.countDown()
+            thread1Release.await(5, TimeUnit.SECONDS)
+            ByteArrayInputStream("tokenA\ntokenB".toByteArray())
+        }
+
+        val executor = Executors.newFixedThreadPool(2)
+        val future1 =
+            executor.submit<Map<String, Int>> {
+                MlModelFactory.getNerVocab(mockContext)
+            }
+
+        assertTrue(thread1InLock.await(5, TimeUnit.SECONDS))
+
+        val thread2Done = CountDownLatch(1)
+        var vocab2: Map<String, Int>? = null
+        executor.submit {
+            vocab2 = MlModelFactory.getNerVocab(mockContext)
+            thread2Done.countDown()
+        }
+
+        Thread.sleep(100)
+        thread1Release.countDown()
+
+        val vocab1 = future1.get(5, TimeUnit.SECONDS)
+        assertTrue(thread2Done.await(5, TimeUnit.SECONDS))
+        executor.shutdown()
+
+        assertSame(vocab1, vocab2)
+        verify(exactly = 1) { mockAssets.open("ner_vocab.txt") }
+    }
+
+    @Test
+    fun `inner double-checked lock branch reuses cached ner label map under contention`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+
+        val thread1InLock = CountDownLatch(1)
+        val thread1Release = CountDownLatch(1)
+
+        every { mockAssets.open("ner_label_map.json") } answers {
+            thread1InLock.countDown()
+            thread1Release.await(5, TimeUnit.SECONDS)
+            ByteArrayInputStream("""{"id_to_label": {"0": "O"}}""".toByteArray())
+        }
+
+        val executor = Executors.newFixedThreadPool(2)
+        val future1 =
+            executor.submit<Map<Int, String>> {
+                MlModelFactory.getNerLabelMap(mockContext)
+            }
+
+        assertTrue(thread1InLock.await(5, TimeUnit.SECONDS))
+
+        val thread2Done = CountDownLatch(1)
+        var map2: Map<Int, String>? = null
+        executor.submit {
+            map2 = MlModelFactory.getNerLabelMap(mockContext)
+            thread2Done.countDown()
+        }
+
+        Thread.sleep(100)
+        thread1Release.countDown()
+
+        val map1 = future1.get(5, TimeUnit.SECONDS)
+        assertTrue(thread2Done.await(5, TimeUnit.SECONDS))
+        executor.shutdown()
+
+        assertSame(map1, map2)
+        verify(exactly = 1) { mockAssets.open("ner_label_map.json") }
+    }
+
+    @Test
+    fun `getNerLabelMap throws JSONException on malformed JSON and does not poison cache`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("ner_label_map.json") } answers {
+            ByteArrayInputStream("{malformed".toByteArray())
+        }
+
+        assertFailsWith<JSONException> {
+            MlModelFactory.getNerLabelMap(mockContext)
+        }
+
+        every { mockAssets.open("ner_label_map.json") } answers {
+            ByteArrayInputStream("""{"id_to_label": {"0": "O"}}""".toByteArray())
+        }
+        val map = MlModelFactory.getNerLabelMap(mockContext)
+        assertEquals("O", map[0])
+    }
+
+    @Test
+    fun `getClassifierVocab throws IOException when asset is missing and does not poison cache`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("vocab.txt") } throws IOException("File not found")
+
+        assertFailsWith<IOException> {
+            MlModelFactory.getClassifierVocab(mockContext)
+        }
+
+        every { mockAssets.open("vocab.txt") } answers {
+            ByteArrayInputStream("token1\ntoken2".toByteArray())
+        }
+        val vocab = MlModelFactory.getClassifierVocab(mockContext)
+        assertEquals(2, vocab.size)
+    }
+
+    @Test
+    fun `getNerVocab throws IOException when asset is missing and does not poison cache`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("ner_vocab.txt") } throws IOException("File not found")
+
+        assertFailsWith<IOException> {
+            MlModelFactory.getNerVocab(mockContext)
+        }
+
+        every { mockAssets.open("ner_vocab.txt") } answers {
+            ByteArrayInputStream("tokenA\ntokenB".toByteArray())
+        }
+        val vocab = MlModelFactory.getNerVocab(mockContext)
+        assertEquals(2, vocab.size)
+    }
+
+    @Test
+    fun `getNerLabelMap throws IOException when asset is missing and does not poison cache`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("ner_label_map.json") } throws IOException("File not found")
+
+        assertFailsWith<IOException> {
+            MlModelFactory.getNerLabelMap(mockContext)
+        }
+
+        every { mockAssets.open("ner_label_map.json") } answers {
+            ByteArrayInputStream("""{"id_to_label": {"0": "O"}}""".toByteArray())
+        }
+        val map = MlModelFactory.getNerLabelMap(mockContext)
+        assertEquals("O", map[0])
+    }
+
+    @Test
+    fun `getClassifier and getNerExtractor exercise default interpreterFactory parameter`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<android.content.res.AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("vocab.txt") } answers {
+            ByteArrayInputStream("token1".toByteArray())
+        }
+        every { mockAssets.open("ner_vocab.txt") } answers {
+            ByteArrayInputStream("tokenA".toByteArray())
+        }
+        every { mockAssets.open("ner_label_map.json") } answers {
+            ByteArrayInputStream("""{"id_to_label": {"0": "O"}}""".toByteArray())
+        }
+        every { mockAssets.openFd(any()) } throws FileNotFoundException("Test stub")
+
+        runCatching {
+            MlModelFactory.getClassifier(mockContext)
+        }
+        runCatching {
+            MlModelFactory.getNerExtractor(mockContext)
         }
     }
 
