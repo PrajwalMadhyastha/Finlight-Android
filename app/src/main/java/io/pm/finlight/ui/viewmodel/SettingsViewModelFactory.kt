@@ -8,8 +8,7 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.ml.NerExtractor
-import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.MlModelFactory
 
 class SettingsViewModelFactory(
     private val application: Application,
@@ -25,8 +24,8 @@ class SettingsViewModelFactory(
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val smsRepository = ServiceLocator.provideSmsRepository(application)
-            val smsClassifier = SmsClassifier(application)
-            val nerExtractor = NerExtractor(application)
+            val smsClassifier = MlModelFactory.getClassifier(application)
+            val nerExtractor = MlModelFactory.getNerExtractor(application)
             val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")

@@ -98,6 +98,23 @@ class SmsClassifier private constructor(
     }
 
     /**
+     * Constructor accepting pre-loaded vocabulary.
+     */
+    constructor(
+        context: Context,
+        vocab: Map<String, Int>,
+        modelName: String = "sms_classifier.tflite",
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
+    ) : this(context, modelName, "", vocab, null, interpreterFactory) {
+        loadModel()
+    }
+
+    constructor(
+        preloadedVocab: Map<String, Int>,
+        hostContext: Context,
+    ) : this(hostContext, preloadedVocab)
+
+    /**
      * Internal constructor for unit testing.
      * Allows injecting pre-loaded vocabulary and interpreter.
      */

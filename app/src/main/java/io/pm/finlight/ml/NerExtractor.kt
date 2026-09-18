@@ -68,6 +68,30 @@ class NerExtractor private constructor(
     }
 
     /**
+     * Constructor accepting pre-loaded vocabulary and label map.
+     */
+    constructor(
+        context: Context,
+        vocab: Map<String, Int>,
+        labelMap: Map<Int, String>,
+        modelName: String = DEFAULT_MODEL,
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
+    ) : this(
+        context = context,
+        modelName = modelName,
+        vocabName = "",
+        labelMapName = "",
+        preloadedTokenizer = WordPieceTokenizer(vocab),
+        preloadedInterpreter = null,
+        preloadedLabelMap = labelMap,
+    ) {
+        if (interpreterFactory != null) {
+            this.interpreterFactory = interpreterFactory
+        }
+        loadModel()
+    }
+
+    /**
      * Internal constructor for unit testing.
      */
     @VisibleForTesting
