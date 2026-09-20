@@ -22,8 +22,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -317,5 +320,236 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             val id = saver.resolveAndSaveTransaction(makeTxn())
 
             assertNull(id)
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null and upgrades when legacy hash exists in database`() =
+        runTest {
+            val potentialTxn = makeTxn()
+            val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash(potentialTxn.sourceSmsHash!!) } returns false
+            coEvery { transactionQueryDao.existsBySmsHash(legacyHash) } returns true
+            coEvery { transactionWriteDao.updateSmsHashByLegacy(any(), any()) } just runs
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNull(id)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) {
+                transactionWriteDao.updateSmsHashByLegacy(
+                    oldHash = legacyHash,
+                    newHash = potentialTxn.sourceSmsHash!!,
+                )
+            }
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null when legacy hash is in deleted deny-list`() =
+        runTest {
+            val potentialTxn = makeTxn()
+            val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+
+            val mockDeletedDao = mockk<DeletedSmsHashDao>(relaxed = true)
+            every { db.deletedSmsHashDao() } returns mockDeletedDao
+            coEvery { mockDeletedDao.existsByHash(potentialTxn.sourceSmsHash!!) } returns false
+            coEvery { mockDeletedDao.existsByHash(legacyHash) } returns true
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash(any()) } returns false
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNull(id)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) { mockDeletedDao.insert(match { it.smsHash == potentialTxn.sourceSmsHash }) }
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction returns null when current hash is in deleted deny-list`() =
+        runTest {
+            val potentialTxn = makeTxn()
+            val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+
+            val mockDeletedDao = mockk<DeletedSmsHashDao>(relaxed = true)
+            every { db.deletedSmsHashDao() } returns mockDeletedDao
+            coEvery { mockDeletedDao.existsByHash(potentialTxn.sourceSmsHash!!) } returns true
+            coEvery { mockDeletedDao.existsByHash(legacyHash) } returns false
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            coEvery { transactionQueryDao.existsBySmsHash(any()) } returns false
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNull(id)
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockDeletedDao.insert(any()) }
+        }
+
+    @Test
+    fun `resolveAndSaveTransaction succeeds when sourceSmsHash is null`() =
+        runTest {
+            val potentialTxn = makeTxn().copy(sourceSmsHash = null)
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+
+            val id = saver.resolveAndSaveTransaction(potentialTxn)
+
+            assertNotNull(id)
+            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
+        }
+
+    // -------------------------------------------------------------------------
+    // Issue #305: Account Sanitization and Amount Guard Tests
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `oversized account name is truncated to 60 characters before DAO calls`() =
+        runTest {
+            val longAccountName = "A".repeat(85)
+            val expectedTruncatedName = "A".repeat(60)
+
+            coEvery { accountAliasDao.findByAlias(expectedTruncatedName) } returns null
+            coEvery { accountDao.findByName(expectedTruncatedName) } returns null
+            coEvery { accountDao.insert(any()) } returns 42L
+            coEvery { accountDao.getAccountByIdSync(42) } returns Account(42, expectedTruncatedName, "Bank Account")
+
+            val id = saver.resolveAndSaveTransaction(makeTxn(account = longAccountName))
+
+            assertNotNull(id)
+            coVerify { accountAliasDao.findByAlias(expectedTruncatedName) }
+            coVerify { accountDao.findByName(expectedTruncatedName) }
+            coVerify { accountDao.insert(match { it.name == expectedTruncatedName }) }
+        }
+
+    @Test
+    fun `account name with control characters has them stripped before DAO calls`() =
+        runTest {
+            val dirtyAccountName = "HDFC\n\u0000\t Bank\r"
+            val expectedCleanName = "HDFC Bank"
+
+            coEvery { accountAliasDao.findByAlias(expectedCleanName) } returns null
+            coEvery { accountDao.findByName(expectedCleanName) } returns null
+            coEvery { accountDao.insert(any()) } returns 43L
+            coEvery { accountDao.getAccountByIdSync(43) } returns Account(43, expectedCleanName, "Bank Account")
+
+            val id = saver.resolveAndSaveTransaction(makeTxn(account = dirtyAccountName))
+
+            assertNotNull(id)
+            coVerify { accountAliasDao.findByAlias(expectedCleanName) }
+            coVerify { accountDao.findByName(expectedCleanName) }
+            coVerify { accountDao.insert(match { it.name == expectedCleanName }) }
+        }
+
+    @Test
+    fun `multi-sentence account hallucination does not create full-sentence account name in DB`() =
+        runTest {
+            val multiSentenceAccount =
+                "Your account ending in 1234 has been debited by Rs 500 for a purchase at Starbucks. Please contact support."
+
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns null
+            coEvery { accountDao.insert(any()) } returns 44L
+            coEvery { accountDao.getAccountByIdSync(44) } returns Account(44, "Truncated", "Bank Account")
+
+            val id = saver.resolveAndSaveTransaction(makeTxn(account = multiSentenceAccount))
+
+            assertNotNull(id)
+            val insertedAccountSlot = slot<Account>()
+            coVerify { accountDao.insert(capture(insertedAccountSlot)) }
+            assertTrue(
+                insertedAccountSlot.captured.name.length <= 60,
+                "Account name must be at most 60 characters",
+            )
+            assertFalse(
+                insertedAccountSlot.captured.name == multiSentenceAccount,
+                "Account name must not be the full multi-sentence string",
+            )
+        }
+
+    @Test
+    fun `transaction with zero amount is dropped and returns null`() =
+        runTest {
+            val id = saver.resolveAndSaveTransaction(makeTxn().copy(amount = 0.0))
+
+            assertNull(id)
+            coVerify(exactly = 0) { accountDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `transaction with negative amount is dropped and returns null`() =
+        runTest {
+            val id = saver.resolveAndSaveTransaction(makeTxn().copy(amount = -75.0))
+
+            assertNull(id)
+            coVerify(exactly = 0) { accountDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `transaction with NaN or Infinite amount is dropped and returns null`() =
+        runTest {
+            val idNaN = saver.resolveAndSaveTransaction(makeTxn().copy(amount = Double.NaN))
+            val idInf = saver.resolveAndSaveTransaction(makeTxn().copy(amount = Double.POSITIVE_INFINITY))
+            val idNegInf = saver.resolveAndSaveTransaction(makeTxn().copy(amount = Double.NEGATIVE_INFINITY))
+
+            assertNull(idNaN)
+            assertNull(idInf)
+            assertNull(idNegInf)
+            coVerify(exactly = 0) { accountDao.insert(any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `sub-60 multi-sentence account hallucination is truncated at sentence break`() =
+        runTest {
+            val multiSentenceAccount = "A/c debited. Do not share OTP."
+            val expectedCleanName = "A/c debited"
+
+            coEvery { accountAliasDao.findByAlias(expectedCleanName) } returns null
+            coEvery { accountDao.findByName(expectedCleanName) } returns null
+            coEvery { accountDao.insert(any()) } returns 45L
+            coEvery { accountDao.getAccountByIdSync(45) } returns Account(45, expectedCleanName, "Bank Account")
+
+            val id = saver.resolveAndSaveTransaction(makeTxn(account = multiSentenceAccount))
+
+            assertNotNull(id)
+            val insertedAccountSlot = slot<Account>()
+            coVerify { accountDao.insert(capture(insertedAccountSlot)) }
+            assertEquals(expectedCleanName, insertedAccountSlot.captured.name)
+        }
+
+    @Test
+    fun `foreign transaction with non-positive or invalid conversion rate falls back to 1_0`() =
+        runTest {
+            coEvery { accountAliasDao.findByAlias(any()) } returns null
+            coEvery { accountDao.findByName(any()) } returns Account(1, "HDFC", "Bank")
+            val captor = slot<Transaction>()
+            coEvery { transactionWriteDao.insert(capture(captor)) } returns 56L
+
+            val zeroRateSettings =
+                TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 0f,
+                )
+
+            saver.resolveAndSaveTransaction(makeTxn().copy(amount = 150.0), isForeign = true, travelSettings = zeroRateSettings)
+            assertEquals(150.0, captor.captured.amount, 0.001)
+            assertEquals(1.0, captor.captured.conversionRate ?: 0.0, 0.001)
+
+            val nanRateSettings =
+                TravelModeSettings(
+                    isEnabled = true, tripName = "Trip", tripType = TripType.INTERNATIONAL,
+                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = Float.NaN,
+                )
+            saver.resolveAndSaveTransaction(makeTxn().copy(amount = 200.0), isForeign = true, travelSettings = nanRateSettings)
+            assertEquals(200.0, captor.captured.amount, 0.001)
+            assertEquals(1.0, captor.captured.conversionRate ?: 0.0, 0.001)
         }
 }

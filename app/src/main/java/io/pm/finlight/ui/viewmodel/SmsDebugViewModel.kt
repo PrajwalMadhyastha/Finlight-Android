@@ -180,6 +180,7 @@ class SmsDebugViewModel(
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
             val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
+            val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
 
             for (sms in recentSms) {
                 // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---
@@ -222,7 +223,11 @@ class SmsDebugViewModel(
 
                 val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
                 if ((originalResult !is ParseResult.Success) && newParseResult is ParseResult.Success) {
-                    if (newParseResult.transaction.sourceSmsHash !in existingSmsHashes) {
+                    val currentHash = newParseResult.transaction.sourceSmsHash
+                    val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                    if (currentHash !in existingSmsHashes && legacyHash !in existingSmsHashes &&
+                        currentHash !in deletedHashes && legacyHash !in deletedHashes
+                    ) {
                         transactionsToImport.add(newParseResult.transaction)
                     }
                 }

@@ -466,4 +466,342 @@ class TransactionViewModelSmsTest : TransactionViewModelBaseSetup() {
             assertFalse(result)
             verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
         }
+
+    @Test
+    fun `approveSmsTransaction returns false and updates hash when legacy sourceSmsHash exists in database`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false and updates hash when legacy sourceSmsHash exists in database`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false when current sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(true)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(false)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction returns false and inserts upgraded hash when legacy sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Auto Merchant", message, PotentialAccount("Cash", "Wallet"), currentHash, 1)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false when current sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(true)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(false)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction returns false and inserts upgraded hash when legacy sourceSmsHash exists in deletedSmsHashDao`() =
+        runTest {
+            val sender = "AM-HDFCBK"
+            val message = "Spent Rs. 100 at Swiggy"
+            val currentHash = SmsParser.computeSmsHash(sender, message)
+            val legacyHash = SmsParser.computeLegacySmsHash(sender, message)
+            val potentialTxn =
+                PotentialTransaction(1L, sender, 100.0, "expense", "Test Merchant", message, PotentialAccount("Cash", "Bank"), currentHash)
+            whenever(transactionQueryDao.existsBySmsHash(currentHash)).thenReturn(false)
+            whenever(transactionQueryDao.existsBySmsHash(legacyHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(currentHash)).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(legacyHash)).thenReturn(true)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertFalse(result)
+            verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    // -------------------------------------------------------------------------
+    // Issue #305 / Remediation: Amount Positivity and Account Sanitization
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `autoSaveSmsTransaction drops non-positive, NaN, or Infinite amount and returns false`() =
+        runTest {
+            val baseTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 0.0,
+                    transactionType = "expense",
+                    merchantName = "Test",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount("HDFC", "Bank"),
+                    sourceSmsHash = "hash1",
+                )
+
+            assertFalse(viewModel.autoSaveSmsTransaction(baseTxn.copy(amount = 0.0)))
+            assertFalse(viewModel.autoSaveSmsTransaction(baseTxn.copy(amount = -50.0)))
+            assertFalse(viewModel.autoSaveSmsTransaction(baseTxn.copy(amount = Double.NaN)))
+            assertFalse(viewModel.autoSaveSmsTransaction(baseTxn.copy(amount = Double.POSITIVE_INFINITY)))
+            assertFalse(viewModel.autoSaveSmsTransaction(baseTxn.copy(amount = Double.NEGATIVE_INFINITY)))
+            advanceUntilIdle()
+
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `autoSaveSmsTransaction sanitizes account name before checking alias or dao`() =
+        runTest {
+            val dirtyAccount = "HDFC\n\u0000\t Bank. Do not share OTP."
+            val expectedCleanName = "HDFC Bank"
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Test",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount(dirtyAccount, "Bank"),
+                    sourceSmsHash = "hash2",
+                )
+            whenever(accountAliasDao.findByAlias(expectedCleanName)).thenReturn(null)
+            whenever(accountDao.findByName(expectedCleanName)).thenReturn(Account(1, expectedCleanName, "Bank"))
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            val result = viewModel.autoSaveSmsTransaction(potentialTxn)
+            advanceUntilIdle()
+
+            assertTrue(result)
+            verify(accountAliasDao).findByAlias(expectedCleanName)
+            verify(accountDao).findByName(expectedCleanName)
+        }
+
+    @Test
+    fun `approveSmsTransaction drops non-positive, NaN, or Infinite amount and returns false`() =
+        runTest {
+            val baseTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 0.0,
+                    transactionType = "expense",
+                    merchantName = "Test",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount("HDFC", "Bank"),
+                    sourceSmsHash = "hash3",
+                )
+
+            assertFalse(viewModel.approveSmsTransaction(baseTxn.copy(amount = 0.0), "Test", null, null, emptySet(), false))
+            assertFalse(viewModel.approveSmsTransaction(baseTxn.copy(amount = -100.0), "Test", null, null, emptySet(), false))
+            assertFalse(viewModel.approveSmsTransaction(baseTxn.copy(amount = Double.NaN), "Test", null, null, emptySet(), false))
+            assertFalse(viewModel.approveSmsTransaction(baseTxn.copy(amount = Double.POSITIVE_INFINITY), "Test", null, null, emptySet(), false))
+            advanceUntilIdle()
+
+            verify(transactionRepository, never()).insertTransactionWithTags(any(), any())
+        }
+
+    @Test
+    fun `approveSmsTransaction sanitizes account name before checking or inserting account`() =
+        runTest {
+            val dirtyAccount = "SBI\nBank A/c 1234. Ignore OTP."
+            val expectedCleanName = "SBI Bank A/c 1234"
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-SBIBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Test",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount(dirtyAccount, "Bank"),
+                    sourceSmsHash = "hash4",
+                )
+            whenever(db.accountDao().findByName(expectedCleanName)).thenReturn(null).thenReturn(Account(10, expectedCleanName, "Bank"))
+            whenever(accountRepository.insert(any())).thenReturn(10L)
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test", null, null, emptySet(), false)
+            advanceUntilIdle()
+
+            assertTrue(result)
+            val accountCaptor = argumentCaptor<Account>()
+            verify(accountRepository).insert(accountCaptor.capture())
+            assertEquals(expectedCleanName, accountCaptor.firstValue.name)
+        }
+
+    @Test
+    fun `approveSmsTransaction falls back to conversion rate 1_0 when travel conversion rate is invalid`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    transactionType = "expense",
+                    merchantName = "Test Merchant",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount("HDFC", "Bank"),
+                    sourceSmsHash = "hash5",
+                )
+            whenever(db.accountDao().findByName("HDFC")).thenReturn(Account(1, "HDFC", "Bank"))
+            val invalidRateSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 0L,
+                    endDate = Long.MAX_VALUE,
+                    currencyCode = "EUR",
+                    conversionRate = 0f,
+                )
+            whenever(settingsRepository.getTravelModeSettings()).thenReturn(flowOf(invalidRateSettings))
+            initializeViewModel()
+            val transactionCaptor = argumentCaptor<Transaction>()
+            whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(1L)
+
+            val result = viewModel.approveSmsTransaction(potentialTxn, "Test Merchant", null, null, emptySet(), true)
+            advanceUntilIdle()
+
+            assertTrue(result)
+            verify(transactionRepository).insertTransactionWithTags(transactionCaptor.capture(), eq(emptySet()))
+            assertEquals(100.0, transactionCaptor.firstValue.amount, 0.01)
+            assertEquals(1.0, transactionCaptor.firstValue.conversionRate ?: 0.0, 0.01)
+        }
+
+    @Test
+    fun `reparseTransactionFromSms sanitizes parsed account name before querying or inserting`() =
+        runTest {
+            // ARRANGE
+            mockkObject(SmsParser)
+            every { SmsParser.sanitizeAccountName(any()) } answers { callOriginal() }
+            val originalTxn =
+                Transaction(
+                    id = 1,
+                    description = "Old",
+                    categoryId = 1,
+                    amount = 100.0,
+                    date = 0,
+                    accountId = 1,
+                    notes = null,
+                    sourceSmsId = 123L,
+                )
+            val sms = SmsMessage(123L, "Sender", "New Merchant spent 150 from HDFC", 0L)
+            val newParsedTxn =
+                PotentialTransaction(
+                    sourceSmsId = 123L,
+                    smsSender = "Sender",
+                    amount = 150.0,
+                    transactionType = "expense",
+                    merchantName = "New Merchant",
+                    originalMessage = "Msg",
+                    potentialAccount = PotentialAccount("HDFC\nBank. Do not share OTP.", "Bank"),
+                    categoryId = 2,
+                )
+
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(originalTxn))
+            whenever(smsRepository.getSmsDetailsById(123L)).thenReturn(sms)
+            whenever(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            whenever(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            whenever(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            whenever(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            whenever(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            whenever(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            whenever(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+
+            whenever(accountRepository.getAccountByIdSync(1)).thenReturn(Account(1, "Old Bank", "Bank"))
+            whenever(accountDao.findByName("HDFC Bank")).thenReturn(null)
+            whenever(accountRepository.insert(Account(name = "HDFC Bank", type = "Bank"))).thenReturn(2L)
+            whenever(accountRepository.getAccountByIdSync(2)).thenReturn(Account(2, "HDFC Bank", "Bank"))
+
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Success(newParsedTxn)
+
+            try {
+                // ACT
+                viewModel.reparseTransactionFromSms(1)
+                advanceUntilIdle()
+
+                // ASSERT
+                verify(accountDao).findByName("HDFC Bank")
+                verify(accountRepository).insert(Account(name = "HDFC Bank", type = "Bank"))
+                verify(transactionRepository).updateAccountId(1, 2)
+            } finally {
+                unmockkObject(SmsParser)
+            }
+        }
 }

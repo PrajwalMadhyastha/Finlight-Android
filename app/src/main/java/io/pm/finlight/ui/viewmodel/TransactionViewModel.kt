@@ -16,6 +16,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.room.withTransaction
 import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
@@ -1315,11 +1316,12 @@ class TransactionViewModel(
                 }
 
                 potentialTxn.potentialAccount?.let { parsedAccount ->
+                    val sanitizedName = SmsParser.sanitizeAccountName(parsedAccount.formattedName)
                     val currentAccount = accountRepository.getAccountByIdSync(transaction.accountId)
-                    if (currentAccount?.name?.equals(parsedAccount.formattedName, ignoreCase = true) == false) {
-                        var account = db.accountDao().findByName(parsedAccount.formattedName)
+                    if (currentAccount?.name?.equals(sanitizedName, ignoreCase = true) == false) {
+                        var account = db.accountDao().findByName(sanitizedName)
                         if (account == null) {
-                            val newAccount = Account(name = parsedAccount.formattedName, type = parsedAccount.accountType)
+                            val newAccount = Account(name = sanitizedName, type = parsedAccount.accountType)
                             val newId = accountRepository.insert(newAccount)
                             account = accountRepository.getAccountByIdSync(newId.toInt())
                         }
@@ -1711,6 +1713,31 @@ class TransactionViewModel(
         currentTxnIdForTags = null
     }
 
+    private suspend fun isDuplicateOrDeletedSms(
+        potentialTxn: PotentialTransaction,
+        actionName: String,
+    ): Boolean {
+        val hash = potentialTxn.sourceSmsHash ?: return false
+        if (db.transactionQueryDao().existsBySmsHash(hash)) {
+            Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping $actionName.")
+            return true
+        }
+        val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+        if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+            Log.d(TAG, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading and skipping $actionName.")
+            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+            return true
+        }
+        if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
+            Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping $actionName.")
+            if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
+                db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+            }
+            return true
+        }
+        return false
+    }
+
     suspend fun approveSmsTransaction(
         potentialTxn: PotentialTransaction,
         description: String,
@@ -1721,14 +1748,16 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
-                potentialTxn.sourceSmsHash?.let { hash ->
-                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping approve.")
-                        return@withContext false
-                    }
+                if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+                    Log.e(TAG, "Invalid transaction amount: ${potentialTxn.amount}. Approve dropped.")
+                    return@withContext false
                 }
 
-                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                if (isDuplicateOrDeletedSms(potentialTxn, "approve")) {
+                    return@withContext false
+                }
+
+                val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
                 var account = db.accountDao().findByName(accountName)
@@ -1748,12 +1777,19 @@ class TransactionViewModel(
                             Log.e(TAG, "Attempted to save foreign SMS transaction, but Travel Mode is not configured.")
                             return@withContext false
                         }
+                        val rawRate = travelSettings.conversionRate?.toDouble()
+                        val conversionRate =
+                            if (rawRate != null && rawRate > 0.0 && !rawRate.isNaN() && !rawRate.isInfinite()) {
+                                rawRate
+                            } else {
+                                1.0
+                            }
                         Transaction(
                             description = description,
                             // FIX: Use the raw pre-rename name for originalDescription.
                             originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
                             categoryId = categoryId,
-                            amount = potentialTxn.amount * (travelSettings.conversionRate ?: 1f),
+                            amount = potentialTxn.amount * conversionRate,
                             date = potentialTxn.date,
                             accountId = account.id,
                             notes = notes,
@@ -1763,7 +1799,7 @@ class TransactionViewModel(
                             source = "Imported",
                             originalAmount = potentialTxn.amount,
                             currencyCode = travelSettings.currencyCode,
-                            conversionRate = travelSettings.conversionRate?.toDouble(),
+                            conversionRate = conversionRate,
                         )
                     } else {
                         Transaction(
@@ -1813,14 +1849,16 @@ class TransactionViewModel(
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
-                potentialTxn.sourceSmsHash?.let { hash ->
-                    if (db.transactionQueryDao().existsBySmsHash(hash)) {
-                        Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping auto-save.")
-                        return@withContext false
-                    }
+                if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+                    Log.e(TAG, "Invalid transaction amount: ${potentialTxn.amount}. Auto-save dropped.")
+                    return@withContext false
                 }
 
-                val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+                if (isDuplicateOrDeletedSms(potentialTxn, "auto-save")) {
+                    return@withContext false
+                }
+
+                val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
                 var finalAccountId: Int? = null

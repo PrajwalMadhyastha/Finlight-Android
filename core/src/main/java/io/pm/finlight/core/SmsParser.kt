@@ -25,10 +25,12 @@
 // =================================================================================
 package io.pm.finlight
 
+import androidx.annotation.VisibleForTesting
 import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
 import io.pm.finlight.core.NerEntity
 import io.pm.finlight.core.utils.MerchantCleaner
 import io.pm.finlight.core.utils.StringSimilarity
+import java.security.MessageDigest
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 import kotlin.math.min
@@ -47,6 +49,29 @@ sealed class ParseResult {
 
 object SmsParser {
 
+    val ACCOUNT_CONTROL_CHARS_REGEX = Regex("[\\p{Cc}\\p{Cf}]")
+    private val SENTENCE_BREAK_REGEX = Regex("""(?<!\b(?:No|no|Acc|acc|Ltd|ltd))[.?!]\s+""")
+
+    /**
+     * Sanitizes an account name string by replacing line breaks and tabs with space,
+     * stripping control and format characters, collapsing whitespace, truncating at
+     * sentence-breaking punctuation, capping at 60 characters, and falling back to
+     * "Unknown Account" if empty or blank.
+     */
+    fun sanitizeAccountName(rawName: String?): String {
+        if (rawName == null) return "Unknown Account"
+        return rawName
+            .replace(Regex("[\\r\\n\\t]"), " ")
+            .replace(ACCOUNT_CONTROL_CHARS_REGEX, "")
+            .replace(Regex("\\s+"), " ")
+            .split(SENTENCE_BREAK_REGEX)
+            .firstOrNull()
+            ?.trim()
+            ?.take(60)
+            ?.trim()
+            ?.ifBlank { "Unknown Account" }
+            ?: "Unknown Account"
+    }
 
     /**
      * Amounts above this threshold (in home currency) are considered suspicious
@@ -60,8 +85,8 @@ object SmsParser {
      */
     private const val NER_CONFIDENCE_THRESHOLD = 0.70f
 
-    private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?([\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*([\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
-    private val FALLBACK_AMOUNT_REGEX = "([\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?([\\d,]+\\.?\\d*)|([\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
+    private val AMOUNT_WITH_HIGH_CONFIDENCE_KEYWORDS_REGEX = "(?:debited by|spent|debited for|credited with|sent|tranx of|transferred from|debited with)\\s+(?:(INR|RS|USD|SGD|MYR|EUR|GBP)[:.]?\\s*)?(-?[\\d,]+\\.?\\d*)|(?:Rs|INR)[:.]?\\s*(-?[\\d,]+\\.?\\d*)".toRegex(RegexOption.IGNORE_CASE)
+    private val FALLBACK_AMOUNT_REGEX = "(-?[\\d,]+\\.?\\d*)(INR|RS|USD|SGD|MYR|EUR|GBP)|(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)(?![a-zA-Z])[ .]*)?(-?[\\d,]+\\.?\\d*)|(-?[\\d,]+\\.?\\d*)\\s*(?:\\b(INR|RS|USD|SGD|MYR|EUR|GBP)\\b)".toRegex(RegexOption.IGNORE_CASE)
     // --- FIX: Added 'Txn' and 'Dr'/'Dr.' to the list of expense keywords, and disambiguated 'debit' to prevent matching 'Debit Card' ---
     val EXPENSE_KEYWORDS_REGEX = "\\b(spent|debited|paid|charged|debit instruction for|Txn|tranx of|deducted for|sent to|sent|withdrawn|DEBIT with amount|spent on|purchase of|transferred from|frm|debited by|has a debit by transfer of|without OTP/PIN|successfully debited with|was spent from|Deducted!?|Dr|Dr\\.|Dr with|debit of|debit(?!\\s*(?:card|a/?c|account|pin)))\\b|transaction has been recorded".toRegex(RegexOption.IGNORE_CASE)
     val INCOME_KEYWORDS_REGEX = "\\b(credited|received|deposited|refund of|refunded by|added|credited with salary of|reversal of transaction|unsuccessful and will be reversed|loaded with|has credit for|CREDIT with amount|CREDITED to your account|has a credit|has been CREDITED to your|is Credited for|We have credited)\\b".toRegex(RegexOption.IGNORE_CASE)
@@ -252,7 +277,7 @@ object SmsParser {
                     } catch (e: PatternSyntaxException) { /* Ignore */ }
                 }
 
-                if (customAmount != null) {
+                if (customAmount != null && customAmount > 0.0 && !customAmount.isNaN() && !customAmount.isInfinite()) {
                     var customMerchant: String? = null
                     rule.merchantRegex?.let { regex ->
                         try {
@@ -298,7 +323,11 @@ object SmsParser {
                         }
                     }
 
-                    var finalAccount = customAccountStr?.let { PotentialAccount(it, "Unknown") }
+                    var finalAccount =
+                        customAccountStr?.let {
+                            val sanitized = sanitizeAccountName(it)
+                            if (sanitized == "Unknown Account") null else PotentialAccount(sanitized, "Unknown")
+                        }
                     if (finalAccount == null) {
                         finalAccount = parseAccount(normalizedBody, sms.sender)
                     }
@@ -413,7 +442,7 @@ object SmsParser {
             }
 
             val amount = extractedAmount
-            if (amount != null) {
+            if (amount != null && amount > 0.0 && !amount.isNaN() && !amount.isInfinite()) {
                 // Transaction type always comes from keywords (NER doesn't extract this)
                 val transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "expense" else if (INCOME_KEYWORDS_REGEX.containsMatchIn(normalizedBody)) "income" else null
                 if (transactionType != null) {
@@ -458,14 +487,14 @@ object SmsParser {
                     if (nerAmountConf != null && nerAmountConf < NER_CONFIDENCE_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "NER model uncertainty: AMOUNT confidence was ${"%.0f".format(nerAmountConf * 100)}% (threshold ${"%.0f".format(NER_CONFIDENCE_THRESHOLD * 100)}%)."
-                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SMS: ${sms.body.take(80)}")
+                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SenderHash: ${sms.sender.hashCode()}, Amount: $amount")
                     }
 
                     // Option A: Hard upper-bound threshold (₹1,00,000 by default)
                     if (!needsReview && amount > SUSPICIOUS_AMOUNT_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "Amount (₹${"%.2f".format(amount)}) exceeds the auto-save threshold of ₹${"%.0f".format(SUSPICIOUS_AMOUNT_THRESHOLD)}."
-                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SMS: ${sms.body.take(80)}")
+                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SenderHash: ${sms.sender.hashCode()}")
                     }
                     // -------------------------------------------------------------------
 
@@ -619,14 +648,22 @@ object SmsParser {
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
-        val finalAccount = txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value?.let { accountStr ->
-            val cleaned = accountStr.split(" ").joinToString(" ") { word ->
-                word.replaceFirstChar { it.uppercaseChar() }
-            }
-            PotentialAccount(cleaned, "Auto-Detected")
-        } ?: parseAccount(normalizedBody, sender)
+        val finalAccount =
+            txn.potentialAccount ?: nerEntities?.get("ACCOUNT")?.value
+                ?.let { raw ->
+                    val sanitized = sanitizeAccountName(raw)
+                    if (sanitized == "Unknown Account") {
+                        null
+                    } else {
+                        val cleaned =
+                            sanitized.split(" ").joinToString(" ") { word ->
+                                word.replaceFirstChar { it.uppercaseChar() }
+                            }
+                        PotentialAccount(cleaned, "Auto-Detected")
+                    }
+                } ?: parseAccount(normalizedBody, sender)
 
-        val smsHash = (sender.filter { it.isDigit() }.takeLast(10) + normalizedBody).hashCode().toString()
+        val smsHash = computeSmsHash(sender, normalizedBody)
         val smsSignature = generateSmsSignature(normalizedBody)
 
         return Triple(
@@ -648,6 +685,52 @@ object SmsParser {
 
 
     // --- Private Helper Functions ---
+
+    private val HEX_CHARS = "0123456789abcdef".toCharArray()
+    private val SHA_256_DIGEST =
+        object : ThreadLocal<MessageDigest>() {
+            override fun initialValue(): MessageDigest = MessageDigest.getInstance("SHA-256")
+        }
+
+    private fun bytesToHex(bytes: ByteArray): String {
+        val result = CharArray(bytes.size * 2)
+        var index = 0
+        for (b in bytes) {
+            val v = b.toInt() and 0xFF
+            result[index++] = HEX_CHARS[v ushr 4]
+            result[index++] = HEX_CHARS[v and 0x0F]
+        }
+        return String(result)
+    }
+
+    /**
+     * Computes legacy 32-bit `hashCode().toString()` string used by versions prior to Issue #304.
+     *
+     * Used exclusively for backward-compatibility lookup and in-flight SQLite migration
+     * (`updateSmsHashByLegacy`) to prevent duplicate transactions on existing user databases.
+     */
+    @VisibleForTesting
+    fun computeLegacySmsHash(sender: String, body: String): String {
+        val normalized = body.replace(Regex("\\s+"), " ").trim()
+        return (sender.filter { it.isDigit() }.takeLast(10) + normalized).hashCode().toString()
+    }
+
+    /**
+     * Computes a deterministic 64-character SHA-256 hex digest for an SMS message.
+     *
+     * Preimage structure: `"<cleanSenderLength>:<cleanSender>|<normalizedBody>"`
+     * Sender is trimmed and lowercased. Body whitespace is collapsed and trimmed.
+     * Delimiter length-prefixing guarantees boundary safety against delimiter injection.
+     */
+    @VisibleForTesting
+    fun computeSmsHash(sender: String, body: String): String {
+        val cleanSender = sender.trim().lowercase()
+        val normalized = body.replace(Regex("\\s+"), " ").trim()
+        val preimage = "${cleanSender.length}:$cleanSender|$normalized"
+        val digest = SHA_256_DIGEST.get()!!.apply { reset() }
+        val hashBytes = digest.digest(preimage.toByteArray(Charsets.UTF_8))
+        return bytesToHex(hashBytes)
+    }
 
     fun generateSmsSignature(body: String): String {
         var signature = body.lowercase()
@@ -839,6 +922,7 @@ object SmsParser {
                 min(template.originalAmountEndIndex, newSmsBody.length)
             )
             val amount = amountStr.replace(",", "").toDoubleOrNull() ?: return null
+            if (amount <= 0.0 || amount.isNaN() || amount.isInfinite()) return null
 
             return PotentialTransaction(
                 sourceSmsId = originalSms.id,
@@ -850,7 +934,7 @@ object SmsParser {
                 date = originalSms.date
             )
         } catch (e: Exception) {
-            System.err.println("[SmsParser]: Error applying heuristic template: ${e.message}")
+            System.err.println("[SmsParser]: Error applying heuristic template: ${e.javaClass.simpleName}")
             return null
         }
     }

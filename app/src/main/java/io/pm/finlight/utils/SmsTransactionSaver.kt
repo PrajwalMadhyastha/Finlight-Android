@@ -13,11 +13,13 @@ import android.util.Log
 import io.pm.finlight.Account
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.SmsParser
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.DetectSelfTransferUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
@@ -92,10 +94,15 @@ class SmsTransactionSaver(
         travelSettings: TravelModeSettings? = null,
         source: String = "Auto-Captured",
     ): Long? {
+        if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
+            Log.e(tag, "Invalid transaction amount: ${potentialTxn.amount}. Transaction dropped.")
+            return null
+        }
+
         val accountDao = db.accountDao()
         val accountAliasDao = db.accountAliasDao()
 
-        val accountName = potentialTxn.potentialAccount?.formattedName ?: "Unknown Account"
+        val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
         // --- Account Resolution (with Bug #1 fix) ---
@@ -131,7 +138,13 @@ class SmsTransactionSaver(
             return null
         }
 
-        val conversionRate = travelSettings?.conversionRate?.toDouble() ?: 1.0
+        val rawRate = travelSettings?.conversionRate?.toDouble()
+        val conversionRate =
+            if (rawRate != null && rawRate > 0.0 && !rawRate.isNaN() && !rawRate.isInfinite()) {
+                rawRate
+            } else {
+                1.0
+            }
         val transactionToSave =
             if (isForeign && travelSettings != null) {
                 Transaction(
@@ -178,6 +191,19 @@ class SmsTransactionSaver(
         potentialTxn.sourceSmsHash?.let { hash ->
             if (db.transactionQueryDao().existsBySmsHash(hash)) {
                 Log.d(tag, "Transaction with sourceSmsHash '$hash' already exists. Dropping duplicate save.")
+                return null
+            }
+            val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
+            if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                Log.d(tag, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading to new hash and dropping duplicate save.")
+                db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+                return null
+            }
+            if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
+                Log.d(tag, "Transaction with sourceSmsHash '$hash' was deleted by user. Dropping duplicate save.")
+                if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
+                    db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+                }
                 return null
             }
         }
