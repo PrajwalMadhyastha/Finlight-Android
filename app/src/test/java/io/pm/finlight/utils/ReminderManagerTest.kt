@@ -14,6 +14,7 @@ import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.pm.finlight.*
 import io.pm.finlight.data.financeSettingsDataStore
+import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -205,4 +206,25 @@ class ReminderManagerTest : BaseViewModelTest() {
             assertWorkIsCancelled("recurring_transaction_work")
             assertWorkIsCancelled("recurring_pattern_work")
         }
+
+    @Test
+    fun `scheduleSmsRecoveryWorker schedules SmsCatchupWorker with batteryNotLow constraint`() {
+        ReminderManager.scheduleSmsRecoveryWorker(context)
+
+        assertWorkIsEnqueued("sms_catchup_work", SmsCatchupWorker::class.java)
+        val workInfos = workManager.getWorkInfosForUniqueWork("sms_catchup_work").get()
+        assertEquals(1, workInfos.size)
+        assertTrue(
+            "Worker must have requiresBatteryNotLow constraint",
+            workInfos[0].constraints.requiresBatteryNotLow(),
+        )
+    }
+
+    @Test
+    fun `cancelSmsRecoveryWorker cancels SmsCatchupWorker`() {
+        ReminderManager.scheduleSmsRecoveryWorker(context)
+        ReminderManager.cancelSmsRecoveryWorker(context)
+
+        assertWorkIsCancelled("sms_catchup_work")
+    }
 }

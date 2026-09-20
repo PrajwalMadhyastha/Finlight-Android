@@ -15,13 +15,25 @@
 // =================================================================================
 package io.pm.finlight.workers
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.util.Log
+import androidx.core.app.ActivityCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import io.pm.finlight.CustomSmsRule
+import io.pm.finlight.CustomSmsRuleProvider
+import io.pm.finlight.IgnoreRule
+import io.pm.finlight.IgnoreRuleProvider
+import io.pm.finlight.MerchantCategoryMappingProvider
 import io.pm.finlight.MerchantMappingRepository
+import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.MerchantRenameRuleProvider
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
+import io.pm.finlight.SmsParseTemplate
+import io.pm.finlight.SmsParseTemplateProvider
 import io.pm.finlight.SmsParser
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.DeletedSmsHash
@@ -36,6 +48,10 @@ class SmsCatchupWorker(
     private val context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
+    companion object {
+        const val MAX_BATCH_SIZE = 150
+    }
+
     private val tag = "SmsCatchupWorker"
 
     /** Look back 48 hours for potentially missed SMS messages. */
@@ -47,6 +63,13 @@ class SmsCatchupWorker(
     override suspend fun doWork(): Result {
         Log.d(tag, "Starting catch-up scan for missed SMS transactions...")
 
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_SMS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            Log.w(tag, "READ_SMS permission not granted. Skipping catch-up scan.")
+            return Result.success()
+        }
+
         val db = AppDatabase.getInstance(context)
         val settingsRepository = ServiceLocator.provideSettingsRepository(context)
         val tagRepository = ServiceLocator.provideTagRepository(context)
@@ -57,7 +80,8 @@ class SmsCatchupWorker(
         val now = System.currentTimeMillis()
         val endDate = now - cooldownMs
         val startDate = endDate - lookbackMs
-        val recentSms: List<SmsMessage> = smsRepository.fetchAllSms(startDate = startDate, endDate = endDate)
+        val recentSms: List<SmsMessage> =
+            smsRepository.fetchAllSms(startDate = startDate, endDate = endDate).take(MAX_BATCH_SIZE)
 
         if (recentSms.isEmpty()) {
             Log.d(tag, "No SMS messages found in the catch-up window. Nothing to catch up.")
@@ -74,13 +98,45 @@ class SmsCatchupWorker(
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
-        // --- Build providers (same as SmsProcessorWorker) ---
+        // Pre-load all rules, mappings, and templates once before the loop to avoid redundant SQLite queries.
+        val customRules = db.customSmsRuleDao().getAllRules().first()
+        val renameRules = db.merchantRenameRuleDao().getAllRulesList()
+        val renameRulesMap = renameRules.associateBy({ it.originalName.lowercase() }, { it.newName })
+        val ignoreRules = db.ignoreRuleDao().getEnabledRules()
+        val categoryMappings = db.merchantCategoryMappingDao().getAll()
+        val categoryMappingsMap = categoryMappings.associateBy({ it.parsedName.lowercase() }, { it.categoryId })
+        val allTemplates = db.smsParseTemplateDao().getAllTemplates()
+        val templatesBySignature = allTemplates.groupBy { it.templateSignature }
+
         val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
-        val customSmsRuleProvider = SmsProviderHelper.getCustomSmsRuleProvider(db)
-        val merchantRenameRuleProvider = SmsProviderHelper.getMerchantRenameRuleProvider(db)
-        val ignoreRuleProvider = SmsProviderHelper.getIgnoreRuleProvider(db)
-        val merchantCategoryMappingProvider = SmsProviderHelper.getMerchantCategoryMappingProvider(db)
-        val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
+        val customSmsRuleProvider =
+            object : CustomSmsRuleProvider {
+                override suspend fun getAllRules(): List<CustomSmsRule> = customRules
+            }
+        val merchantRenameRuleProvider =
+            object : MerchantRenameRuleProvider {
+                override suspend fun getAllRules(): List<MerchantRenameRule> = renameRules
+
+                override suspend fun getAllRulesMap(): Map<String, String> = renameRulesMap
+            }
+        val ignoreRuleProvider =
+            object : IgnoreRuleProvider {
+                override suspend fun getEnabledRules(): List<IgnoreRule> = ignoreRules
+            }
+        val merchantCategoryMappingProvider =
+            object : MerchantCategoryMappingProvider {
+                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                    categoryMappingsMap[merchantName.lowercase()]
+
+                override suspend fun getAllMappings(): Map<String, Int> = categoryMappingsMap
+            }
+        val smsParseTemplateProvider =
+            object : SmsParseTemplateProvider {
+                override suspend fun getAllTemplates(): List<SmsParseTemplate> = allTemplates
+
+                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                    templatesBySignature[signature] ?: emptyList()
+            }
 
         // Load ML models once for the entire scan batch (more efficient than per-SMS).
         val classifier = MlModelFactory.getClassifier(context)
@@ -95,6 +151,11 @@ class SmsCatchupWorker(
 
         try {
             for (sms in recentSms) {
+                if (isStopped) {
+                    Log.i(tag, "Worker stopped. Exiting catch-up processing loop early.")
+                    break
+                }
+
                 // --- HIERARCHY STEP 1: Custom rules ---
                 var parseResult =
                     SmsParser.parseWithOnlyCustomRules(

@@ -2,6 +2,7 @@ package io.pm.finlight.utils
 
 import android.content.Context
 import android.util.Log
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
@@ -59,8 +60,13 @@ object ReminderManager {
     }
 
     fun scheduleSmsRecoveryWorker(context: Context) {
+        val constraints =
+            Constraints.Builder()
+                .setRequiresBatteryNotLow(true)
+                .build()
         val request =
             PeriodicWorkRequestBuilder<SmsCatchupWorker>(4, TimeUnit.HOURS)
+                .setConstraints(constraints)
                 .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             SMS_CATCHUP_WORK_TAG,
