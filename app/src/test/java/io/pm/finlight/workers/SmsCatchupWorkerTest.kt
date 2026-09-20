@@ -674,4 +674,73 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
                 SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
             }
         }
+
+    @Test
+    fun `does not starve older unparsed SMS messages when newer messages are already processed`() =
+        runTest {
+            // 200 SMS messages: newest 150 (indices 1..150) are already saved in DB
+            val messages =
+                (1..200).map { i ->
+                    SmsMessage(i.toLong(), "AM-HDFCBK", "Spent Rs.$i at Swiggy", System.currentTimeMillis() - i * 1000)
+                }
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns messages
+
+            val alreadyProcessedHashes =
+                messages.take(150).map { sms ->
+                    SmsParser.computeSmsHash(sms.sender, sms.body)
+                }
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(alreadyProcessedHashes)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Ignored("Ignored")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            // The 150 already processed messages are filtered out, so the remaining 50 older messages get processed
+            coVerify(exactly = 50) {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `bypasses ML classification when messages match known hashes in loop fast-path`() =
+        runTest {
+            val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            val currentHash = SmsParser.computeSmsHash(sms.sender, sms.body)
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms)
+
+            // Simulate snapshot returning empty initially, but dynamic TOCTOU query finds it in DB
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+            coEvery { transactionQueryDao.existsBySmsHash(currentHash) } returns true
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            // Should skip ML inference and rule parsing entirely
+            verify(exactly = 0) { mockClassifier.classify(any()) }
+            coVerify(exactly = 0) { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `closes classifier even if nerExtractor fails to instantiate`() =
+        runTest {
+            val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms)
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+
+            every { MlModelFactory.getNerExtractor(any()) } throws RuntimeException("NER model loading failed")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            try {
+                worker.doWork()
+            } catch (e: RuntimeException) {
+                assertEquals("NER model loading failed", e.message)
+            }
+
+            verify(exactly = 1) { mockClassifier.close() }
+        }
 }

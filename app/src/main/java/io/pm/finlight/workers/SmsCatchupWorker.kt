@@ -19,27 +19,20 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.CustomSmsRuleProvider
-import io.pm.finlight.IgnoreRule
-import io.pm.finlight.IgnoreRuleProvider
-import io.pm.finlight.MerchantCategoryMappingProvider
 import io.pm.finlight.MerchantMappingRepository
-import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRenameRuleProvider
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
-import io.pm.finlight.SmsParseTemplate
-import io.pm.finlight.SmsParseTemplateProvider
 import io.pm.finlight.SmsParser
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SmsTransactionSaver
 import kotlinx.coroutines.flow.first
@@ -63,7 +56,7 @@ class SmsCatchupWorker(
     override suspend fun doWork(): Result {
         Log.d(tag, "Starting catch-up scan for missed SMS transactions...")
 
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_SMS)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS)
             != PackageManager.PERMISSION_GRANTED
         ) {
             Log.w(tag, "READ_SMS permission not granted. Skipping catch-up scan.")
@@ -80,10 +73,10 @@ class SmsCatchupWorker(
         val now = System.currentTimeMillis()
         val endDate = now - cooldownMs
         val startDate = endDate - lookbackMs
-        val recentSms: List<SmsMessage> =
-            smsRepository.fetchAllSms(startDate = startDate, endDate = endDate).take(MAX_BATCH_SIZE)
+        val allRecentSms: List<SmsMessage> =
+            smsRepository.fetchAllSms(startDate = startDate, endDate = endDate)
 
-        if (recentSms.isEmpty()) {
+        if (allRecentSms.isEmpty()) {
             Log.d(tag, "No SMS messages found in the catch-up window. Nothing to catch up.")
             return Result.success()
         }
@@ -94,6 +87,38 @@ class SmsCatchupWorker(
         // Load deleted hashes — transactions the user intentionally removed should
         // never be re-created by this worker, even if their SMS reappears in the inbox.
         val deletedHashes = db.deletedSmsHashDao().getAllHashes().toMutableSet()
+
+        // Filter out already-saved/deleted SMS hashes BEFORE slicing so older unparsed messages
+        // are not starved across cycles when inbox volume exceeds the batch cap.
+        val unhandledSms =
+            allRecentSms.filter { sms ->
+                val currentHash = SmsParser.computeSmsHash(sms.sender, sms.body)
+                val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                val isKnown =
+                    currentHash in existingSmsHashes || legacyHash in existingSmsHashes ||
+                        currentHash in deletedHashes || legacyHash in deletedHashes
+                if (isKnown) {
+                    if (legacyHash in existingSmsHashes) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                        existingSmsHashes.remove(legacyHash)
+                        existingSmsHashes.add(currentHash)
+                    }
+                    if (legacyHash in deletedHashes) {
+                        db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                        deletedHashes.add(currentHash)
+                    }
+                    false
+                } else {
+                    true
+                }
+            }
+
+        val recentSms: List<SmsMessage> = unhandledSms.take(MAX_BATCH_SIZE)
+
+        if (recentSms.isEmpty()) {
+            Log.d(tag, "No unhandled SMS messages found in the catch-up window. Nothing to catch up.")
+            return Result.success()
+        }
 
         val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
@@ -109,38 +134,14 @@ class SmsCatchupWorker(
         val templatesBySignature = allTemplates.groupBy { it.templateSignature }
 
         val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
-        val customSmsRuleProvider =
-            object : CustomSmsRuleProvider {
-                override suspend fun getAllRules(): List<CustomSmsRule> = customRules
-            }
+        val customSmsRuleProvider = SmsProviderHelper.createPreCachedCustomSmsRuleProvider(customRules)
         val merchantRenameRuleProvider =
-            object : MerchantRenameRuleProvider {
-                override suspend fun getAllRules(): List<MerchantRenameRule> = renameRules
-
-                override suspend fun getAllRulesMap(): Map<String, String> = renameRulesMap
-            }
-        val ignoreRuleProvider =
-            object : IgnoreRuleProvider {
-                override suspend fun getEnabledRules(): List<IgnoreRule> = ignoreRules
-            }
+            SmsProviderHelper.createPreCachedMerchantRenameRuleProvider(renameRules, renameRulesMap)
+        val ignoreRuleProvider = SmsProviderHelper.createPreCachedIgnoreRuleProvider(ignoreRules)
         val merchantCategoryMappingProvider =
-            object : MerchantCategoryMappingProvider {
-                override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                    categoryMappingsMap[merchantName.lowercase()]
-
-                override suspend fun getAllMappings(): Map<String, Int> = categoryMappingsMap
-            }
+            SmsProviderHelper.createPreCachedMerchantCategoryMappingProvider(categoryMappingsMap)
         val smsParseTemplateProvider =
-            object : SmsParseTemplateProvider {
-                override suspend fun getAllTemplates(): List<SmsParseTemplate> = allTemplates
-
-                override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                    templatesBySignature[signature] ?: emptyList()
-            }
-
-        // Load ML models once for the entire scan batch (more efficient than per-SMS).
-        val classifier = MlModelFactory.getClassifier(context)
-        val nerExtractor = MlModelFactory.getNerExtractor(context)
+            SmsProviderHelper.createPreCachedSmsParseTemplateProvider(allTemplates, templatesBySignature)
 
         // Load travel settings once for the entire scan batch.
         val travelSettings = settingsRepository.getCurrentTravelModeSettings()
@@ -149,11 +150,48 @@ class SmsCatchupWorker(
         val savedHashesThisRun = mutableSetOf<String>()
         var savedCount = 0
 
+        // Load ML models once for the entire scan batch (more efficient than per-SMS).
+        var classifier: SmsClassifier? = null
+        var nerExtractor: NerExtractor? = null
         try {
+            classifier = MlModelFactory.getClassifier(context)
+            nerExtractor = MlModelFactory.getNerExtractor(context)
+
             for (sms in recentSms) {
                 if (isStopped) {
                     Log.i(tag, "Worker stopped. Exiting catch-up processing loop early.")
                     break
+                }
+
+                val currentHash = SmsParser.computeSmsHash(sms.sender, sms.body)
+                val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+
+                // Fast-path guard: skip duplicate / deleted messages BEFORE running expensive ML/NER models.
+                if (currentHash in existingSmsHashes || legacyHash in existingSmsHashes ||
+                    currentHash in deletedHashes || legacyHash in deletedHashes ||
+                    currentHash in savedHashesThisRun
+                ) {
+                    if (legacyHash in existingSmsHashes) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                        existingSmsHashes.remove(legacyHash)
+                        existingSmsHashes.add(currentHash)
+                    }
+                    if (legacyHash in deletedHashes) {
+                        db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                        deletedHashes.add(currentHash)
+                    }
+                    continue
+                }
+
+                // Dynamic TOCTOU check against DB in case real-time worker saved it concurrently
+                if (db.transactionQueryDao().existsBySmsHash(currentHash) ||
+                    db.transactionQueryDao().existsBySmsHash(legacyHash)
+                ) {
+                    if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                    }
+                    existingSmsHashes.add(currentHash)
+                    continue
                 }
 
                 // --- HIERARCHY STEP 1: Custom rules ---
@@ -191,33 +229,14 @@ class SmsCatchupWorker(
                 if (parseResult !is ParseResult.Success) continue
 
                 val potentialTxn = parseResult.transaction
-                val currentHash = potentialTxn.sourceSmsHash ?: continue
-                val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                val txnHash = potentialTxn.sourceSmsHash ?: continue
 
-                // Skip if already in DB, already saved during this run,
-                // or intentionally deleted by the user.
-                if (currentHash in existingSmsHashes || legacyHash in existingSmsHashes ||
-                    currentHash in deletedHashes || legacyHash in deletedHashes ||
-                    currentHash in savedHashesThisRun
-                ) {
-                    if (legacyHash in existingSmsHashes) {
-                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-                        existingSmsHashes.remove(legacyHash)
-                        existingSmsHashes.add(currentHash)
-                    }
-                    if (legacyHash in deletedHashes) {
-                        db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
-                        deletedHashes.add(currentHash)
-                    }
+                if (txnHash in existingSmsHashes || txnHash in deletedHashes || txnHash in savedHashesThisRun) {
                     continue
                 }
 
-                // Dynamic TOCTOU check against DB in case real-time worker saved it concurrently
-                if (db.transactionQueryDao().existsBySmsHash(currentHash) || db.transactionQueryDao().existsBySmsHash(legacyHash)) {
-                    if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
-                        db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-                    }
-                    existingSmsHashes.add(currentHash)
+                if (db.transactionQueryDao().existsBySmsHash(txnHash)) {
+                    existingSmsHashes.add(txnHash)
                     continue
                 }
 
@@ -230,15 +249,18 @@ class SmsCatchupWorker(
                     )
 
                 if (newId != null) {
-                    existingSmsHashes.add(currentHash)
-                    savedHashesThisRun.add(currentHash)
+                    existingSmsHashes.add(txnHash)
+                    savedHashesThisRun.add(txnHash)
                     savedCount++
                     Log.d(tag, "Recovered missed transaction: ${potentialTxn.merchantName} (₹${potentialTxn.amount})")
                 }
             }
         } finally {
-            classifier.close()
-            nerExtractor.close()
+            try {
+                classifier?.close()
+            } finally {
+                nerExtractor?.close()
+            }
         }
 
         if (savedCount > 0) {

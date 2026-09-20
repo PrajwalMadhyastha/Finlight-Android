@@ -19,6 +19,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -216,6 +217,33 @@ class ReminderManagerTest : BaseViewModelTest() {
         assertEquals(1, workInfos.size)
         assertTrue(
             "Worker must have requiresBatteryNotLow constraint",
+            workInfos[0].constraints.requiresBatteryNotLow(),
+        )
+    }
+
+    @Test
+    fun `scheduleSmsRecoveryWorker updates existing work with new constraints`() {
+        // Enqueue an initial work request without constraints to simulate an older app version
+        val oldRequest =
+            PeriodicWorkRequestBuilder<SmsCatchupWorker>(4, java.util.concurrent.TimeUnit.HOURS)
+                .build()
+        workManager.enqueueUniquePeriodicWork(
+            "sms_catchup_work",
+            ExistingPeriodicWorkPolicy.KEEP,
+            oldRequest,
+        ).result.get()
+
+        var workInfos = workManager.getWorkInfosForUniqueWork("sms_catchup_work").get()
+        assertEquals(1, workInfos.size)
+        assertFalse(workInfos[0].constraints.requiresBatteryNotLow())
+
+        // Call scheduleSmsRecoveryWorker which uses UPDATE policy
+        ReminderManager.scheduleSmsRecoveryWorker(context)
+
+        workInfos = workManager.getWorkInfosForUniqueWork("sms_catchup_work").get()
+        assertEquals(1, workInfos.size)
+        assertTrue(
+            "Worker must update to have requiresBatteryNotLow constraint",
             workInfos[0].constraints.requiresBatteryNotLow(),
         )
     }

@@ -70,7 +70,7 @@ object ReminderManager {
                 .build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             SMS_CATCHUP_WORK_TAG,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
         Log.d("ReminderManager", "SMS catch-up worker scheduled (every 4 hours).")
