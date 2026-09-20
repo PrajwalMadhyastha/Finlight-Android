@@ -53,4 +53,43 @@ object SmsProviderHelper {
             override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
                 db.smsParseTemplateDao().getTemplatesBySignature(signature)
         }
+
+    fun createPreCachedCustomSmsRuleProvider(rules: List<CustomSmsRule>): CustomSmsRuleProvider =
+        object : CustomSmsRuleProvider {
+            override suspend fun getAllRules(): List<CustomSmsRule> = rules
+        }
+
+    fun createPreCachedMerchantRenameRuleProvider(
+        rules: List<MerchantRenameRule>,
+        rulesMap: Map<String, String> = rules.associateBy({ it.originalName.lowercase() }, { it.newName }),
+    ): MerchantRenameRuleProvider =
+        object : MerchantRenameRuleProvider {
+            override suspend fun getAllRules(): List<MerchantRenameRule> = rules
+
+            override suspend fun getAllRulesMap(): Map<String, String> = rulesMap
+        }
+
+    fun createPreCachedIgnoreRuleProvider(rules: List<IgnoreRule>): IgnoreRuleProvider =
+        object : IgnoreRuleProvider {
+            override suspend fun getEnabledRules(): List<IgnoreRule> = rules
+        }
+
+    fun createPreCachedMerchantCategoryMappingProvider(mappingsMap: Map<String, Int>): MerchantCategoryMappingProvider =
+        object : MerchantCategoryMappingProvider {
+            override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                mappingsMap[merchantName.lowercase()]
+
+            override suspend fun getAllMappings(): Map<String, Int> = mappingsMap
+        }
+
+    fun createPreCachedSmsParseTemplateProvider(
+        templates: List<SmsParseTemplate>,
+        templatesBySignature: Map<String, List<SmsParseTemplate>> = templates.groupBy { it.templateSignature },
+    ): SmsParseTemplateProvider =
+        object : SmsParseTemplateProvider {
+            override suspend fun getAllTemplates(): List<SmsParseTemplate> = templates
+
+            override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
+                templatesBySignature[signature] ?: emptyList()
+        }
 }

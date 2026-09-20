@@ -5,6 +5,7 @@
 // =================================================================================
 package io.pm.finlight.workers
 
+import android.Manifest
 import android.content.Context
 import android.os.Build
 import android.util.Log
@@ -35,6 +36,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowApplication
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -62,6 +64,7 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
+        ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
 
         val config =
             Configuration.Builder()
@@ -572,5 +575,172 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.success(), result)
             coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
             coVerify(exactly = 0) { deletedSmsHashDao.insert(any()) }
+        }
+
+    @Test
+    fun `returns success immediately when READ_SMS permission is not granted`() =
+        runTest {
+            ShadowApplication.getInstance().denyPermissions(Manifest.permission.READ_SMS)
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { smsRepository.fetchAllSms(any(), any()) }
+        }
+
+    @Test
+    fun `respects batch cap of at most 150 SMS messages per catch-up run`() =
+        runTest {
+            val messages =
+                (1..200).map { i ->
+                    SmsMessage(i.toLong(), "AM-HDFCBK", "Spent Rs.$i at Swiggy", System.currentTimeMillis() - i * 1000)
+                }
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns messages
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Ignored("Ignored")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 150) {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `pre-caches rule queries once before processing loop and does not repeat per SMS`() =
+        runTest {
+            val sms1 = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            val sms2 = SmsMessage(2L, "AM-HDFCBK", "Spent Rs.200 at Swiggy", System.currentTimeMillis() - 1000)
+            val sms3 = SmsMessage(3L, "AM-HDFCBK", "Spent Rs.300 at Swiggy", System.currentTimeMillis() - 2000)
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms1, sms2, sms3)
+
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Ignored("Ignored")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 1) { customSmsRuleDao.getAllRules() }
+            coVerify(exactly = 1) { merchantRenameRuleDao.getAllRulesList() }
+            coVerify(exactly = 1) { ignoreRuleDao.getEnabledRules() }
+            coVerify(exactly = 1) { merchantCategoryMappingDao.getAll() }
+            coVerify(exactly = 1) { smsParseTemplateDao.getAllTemplates() }
+        }
+
+    @Test
+    fun `exits processing loop immediately when isStopped is true`() =
+        runTest {
+            val sms1 = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            val sms2 = SmsMessage(2L, "AM-HDFCBK", "Spent Rs.200 at Swiggy", System.currentTimeMillis() - 1000)
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms1, sms2)
+
+            val worker = spyk(TestListenableWorkerBuilder<SmsCatchupWorker>(context).build())
+            every { worker.isStopped } returns true
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `exits processing loop after first SMS when isStopped becomes true`() =
+        runTest {
+            val sms1 = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            val sms2 = SmsMessage(2L, "AM-HDFCBK", "Spent Rs.200 at Swiggy", System.currentTimeMillis() - 1000)
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms1, sms2)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Ignored("Ignored")
+
+            val worker = spyk(TestListenableWorkerBuilder<SmsCatchupWorker>(context).build())
+            every { worker.isStopped } returnsMany listOf(false, true)
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 1) {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `does not starve older unparsed SMS messages when newer messages are already processed`() =
+        runTest {
+            // 200 SMS messages: newest 150 (indices 1..150) are already saved in DB
+            val messages =
+                (1..200).map { i ->
+                    SmsMessage(i.toLong(), "AM-HDFCBK", "Spent Rs.$i at Swiggy", System.currentTimeMillis() - i * 1000)
+                }
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns messages
+
+            val alreadyProcessedHashes =
+                messages.take(150).map { sms ->
+                    SmsParser.computeSmsHash(sms.sender, sms.body)
+                }
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(alreadyProcessedHashes)
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any())
+            } returns ParseResult.Ignored("Ignored")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            // The 150 already processed messages are filtered out, so the remaining 50 older messages get processed
+            coVerify(exactly = 50) {
+                SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `bypasses ML classification when messages match known hashes in loop fast-path`() =
+        runTest {
+            val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            val currentHash = SmsParser.computeSmsHash(sms.sender, sms.body)
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms)
+
+            // Simulate snapshot returning empty initially, but dynamic TOCTOU query finds it in DB
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+            coEvery { transactionQueryDao.existsBySmsHash(currentHash) } returns true
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            // Should skip ML inference and rule parsing entirely
+            verify(exactly = 0) { mockClassifier.classify(any()) }
+            coVerify(exactly = 0) { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) }
+        }
+
+    @Test
+    fun `closes classifier even if nerExtractor fails to instantiate`() =
+        runTest {
+            val sms = SmsMessage(1L, "AM-HDFCBK", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms)
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+
+            every { MlModelFactory.getNerExtractor(any()) } throws RuntimeException("NER model loading failed")
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            try {
+                worker.doWork()
+            } catch (e: RuntimeException) {
+                assertEquals("NER model loading failed", e.message)
+            }
+
+            verify(exactly = 1) { mockClassifier.close() }
         }
 }
