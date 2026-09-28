@@ -19,6 +19,10 @@ interface DeletedSmsHashDao {
     @Query("SELECT smsHash FROM deleted_sms_hashes")
     suspend fun getAllHashes(): List<String>
 
+    /** Returns whether a given SMS hash exists in the deny-list. */
+    @Query("SELECT EXISTS(SELECT 1 FROM deleted_sms_hashes WHERE smsHash = :hash)")
+    suspend fun existsByHash(hash: String): Boolean
+
     /**
      * Removes a specific hash from the deny-list.
      * Called during unmerge so the child's source SMS is no longer treated as

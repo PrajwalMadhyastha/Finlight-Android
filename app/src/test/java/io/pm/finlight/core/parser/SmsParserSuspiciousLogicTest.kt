@@ -1,12 +1,15 @@
 package io.pm.finlight.core.parser
 
 import io.pm.finlight.SmsMessage
+import io.pm.finlight.SmsParseTemplate
 import io.pm.finlight.SmsParser
 import io.pm.finlight.core.NerEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.Mockito.`when`
+import org.mockito.Mockito.anyString
 import org.mockito.junit.MockitoJUnitRunner
 
 @RunWith(MockitoJUnitRunner.Silent::class)
@@ -203,5 +206,177 @@ class SmsParserSuspiciousLogicTest : BaseSmsParserTest() {
             assertFalse("Transaction should NOT be flagged for review", transaction!!.needsReview)
             assertNull("Suspicion reason should be null", transaction.suspicionReason)
             assertEquals(250.0, transaction.amount, 0.001)
+        }
+
+    @Test
+    fun `Option A - amount exceeding 100,000 does not log SMS body`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 1,
+                    sender = "AM-HDFCBK",
+                    body = "Rs 150000.00 debited from a/c **4321 on 12-07-25 to VPA swiggy@hdfcbank.",
+                    date = System.currentTimeMillis(),
+                )
+
+            val nerEntities =
+                mapOf(
+                    "AMOUNT" to NerEntity("150000.00", 0.95f),
+                    "MERCHANT" to NerEntity("swiggy@hdfcbank", 0.90f),
+                )
+
+            val logRecords = mutableListOf<java.util.logging.LogRecord>()
+            val handler =
+                object : java.util.logging.Handler() {
+                    override fun publish(record: java.util.logging.LogRecord) {
+                        logRecords.add(record)
+                    }
+
+                    override fun flush() {}
+
+                    override fun close() {}
+                }
+            val julLogger = java.util.logging.Logger.getLogger("SmsParser")
+            julLogger.addHandler(handler)
+            try {
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+            } finally {
+                julLogger.removeHandler(handler)
+            }
+
+            val logText = logRecords.joinToString("\n") { it.message }
+            assertTrue("Log should contain sender hash", logText.contains("SenderHash: ${sms.sender.hashCode()}"))
+            assertTrue("Log should contain large amount message", logText.contains("Large amount 150000.0 exceeds threshold"))
+            assertFalse("Log must not contain SMS body", logText.contains(sms.body))
+            assertFalse("Log must not contain sensitive account substring", logText.contains("**4321"))
+            assertFalse("Log must not contain sensitive merchant substring", logText.contains("swiggy@hdfcbank"))
+        }
+
+    @Test
+    fun `Option D - NER confidence below threshold does not log SMS body`() =
+        runBlocking {
+            setupTest()
+            val sms =
+                SmsMessage(
+                    id = 3,
+                    sender = "AM-AXIS",
+                    body = "INR 450.00 sent from Axis Bank A/C XX6789 to VPA zomato@icici.",
+                    date = System.currentTimeMillis(),
+                )
+
+            val nerEntities =
+                mapOf(
+                    "AMOUNT" to NerEntity("450.00", 0.65f),
+                    "MERCHANT" to NerEntity("zomato@icici", 0.90f),
+                )
+
+            val logRecords = mutableListOf<java.util.logging.LogRecord>()
+            val handler =
+                object : java.util.logging.Handler() {
+                    override fun publish(record: java.util.logging.LogRecord) {
+                        logRecords.add(record)
+                    }
+
+                    override fun flush() {}
+
+                    override fun close() {}
+                }
+            val julLogger = java.util.logging.Logger.getLogger("SmsParser")
+            julLogger.addHandler(handler)
+            try {
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                    nerEntities = nerEntities,
+                )
+            } finally {
+                julLogger.removeHandler(handler)
+            }
+
+            val logText = logRecords.joinToString("\n") { it.message }
+            assertTrue("Log should contain sender hash", logText.contains("SenderHash: ${sms.sender.hashCode()}"))
+            assertTrue("Log should contain amount", logText.contains("Amount: 450.0"))
+            assertTrue("Log should contain NER confidence", logText.contains("Low NER confidence for AMOUNT (0.65)"))
+            assertFalse("Log must not contain SMS body", logText.contains(sms.body))
+            assertFalse("Log must not contain sensitive account substring", logText.contains("XX6789"))
+            assertFalse("Log must not contain sensitive merchant substring", logText.contains("zomato@icici"))
+        }
+
+    @Test
+    fun `Template error logs exception class name and does not log SMS body or exception message`() =
+        runBlocking {
+            setupTest()
+            val smsBody = "Short body"
+            val sms =
+                SmsMessage(
+                    id = 5,
+                    sender = "AM-HDFCBK",
+                    body = smsBody,
+                    date = System.currentTimeMillis(),
+                )
+
+            val sig = SmsParser.generateSmsSignature(smsBody)
+            val template =
+                SmsParseTemplate(
+                    templateSignature = sig,
+                    correctedMerchantName = "TargetMerchant",
+                    originalSmsBody = "Some template body",
+                    originalAmountStartIndex = 100,
+                    originalAmountEndIndex = 200,
+                )
+            `when`(mockSmsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(listOf(template))
+
+            val logRecords = mutableListOf<java.util.logging.LogRecord>()
+            val handler =
+                object : java.util.logging.Handler() {
+                    override fun publish(record: java.util.logging.LogRecord) {
+                        logRecords.add(record)
+                    }
+
+                    override fun flush() {}
+
+                    override fun close() {}
+                }
+            val julLogger = java.util.logging.Logger.getLogger("SmsParser")
+            julLogger.addHandler(handler)
+            try {
+                SmsParser.parse(
+                    sms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+            } finally {
+                julLogger.removeHandler(handler)
+            }
+
+            val logText = logRecords.joinToString("\n") { it.message }
+            assertTrue(
+                "Should log sanitized template error with exception class",
+                logText.contains("Error applying heuristic template: StringIndexOutOfBoundsException"),
+            )
+            assertFalse("Should not log SMS body in error", logText.contains(smsBody))
+            assertFalse("Should not log template body in error", logText.contains("Some template body"))
         }
 }

@@ -18,6 +18,7 @@ import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
+import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.INotificationSettingsRepository
 import io.pm.finlight.ISecuritySettingsRepository
 import io.pm.finlight.ISettingsRepository
@@ -26,6 +27,7 @@ import io.pm.finlight.ISmsRuleSettingsRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.NotificationSettingsRepository
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
@@ -37,6 +39,7 @@ import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 
@@ -103,6 +106,12 @@ object ServiceLocator {
 
     @Volatile
     private var manageReimbursementUseCase: ManageReimbursementUseCase? = null
+
+    @Volatile
+    private var mergeTransactionsUseCase: MergeTransactionsUseCase? = null
+
+    @Volatile
+    private var merchantMappingRepository: IMerchantMappingRepository? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -340,6 +349,53 @@ object ServiceLocator {
         }
     }
 
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMergeTransactionsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): MergeTransactionsUseCase {
+        return mergeTransactionsUseCase ?: synchronized(this) {
+            mergeTransactionsUseCase ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MergeTransactionsUseCase(
+                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionReimbursementDao = db.transactionReimbursementDao(),
+                    mergeRecordDao = db.mergeRecordDao(),
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    db = db,
+                ).also {
+                    mergeTransactionsUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMerchantMappingRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IMerchantMappingRepository {
+        return merchantMappingRepository ?: synchronized(this) {
+            merchantMappingRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MerchantMappingRepository(
+                    merchantMappingDao = db.merchantMappingDao(),
+                ).also {
+                    merchantMappingRepository = it
+                }
+            }
+        }
+    }
+
     @VisibleForTesting
     fun setSettingsRepository(repository: ISettingsRepository?) {
         settingsRepository = repository
@@ -436,6 +492,16 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setMergeTransactionsUseCase(useCase: MergeTransactionsUseCase?) {
+        mergeTransactionsUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
+        merchantMappingRepository = repository
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -456,5 +522,7 @@ object ServiceLocator {
         smsRepository = null
         mergeAccountsUseCase = null
         manageReimbursementUseCase = null
+        mergeTransactionsUseCase = null
+        merchantMappingRepository = null
     }
 }

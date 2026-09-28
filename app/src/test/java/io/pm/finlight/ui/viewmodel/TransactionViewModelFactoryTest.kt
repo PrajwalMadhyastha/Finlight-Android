@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
@@ -17,6 +18,7 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
+import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -59,6 +61,8 @@ class TransactionViewModelFactoryTest {
         val mockTagRepo: ITagRepository = mockk(relaxed = true)
         val mockSmsRepo: ISmsRepository = mockk(relaxed = true)
         val mockManageReimbursementUseCase: ManageReimbursementUseCase = mockk(relaxed = true)
+        val mockMergeTransactionsUseCase: MergeTransactionsUseCase = mockk(relaxed = true)
+        val mockMerchantMappingRepo: IMerchantMappingRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxnRepo)
         ServiceLocator.setAccountRepository(mockAccountRepo)
@@ -66,6 +70,8 @@ class TransactionViewModelFactoryTest {
         ServiceLocator.setTagRepository(mockTagRepo)
         ServiceLocator.setSmsRepository(mockSmsRepo)
         ServiceLocator.setManageReimbursementUseCase(mockManageReimbursementUseCase)
+        ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactionsUseCase)
+        ServiceLocator.setMerchantMappingRepository(mockMerchantMappingRepo)
 
         val viewModel = factory.create(TransactionViewModel::class.java)
 
@@ -91,6 +97,18 @@ class TransactionViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockManageReimbursementUseCase, reimbursementUseCaseField)
+
+        val mergeUseCaseField =
+            TransactionViewModel::class.java.getDeclaredField("mergeTransactionsUseCase").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
+
+        val mappingRepoField =
+            TransactionViewModel::class.java.getDeclaredField("merchantMappingRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantMappingRepo, mappingRepoField)
     }
 
     @Test

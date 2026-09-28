@@ -17,6 +17,7 @@ import io.pm.finlight.TransactionType
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -34,11 +35,14 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     private lateinit var transactionQueryDao: TransactionQueryDao
     private lateinit var transactionWriteDao: TransactionWriteDao
     private lateinit var recurringDao: RecurringTransactionDao
+    private lateinit var testDispatcherProvider: TestDispatcherProvider
 
     @Before
     override fun setup() {
         super.setup()
         application = mockk(relaxed = true)
+
+        testDispatcherProvider = TestDispatcherProvider(testDispatcher)
 
         db = mockk()
         transactionQueryDao = mockk(relaxed = true)
@@ -67,7 +71,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             every { transactionQueryDao.getPendingTransactions() } returns flow
 
             // Act
-            viewModel = PendingTransactionsViewModel(application)
+            viewModel = PendingTransactionsViewModel(application, testDispatcherProvider)
 
             // Assert
             viewModel.pendingTransactions.test {
@@ -81,7 +85,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             every { transactionQueryDao.getPendingTransactions() } returns MutableStateFlow(emptyList())
-            viewModel = PendingTransactionsViewModel(application)
+            viewModel = PendingTransactionsViewModel(application, testDispatcherProvider)
 
             // Act
             viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = null)
@@ -99,7 +103,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             every { transactionQueryDao.getPendingTransactions() } returns MutableStateFlow(emptyList())
-            viewModel = PendingTransactionsViewModel(application)
+            viewModel = PendingTransactionsViewModel(application, testDispatcherProvider)
 
             // Act
             viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = 150.0)
@@ -119,7 +123,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             every { transactionQueryDao.getPendingTransactions() } returns MutableStateFlow(emptyList())
             val rule = RecurringTransaction(id = 2, description = "Test", amount = 100.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1, skipCount = 1)
             coEvery { recurringDao.getAllRulesList() } returns listOf(rule)
-            viewModel = PendingTransactionsViewModel(application)
+            viewModel = PendingTransactionsViewModel(application, testDispatcherProvider)
 
             // Act
             viewModel.skipPending(draftId = 1, ruleId = 2)

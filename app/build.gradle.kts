@@ -90,6 +90,9 @@ sonar {
         // Point to Kover report - FIXED: Use variant-specific report for Debug
         property("sonar.coverage.jacoco.xmlReportPaths", "build/reports/kover/reportDebug.xml")
 
+        // Android Lint reports are not imported into Sonar; clear path to suppress missing report warning
+        property("sonar.androidLint.reportPaths", "")
+
         // Exclude from coverage (will be tested with instrumented tests later)
         // These exclusions match Kover's exclusions to ensure consistent coverage reporting
         property(

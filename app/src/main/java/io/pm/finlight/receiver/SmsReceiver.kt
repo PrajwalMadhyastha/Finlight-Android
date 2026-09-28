@@ -17,7 +17,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import android.telephony.SmsMessage
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
@@ -33,12 +35,25 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-        val messagesBySender = messages.groupBy { it.originatingAddress }
+        if (messages.isNullOrEmpty()) return
 
+        val nonNullMessages = messages.filterNotNull()
+        if (nonNullMessages.isEmpty()) return
+
+        val messagesBySender = nonNullMessages.groupBy { it.originatingAddress }
+        dispatchMessages(context, messagesBySender)
+    }
+
+    @VisibleForTesting
+    internal fun dispatchMessages(
+        context: Context,
+        messagesBySender: Map<String?, List<SmsMessage>>,
+    ) {
         for ((sender, parts) in messagesBySender) {
-            if (sender == null) continue
-            val body = parts.joinToString("") { it.messageBody }
-            val date = parts.first().timestampMillis
+            if (sender.isNullOrBlank() || parts.isEmpty()) continue
+            val body = parts.joinToString("") { it.messageBody.orEmpty() }
+            if (body.isBlank()) continue
+            val date = parts.firstOrNull()?.timestampMillis?.takeIf { it > 0L } ?: System.currentTimeMillis()
 
             Log.d(tag, "SMS received from $sender. Enqueuing SmsProcessorWorker.")
 

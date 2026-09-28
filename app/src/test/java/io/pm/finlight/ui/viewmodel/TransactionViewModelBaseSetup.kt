@@ -149,6 +149,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(transactionRepository.getReimbursementsForExpense(anyInt())).thenReturn(flowOf(emptyList()))
             whenever(transactionQueryDao.getSmsHashesByIds(any())).thenReturn(emptyList())
             whenever(transactionQueryDao.existsBySmsHash(anyString())).thenReturn(false)
+            whenever(deletedSmsHashDao.existsByHash(anyString())).thenReturn(false)
+            whenever(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
         }
     }
 

@@ -25,8 +25,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
-import io.pm.finlight.ml.NerExtractor
-import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -47,8 +46,8 @@ class BatchAnalysisViewModel(
     private val context: Context,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
-    private val classifier = SmsClassifier(context)
-    private val nerExtractor: SmsEntityExtractor = NerExtractor(context)
+    private val classifier = MlModelFactory.getClassifier(context)
+    private val nerExtractor: SmsEntityExtractor = MlModelFactory.getNerExtractor(context)
     var status by mutableStateOf(BatchStatus())
         private set
 

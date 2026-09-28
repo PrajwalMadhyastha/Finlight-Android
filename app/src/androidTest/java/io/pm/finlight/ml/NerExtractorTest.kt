@@ -82,7 +82,7 @@ class NerExtractorTest {
         testCases.forEach { tc ->
             val entities = extractor.extract(tc.message)
             Log.d(TAG, "Input:    '${tc.message}'")
-            Log.d(TAG, "Entities: $entities")
+            Log.d(TAG, "Entities (keys only): ${entities.keys}")
 
             // Check that extracted entities contain expected keywords
             tc.expectedEntities.forEach { (entityType, keywords) ->
@@ -128,7 +128,7 @@ class NerExtractorTest {
         messages.forEach { message ->
             val entities = extractor.extract(message)
             Log.d(TAG, "Input:    '${message.take(60)}...'")
-            Log.d(TAG, "Entities: $entities")
+            Log.d(TAG, "Entities (keys only): ${entities.keys}")
 
             // All entity types should be valid
             entities.keys.forEach { key ->
@@ -163,7 +163,7 @@ class NerExtractorTest {
         messages.forEach { message ->
             val entities = extractor.extract(message)
             Log.d(TAG, "Non-txn input: '${message.take(50)}...'")
-            Log.d(TAG, "Non-txn entities: $entities")
+            Log.d(TAG, "Non-txn entities (keys only): ${entities.keys}")
             // We don't strictly assert empty — the model may find some entities —
             // but we log them for manual review
         }

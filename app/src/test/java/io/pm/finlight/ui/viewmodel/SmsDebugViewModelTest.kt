@@ -75,6 +75,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
 
+    @Mock private lateinit var deletedSmsHashDao: DeletedSmsHashDao
+
     private lateinit var viewModel: SmsDebugViewModel
 
     @Before
@@ -91,6 +93,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
         `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
         `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
+        `when`(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         `when`(application.applicationContext).thenReturn(application)
 
@@ -108,6 +111,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // --- FIX: Add missing mock for getTemplatesBySignature to prevent NPE ---
             `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
             `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
             `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
         }
 
@@ -236,7 +240,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // --- TEST FIX: Removed "Txn" from the start of the message body ---
             val sms1Body = "Update from MyBank. Order 123 completed. Val: 20."
             val sms1 = SmsMessage(1, "SENDER1", sms1Body, 1L)
-            val sms1Hash = (sms1.sender.filter { it.isDigit() }.takeLast(10) + sms1.body.replace(Regex("\\s+"), " ").trim()).hashCode().toString()
+            val sms1Hash = SmsParser.computeSmsHash(sms1.sender, sms1.body.replace(Regex("\\s+"), " ").trim())
             val successTxnRule =
                 CustomSmsRule(
                     id = 1,
@@ -406,5 +410,149 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 assertEquals(4, success.transaction.categoryId)
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh skips transaction when current hash exists in existingSmsHashes`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
+            val currentHash = SmsParser.computeSmsHash(sms1.sender, sms1.body)
+            val successTxnRule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "Update from MyBank",
+                    amountRegex = "Val: ([\\d,.]+)",
+                    merchantRegex = "Order (\\d+)",
+                    accountRegex = null,
+                    merchantNameExample = "123",
+                    amountExample = "20",
+                    accountNameExample = null,
+                    priority = 10,
+                    sourceSmsBody = sms1.body,
+                )
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
+            `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh skips transaction when legacy hash exists in existingSmsHashes`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
+            val legacyHash = SmsParser.computeLegacySmsHash(sms1.sender, sms1.body)
+            val successTxnRule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "Update from MyBank",
+                    amountRegex = "Val: ([\\d,.]+)",
+                    merchantRegex = "Order (\\d+)",
+                    accountRegex = null,
+                    merchantNameExample = "123",
+                    amountExample = "20",
+                    accountNameExample = null,
+                    priority = 10,
+                    sourceSmsBody = sms1.body,
+                )
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
+            `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh skips transaction when current hash exists in deletedHashes`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
+            val currentHash = SmsParser.computeSmsHash(sms1.sender, sms1.body)
+            val successTxnRule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "Update from MyBank",
+                    amountRegex = "Val: ([\\d,.]+)",
+                    merchantRegex = "Order (\\d+)",
+                    accountRegex = null,
+                    merchantNameExample = "123",
+                    amountExample = "20",
+                    accountNameExample = null,
+                    priority = 10,
+                    sourceSmsBody = sms1.body,
+                )
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
+            `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh skips transaction when legacy hash exists in deletedHashes`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
+            val legacyHash = SmsParser.computeLegacySmsHash(sms1.sender, sms1.body)
+            val successTxnRule =
+                CustomSmsRule(
+                    id = 1,
+                    triggerPhrase = "Update from MyBank",
+                    amountRegex = "Val: ([\\d,.]+)",
+                    merchantRegex = "Order (\\d+)",
+                    accountRegex = null,
+                    merchantNameExample = "123",
+                    amountExample = "20",
+                    accountNameExample = null,
+                    priority = 10,
+                    sourceSmsBody = sms1.body,
+                )
+
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
+            `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(legacyHash))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
         }
 }

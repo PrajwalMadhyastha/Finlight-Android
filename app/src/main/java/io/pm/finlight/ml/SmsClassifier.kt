@@ -80,7 +80,7 @@ class SmsClassifier private constructor(
     private var interpreter: Interpreter? = preloadedInterpreter
 
     @VisibleForTesting
-    internal val vocab = preloadedVocab?.toMutableMap() ?: mutableMapOf()
+    internal val vocab: Map<String, Int> = preloadedVocab ?: mutableMapOf()
 
     private val interpreterLock = Any()
 
@@ -88,6 +88,10 @@ class SmsClassifier private constructor(
      * Primary constructor for production use.
      * Loads the TFLite model and vocabulary from assets.
      */
+    @Deprecated(
+        message = "Use MlModelFactory.getClassifier(context) to benefit from cached vocabulary",
+        replaceWith = ReplaceWith("MlModelFactory.getClassifier(context)", "io.pm.finlight.ml.MlModelFactory"),
+    )
     constructor(
         context: Context,
         modelName: String = "sms_classifier.tflite",
@@ -95,6 +99,18 @@ class SmsClassifier private constructor(
     ) : this(context, modelName, vocabName, null, null) {
         loadModel()
         loadVocabulary()
+    }
+
+    /**
+     * Constructor accepting pre-loaded vocabulary.
+     */
+    constructor(
+        context: Context,
+        vocab: Map<String, Int>,
+        modelName: String = "sms_classifier.tflite",
+        interpreterFactory: ((ByteBuffer, Interpreter.Options) -> Interpreter)? = null,
+    ) : this(context, modelName, "", vocab, null, interpreterFactory) {
+        loadModel()
     }
 
     /**
@@ -147,9 +163,10 @@ class SmsClassifier private constructor(
      */
     private fun loadVocabulary() {
         val ctx = context ?: return
+        val map = vocab as? MutableMap<String, Int> ?: return
         ctx.assets.open(vocabName).bufferedReader().useLines { lines ->
             lines.forEachIndexed { index, line ->
-                vocab[line] = index
+                map[line] = index
             }
         }
     }
