@@ -19,6 +19,7 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
@@ -121,24 +122,10 @@ class TransactionViewModel(
     private val splitTransactionRepository: ISplitTransactionRepository,
     private val smsParseTemplateDao: SmsParseTemplateDao,
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
-    private val mergeTransactionsUseCase: MergeTransactionsUseCase =
-        MergeTransactionsUseCase(
-            transactionQueryDao = db.transactionQueryDao(),
-            transactionWriteDao = db.transactionWriteDao(),
-            transactionReimbursementDao = db.transactionReimbursementDao(),
-            mergeRecordDao = db.mergeRecordDao(),
-            deletedSmsHashDao = db.deletedSmsHashDao(),
-            db = db,
-        ),
+    private val mergeTransactionsUseCase: MergeTransactionsUseCase,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     private val manageReimbursementUseCase: ManageReimbursementUseCase =
-        ManageReimbursementUseCase(
-            transactionQueryDao = db.transactionQueryDao(),
-            transactionWriteDao = db.transactionWriteDao(),
-            transactionReimbursementDao = db.transactionReimbursementDao(),
-            db = db,
-            dispatcherProvider = dispatcherProvider,
-        ),
+        ServiceLocator.provideManageReimbursementUseCase(application, db),
 ) : AndroidViewModel(application) {
     private val context = application
 

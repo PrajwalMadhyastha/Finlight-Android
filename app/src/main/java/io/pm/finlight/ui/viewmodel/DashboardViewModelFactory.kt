@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
-import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.utils.SystemTimeProvider
 
 /**
@@ -28,15 +27,7 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
-            val mergeTransactionsUseCase =
-                MergeTransactionsUseCase(
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    db = db,
-                )
+            val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(

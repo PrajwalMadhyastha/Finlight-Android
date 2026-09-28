@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 
 class TransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
@@ -16,15 +15,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val tagRepository = ServiceLocator.provideTagRepository(application)
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
-            val mergeTransactionsUseCase =
-                MergeTransactionsUseCase(
-                    transactionQueryDao = db.transactionQueryDao(),
-                    transactionWriteDao = db.transactionWriteDao(),
-                    transactionReimbursementDao = db.transactionReimbursementDao(),
-                    mergeRecordDao = db.mergeRecordDao(),
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
-                    db = db,
-                )
+            val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val manageReimbursementUseCase = ServiceLocator.provideManageReimbursementUseCase(application)
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
@@ -44,7 +35,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 smsRepository = smsRepository,
                 merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao()),
                 merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao()),
-                merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao()),
+                merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(application, db),
                 splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao()),
                 smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,

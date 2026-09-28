@@ -24,7 +24,6 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.pm.finlight.MerchantCategoryMapping
-import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRule
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
@@ -79,7 +78,7 @@ class SmsProcessorWorker(
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
             val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
 
-            val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
+            val mappingRepository = ServiceLocator.provideMerchantMappingRepository(context, db)
             val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
             val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toMutableSet()
             // Permanently skipped hashes (user deliberately deleted these transactions).
