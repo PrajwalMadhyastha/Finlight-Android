@@ -3,25 +3,19 @@ package io.pm.finlight.receiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import androidx.core.app.NotificationManagerCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.mockk.coVerify
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkAll
 import io.mockk.mockkStatic
+import io.mockk.unmockkAll
 import io.mockk.verify
-import androidx.core.app.NotificationManagerCompat
-import io.pm.finlight.TestApplication
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
-import io.pm.finlight.data.db.dao.TransactionReimbursementDao
-import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionType
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
@@ -41,11 +35,6 @@ import kotlinx.coroutines.delay
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class MergeActionReceiverTest : BaseViewModelTest() {
     private lateinit var context: Context
-    private lateinit var db: AppDatabase
-    private lateinit var transactionWriteDao: TransactionWriteDao
-    private lateinit var transactionQueryDao: TransactionQueryDao
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
-    private lateinit var transactionReimbursementDao: TransactionReimbursementDao
     private lateinit var transactionRepository: ITransactionRepository
     private lateinit var smsRepository: ISmsRepository
     private lateinit var mergeTransactionsUseCase: MergeTransactionsUseCase
@@ -56,21 +45,8 @@ class MergeActionReceiverTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
-        db = mockk<AppDatabase>(relaxed = true)
-        transactionWriteDao = mockk<TransactionWriteDao>(relaxed = true)
-        transactionQueryDao = mockk<TransactionQueryDao>(relaxed = true)
-        transactionAnalyticsDao = mockk<TransactionAnalyticsDao>(relaxed = true)
-        transactionReimbursementDao = mockk<TransactionReimbursementDao>(relaxed = true)
         transactionRepository = mockk<ITransactionRepository>(relaxed = true)
         smsRepository = mockk<ISmsRepository>(relaxed = true)
-
-        mockkObject(AppDatabase)
-        every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionQueryDao() } returns transactionQueryDao
-        every { db.transactionWriteDao() } returns transactionWriteDao
-        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
-        every { db.transactionReimbursementDao() } returns transactionReimbursementDao
-
         mergeTransactionsUseCase = mockk<MergeTransactionsUseCase>(relaxed = true)
 
         ServiceLocator.setTransactionRepository(transactionRepository)
