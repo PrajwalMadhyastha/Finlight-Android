@@ -764,4 +764,106 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
             assertEquals(ListenableWorker.Result.success(), result)
             verify { mockMappingRepo.allMappings }
         }
+
+    // --- Tests for Audit Finding: Retry Cap & Outer Try/Catch ---
+
+    @Test
+    fun `returns failure immediately when runAttemptCount equals MAX_OUTER_RETRIES`() =
+        runTest {
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(SmsCatchupWorker.MAX_OUTER_RETRIES)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            // Must not touch any DB or SMS data
+            coVerify(exactly = 0) { smsRepository.fetchAllSms(any(), any()) }
+            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+        }
+
+    @Test
+    fun `returns failure immediately when runAttemptCount exceeds MAX_OUTER_RETRIES`() =
+        runTest {
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(SmsCatchupWorker.MAX_OUTER_RETRIES + 5)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 0) { smsRepository.fetchAllSms(any(), any()) }
+        }
+
+    @Test
+    fun `outer exception on first attempt returns retry`() =
+        runTest {
+            // Simulate AppDatabase.getInstance() throwing on first attempt
+            every { AppDatabase.getInstance(any()) } throws RuntimeException("DB init failed")
+
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(0)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+        }
+
+    @Test
+    fun `outer exception on second attempt returns retry`() =
+        runTest {
+            every { AppDatabase.getInstance(any()) } throws RuntimeException("DB init failed")
+
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(1)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+        }
+
+    @Test
+    fun `outer exception on final retry attempt returns failure`() =
+        runTest {
+            every { AppDatabase.getInstance(any()) } throws RuntimeException("DB init failed")
+
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(SmsCatchupWorker.MAX_OUTER_RETRIES - 1)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `outer OOM error returns failure immediately without retry`() =
+        runTest {
+            every { AppDatabase.getInstance(any()) } throws OutOfMemoryError("heap exhausted")
+
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(0)
+                    .build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+        }
+
+    @Test
+    fun `outer CancellationException is rethrown and not swallowed`() =
+        runTest {
+            every { AppDatabase.getInstance(any()) } throws kotlinx.coroutines.CancellationException("Worker cancelled")
+
+            val worker =
+                TestListenableWorkerBuilder<SmsCatchupWorker>(context)
+                    .setRunAttemptCount(0)
+                    .build()
+
+            kotlin.test.assertFailsWith<kotlinx.coroutines.CancellationException> {
+                worker.doWork()
+            }
+        }
 }
