@@ -307,7 +307,7 @@ class SmsProcessorWorker(
             Log.e(tag, "SmsProcessorWorker encountered OOM on attempt $runAttemptCount. Failing permanently.", oom)
             Result.failure()
         } catch (e: Exception) {
-            Log.e(tag, "SmsProcessorWorker failed (attempt $runAttemptCount): ${e.message}", e)
+            Log.e(tag, "SmsProcessorWorker failed (attempt $runAttemptCount): ${e.javaClass.simpleName}", e)
             if (runAttemptCount >= 2) Result.failure() else Result.retry()
         }
     }

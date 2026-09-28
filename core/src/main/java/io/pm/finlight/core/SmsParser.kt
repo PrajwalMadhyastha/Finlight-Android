@@ -30,6 +30,7 @@ import io.pm.finlight.core.CATEGORY_KEYWORD_MAP
 import io.pm.finlight.core.NerEntity
 import io.pm.finlight.core.utils.MerchantCleaner
 import io.pm.finlight.core.utils.StringSimilarity
+import java.util.logging.Logger
 import java.security.MessageDigest
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
@@ -48,6 +49,8 @@ sealed class ParseResult {
 }
 
 object SmsParser {
+
+    private val logger: Logger = Logger.getLogger("SmsParser")
 
     val ACCOUNT_CONTROL_CHARS_REGEX = Regex("[\\p{Cc}\\p{Cf}]")
     private val SENTENCE_BREAK_REGEX = Regex("""(?<!\b(?:No|no|Acc|acc|Ltd|ltd))[.?!]\s+""")
@@ -487,14 +490,14 @@ object SmsParser {
                     if (nerAmountConf != null && nerAmountConf < NER_CONFIDENCE_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "NER model uncertainty: AMOUNT confidence was ${"%.0f".format(nerAmountConf * 100)}% (threshold ${"%.0f".format(NER_CONFIDENCE_THRESHOLD * 100)}%)."
-                        System.err.println("[SmsParser][Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SenderHash: ${sms.sender.hashCode()}, Amount: $amount")
+                        logger.warning("[Suspicious] Low NER confidence for AMOUNT ($nerAmountConf). SenderHash: ${sms.sender.hashCode()}, Amount: $amount")
                     }
 
                     // Option A: Hard upper-bound threshold (₹1,00,000 by default)
                     if (!needsReview && amount > SUSPICIOUS_AMOUNT_THRESHOLD) {
                         needsReview = true
                         suspicionReason = "Amount (₹${"%.2f".format(amount)}) exceeds the auto-save threshold of ₹${"%.0f".format(SUSPICIOUS_AMOUNT_THRESHOLD)}."
-                        System.err.println("[SmsParser][Suspicious] Large amount $amount exceeds threshold. SenderHash: ${sms.sender.hashCode()}")
+                        logger.warning("[Suspicious] Large amount $amount exceeds threshold. SenderHash: ${sms.sender.hashCode()}")
                     }
                     // -------------------------------------------------------------------
 
@@ -727,7 +730,7 @@ object SmsParser {
         val cleanSender = sender.trim().lowercase()
         val normalized = body.replace(Regex("\\s+"), " ").trim()
         val preimage = "${cleanSender.length}:$cleanSender|$normalized"
-        val digest = SHA_256_DIGEST.get()!!.apply { reset() }
+        val digest = SHA_256_DIGEST.get().apply { reset() }
         val hashBytes = digest.digest(preimage.toByteArray(Charsets.UTF_8))
         return bytesToHex(hashBytes)
     }
@@ -934,7 +937,7 @@ object SmsParser {
                 date = originalSms.date
             )
         } catch (e: Exception) {
-            System.err.println("[SmsParser]: Error applying heuristic template: ${e.javaClass.simpleName}")
+            logger.warning("Error applying heuristic template: ${e.javaClass.simpleName}")
             return null
         }
     }
