@@ -743,4 +743,25 @@ class SmsCatchupWorkerTest : BaseViewModelTest() {
 
             verify(exactly = 1) { mockClassifier.close() }
         }
+
+    @Test
+    fun `resolves MerchantMappingRepository from ServiceLocator`() =
+        runTest {
+            val mockMappingRepo = mockk<IMerchantMappingRepository>(relaxed = true)
+            every { mockMappingRepo.allMappings } returns
+                flowOf(
+                    listOf(MerchantMapping(smsSender = "CUSTOM_SENDER", merchantName = "CustomMerchant")),
+                )
+            ServiceLocator.setMerchantMappingRepository(mockMappingRepo)
+
+            val sms = SmsMessage(1L, "CUSTOM_SENDER", "Spent Rs.100 at Swiggy", System.currentTimeMillis())
+            coEvery { smsRepository.fetchAllSms(any(), any()) } returns listOf(sms)
+            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
+
+            val worker = TestListenableWorkerBuilder<SmsCatchupWorker>(context).build()
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify { mockMappingRepo.allMappings }
+        }
 }

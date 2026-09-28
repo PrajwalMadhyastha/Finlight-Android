@@ -48,6 +48,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
     private lateinit var transactionReimbursementDao: TransactionReimbursementDao
     private lateinit var transactionRepository: ITransactionRepository
     private lateinit var smsRepository: ISmsRepository
+    private lateinit var mergeTransactionsUseCase: MergeTransactionsUseCase
     private lateinit var receiver: MergeActionReceiver
     private lateinit var mockNotificationManager: NotificationManagerCompat
 
@@ -70,12 +71,13 @@ class MergeActionReceiverTest : BaseViewModelTest() {
         every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
         every { db.transactionReimbursementDao() } returns transactionReimbursementDao
 
+        mergeTransactionsUseCase = mockk<MergeTransactionsUseCase>(relaxed = true)
+
         ServiceLocator.setTransactionRepository(transactionRepository)
         ServiceLocator.setSmsRepository(smsRepository)
+        ServiceLocator.setMergeTransactionsUseCase(mergeTransactionsUseCase)
 
-        io.mockk.mockkConstructor(MergeTransactionsUseCase::class)
-
-        coEvery { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) } returns Unit
+        coEvery { mergeTransactionsUseCase.invoke(any(), any(), any(), any()) } returns Unit
         coEvery { transactionRepository.getTransactionSync(any()) } returns null
         coEvery { transactionRepository.dismissMerge(any()) } returns Unit
 
@@ -105,7 +107,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
 
             receiver.onReceive(context, intent)
 
-            coVerify(timeout = 2000) { anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, any(), any()) }
+            coVerify(timeout = 2000) { mergeTransactionsUseCase(1, 2, any(), any()) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
             delay(100)
@@ -159,7 +161,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) {
-                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, "Test SMS body", 1000L)
+                mergeTransactionsUseCase(1, 2, "Test SMS body", 1000L)
             }
             delay(100)
         }
@@ -169,7 +171,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
         runTest {
             val intent = Intent()
             receiver.onReceive(context, intent)
-            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mergeTransactionsUseCase(any(), any(), any(), any()) }
             coVerify(exactly = 0) { transactionRepository.dismissMerge(any()) }
         }
 
@@ -182,7 +184,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
                     putExtra("notificationId", 10002)
                 }
             receiver.onReceive(context, intent)
-            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mergeTransactionsUseCase(any(), any(), any(), any()) }
             coVerify(exactly = 0) { transactionRepository.dismissMerge(any()) }
             verify(timeout = 2000) { mockNotificationManager.cancel(10002) }
             verify(timeout = 2000) { mockNotificationManager.cancel(2) }
@@ -198,7 +200,7 @@ class MergeActionReceiverTest : BaseViewModelTest() {
                     putExtra("childTxnId", -1)
                 }
             receiver.onReceive(context, intent)
-            coVerify(exactly = 0) { anyConstructed<MergeTransactionsUseCase>().invoke(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { mergeTransactionsUseCase(any(), any(), any(), any()) }
             delay(100)
         }
 
@@ -243,8 +245,27 @@ class MergeActionReceiverTest : BaseViewModelTest() {
             receiver.onReceive(context, intent)
 
             coVerify(timeout = 2000) {
-                anyConstructed<MergeTransactionsUseCase>().invoke(1, 2, null, null)
+                mergeTransactionsUseCase(1, 2, null, null)
             }
+            delay(100)
+        }
+
+    @Test
+    fun `ACTION_MERGE uses injected MergeTransactionsUseCase from ServiceLocator`() =
+        runTest {
+            val customUseCase = mockk<MergeTransactionsUseCase>(relaxed = true)
+            ServiceLocator.setMergeTransactionsUseCase(customUseCase)
+
+            val intent =
+                Intent("ACTION_MERGE").apply {
+                    putExtra("parentTxnId", 10)
+                    putExtra("childTxnId", 20)
+                    putExtra("notificationId", 10020)
+                }
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 2000) { customUseCase(10, 20, any(), any()) }
             delay(100)
         }
 }

@@ -3,7 +3,6 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
@@ -20,7 +19,7 @@ class SettingsViewModelFactory(
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
+            val merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(application, db)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val smsRepository = ServiceLocator.provideSmsRepository(application)

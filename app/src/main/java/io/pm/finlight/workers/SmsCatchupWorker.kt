@@ -22,7 +22,6 @@ import android.util.Log
 import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
@@ -120,7 +119,7 @@ class SmsCatchupWorker(
             return Result.success()
         }
 
-        val mappingRepository = MerchantMappingRepository(db.merchantMappingDao())
+        val mappingRepository = ServiceLocator.provideMerchantMappingRepository(context, db)
         val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
         // Pre-load all rules, mappings, and templates once before the loop to avoid redundant SQLite queries.

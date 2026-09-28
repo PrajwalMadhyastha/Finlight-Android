@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationManagerCompat
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -19,18 +18,9 @@ class MergeActionReceiver : BroadcastReceiver() {
         val childTxnId = intent.getIntExtra("childTxnId", -1)
         val notificationId = childTxnId + 10000
 
-        val db = AppDatabase.getInstance(context)
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         val transactionRepository = ServiceLocator.provideTransactionRepository(context)
-        val mergeTransactionsUseCase =
-            io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
-                transactionQueryDao = db.transactionQueryDao(),
-                transactionWriteDao = db.transactionWriteDao(),
-                transactionReimbursementDao = db.transactionReimbursementDao(),
-                mergeRecordDao = db.mergeRecordDao(),
-                deletedSmsHashDao = db.deletedSmsHashDao(),
-                db = db,
-            )
+        val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(context)
 
         val pendingResult = goAsync()
         CoroutineScope(dispatcherProvider.io).launch {

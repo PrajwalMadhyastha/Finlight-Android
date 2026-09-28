@@ -1044,4 +1044,32 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             verify(exactly = 0) { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) }
             coVerify(exactly = 0) { recurringDao.getRuleBySmsSenderId(any()) }
         }
+
+    @Test
+    fun `resolves MerchantMappingRepository from ServiceLocator`() =
+        runTest {
+            val mockMappingRepo = mockk<IMerchantMappingRepository>(relaxed = true)
+            every { mockMappingRepo.allMappings } returns
+                flowOf(
+                    listOf(MerchantMapping(smsSender = "CUSTOM_SENDER", merchantName = "CustomMerchant")),
+                )
+            io.pm.finlight.di.ServiceLocator.setMerchantMappingRepository(mockMappingRepo)
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "CUSTOM_SENDER",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    merchantName = "Tea",
+                    originalMessage = "Spent 50",
+                    sourceSmsHash = "hashCustomSender",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("CUSTOM_SENDER", "Spent 50").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify { mockMappingRepo.allMappings }
+        }
 }
