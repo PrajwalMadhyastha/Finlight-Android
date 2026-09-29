@@ -219,4 +219,56 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
         val repo = TravelSettingsRepository(context)
         assertNotNull(repo)
     }
+
+    @Test
+    fun `travelModeSettings json serialization contract maintains expected keys and enum values`() {
+        val settings =
+            TravelModeSettings(
+                isEnabled = true,
+                tripName = "Euro Trip",
+                tripType = TripType.INTERNATIONAL,
+                startDate = 1700000000000L,
+                endDate = 1700100000000L,
+                currencyCode = "EUR",
+                conversionRate = 90.5f,
+            )
+
+        val json = gson.toJson(settings)
+        val jsonObject = org.json.JSONObject(json)
+
+        // Verify all contract field keys exist un-obfuscated
+        assertEquals(true, jsonObject.getBoolean("isEnabled"))
+        assertEquals("Euro Trip", jsonObject.getString("tripName"))
+        assertEquals("INTERNATIONAL", jsonObject.getString("tripType"))
+        assertEquals(1700000000000L, jsonObject.getLong("startDate"))
+        assertEquals(1700100000000L, jsonObject.getLong("endDate"))
+        assertEquals("EUR", jsonObject.getString("currencyCode"))
+        assertEquals(90.5, jsonObject.getDouble("conversionRate"), 0.001)
+
+        // Verify deserialization from canonical JSON
+        val canonicalJson =
+            """
+            {
+                "isEnabled": false,
+                "tripName": "Goa Trip",
+                "tripType": "DOMESTIC",
+                "startDate": 1600000000000,
+                "endDate": 1600050000000,
+                "currencyCode": null,
+                "conversionRate": null
+            }
+            """.trimIndent()
+        val deserialized = gson.fromJson(canonicalJson, TravelModeSettings::class.java)
+        assertEquals(false, deserialized.isEnabled)
+        assertEquals("Goa Trip", deserialized.tripName)
+        assertEquals(TripType.DOMESTIC, deserialized.tripType)
+        assertEquals(1600000000000L, deserialized.startDate)
+        assertEquals(1600050000000L, deserialized.endDate)
+        assertNull(deserialized.currencyCode)
+        assertNull(deserialized.conversionRate)
+
+        // Verify round-trip preserves equality
+        val roundTrip = gson.fromJson(json, TravelModeSettings::class.java)
+        assertEquals(settings, roundTrip)
+    }
 }
