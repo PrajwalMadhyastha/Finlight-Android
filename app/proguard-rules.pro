@@ -40,7 +40,6 @@
 -keepclassmembers class io.pm.finlight.PeriodTotal { <fields>; <init>(...); }
 -keepclassmembers class io.pm.finlight.FinancialSummary { <fields>; <init>(...); }
 -keepclassmembers class io.pm.finlight.BudgetWithSpending { <fields>; <init>(...); }
--keepclassmembers class io.pm.finlight.MonthlySummaryItem { <fields>; <init>(...); }
 -keepclassmembers class io.pm.finlight.GoalWithAccountName { <fields>; <init>(...); }
 -keepclassmembers class io.pm.finlight.data.db.dao.TripWithStats { <fields>; <init>(...); }
 -keepclassmembers class io.pm.finlight.data.db.dao.OriginalDescriptionCount { <fields>; <init>(...); }
@@ -72,13 +71,12 @@
 -keep class *$$serializer {
     public static final *$$serializer INSTANCE;
 }
--keep class kotlinx.serialization.** { *; }
 
 # --- Gson ---
 # Keep data classes used with Gson for passing data between screens and in repositories.
--keepclassmembers class io.pm.finlight.PotentialTransaction { <fields>; <init>(...); }
--keepclassmembers class io.pm.finlight.PotentialAccount { <fields>; <init>(...); }
--keepclassmembers class io.pm.finlight.TravelModeSettings {
+-keep class io.pm.finlight.PotentialTransaction { <fields>; <init>(...); }
+-keep class io.pm.finlight.PotentialAccount { <fields>; <init>(...); }
+-keep class io.pm.finlight.TravelModeSettings {
     <fields>;
     <init>(...);
 }

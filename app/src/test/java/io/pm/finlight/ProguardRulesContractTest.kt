@@ -37,7 +37,6 @@ class ProguardRulesContractTest {
                 "io.pm.finlight.PeriodTotal",
                 "io.pm.finlight.FinancialSummary",
                 "io.pm.finlight.BudgetWithSpending",
-                "io.pm.finlight.MonthlySummaryItem",
                 "io.pm.finlight.GoalWithAccountName",
                 "io.pm.finlight.data.db.dao.TripWithStats",
                 "io.pm.finlight.data.db.dao.OriginalDescriptionCount",
@@ -52,10 +51,14 @@ class ProguardRulesContractTest {
             )
         }
 
-        // Verify domain-only model is not classified as Room DTO
+        // Verify domain-only models are not classified as Room DTOs
         assertFalse(
             "MergedTransactionItem is not a Room DTO and should not be in Room DTO rules",
             content.contains("-keepclassmembers class io.pm.finlight.data.model.MergedTransactionItem"),
+        )
+        assertFalse(
+            "MonthlySummaryItem is not a Room DTO and should not be in Room DTO rules",
+            content.contains("-keepclassmembers class io.pm.finlight.MonthlySummaryItem"),
         )
     }
 
@@ -80,6 +83,35 @@ class ProguardRulesContractTest {
         assertTrue("Companion keep rule must be present", content.contains("*** Companion;"))
         assertTrue("serializer method keep rule must be present", content.contains("*** serializer(...);"))
         assertTrue("Generated serializer class keep rule must be present", content.contains("-keep class *$\$serializer"))
+        assertFalse(
+            "Blanket kotlinx serialization rule must be absent to allow library optimization",
+            content.contains("-keep class kotlinx.serialization.**"),
+        )
+    }
+
+    @Test
+    fun `proguard rules preserve screen navigation and serialization models with full class keep`() {
+        val content = proguardRulesFile.readText()
+        assertTrue(
+            "Must preserve PotentialTransaction with full class keep",
+            content.contains("-keep class io.pm.finlight.PotentialTransaction"),
+        )
+        assertTrue(
+            "Must preserve PotentialAccount with full class keep",
+            content.contains("-keep class io.pm.finlight.PotentialAccount"),
+        )
+        assertTrue(
+            "Must preserve TravelModeSettings with full class keep",
+            content.contains("-keep class io.pm.finlight.TravelModeSettings"),
+        )
+        assertFalse(
+            "PotentialTransaction should not use fragile keepclassmembers",
+            content.contains("-keepclassmembers class io.pm.finlight.PotentialTransaction"),
+        )
+        assertFalse(
+            "PotentialAccount should not use fragile keepclassmembers",
+            content.contains("-keepclassmembers class io.pm.finlight.PotentialAccount"),
+        )
     }
 
     @Test
@@ -87,7 +119,7 @@ class ProguardRulesContractTest {
         val content = proguardRulesFile.readText()
         assertTrue(
             "Must preserve io.pm.finlight.TravelModeSettings",
-            content.contains("-keepclassmembers class io.pm.finlight.TravelModeSettings"),
+            content.contains("-keep class io.pm.finlight.TravelModeSettings"),
         )
         assertFalse(
             "Must not reference wrong package io.pm.finlight.data.repository.TravelModeSettings",
