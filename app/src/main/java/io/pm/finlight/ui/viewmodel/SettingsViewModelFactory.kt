@@ -8,10 +8,12 @@ import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.SmsEntityExtractor
 
 class SettingsViewModelFactory(
     private val application: Application,
     private val transactionViewModel: TransactionViewModel,
+    private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -24,7 +26,6 @@ class SettingsViewModelFactory(
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val smsRepository = ServiceLocator.provideSmsRepository(application)
             val smsClassifier = MlModelFactory.getClassifier(application)
-            val nerExtractor = MlModelFactory.getNerExtractor(application)
             val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")
@@ -39,7 +40,7 @@ class SettingsViewModelFactory(
                 smsRepository,
                 transactionViewModel,
                 smsClassifier,
-                nerExtractor,
+                nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
                 transactionRunner,
                 dispatchers = dispatcherProvider,
             ) as T

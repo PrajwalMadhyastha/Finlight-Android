@@ -10,6 +10,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
+import io.mockk.verify
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IMerchantMappingRepository
@@ -155,11 +156,57 @@ class SettingsViewModelFactoryTest {
             }.get(viewModel)
         assertSame(mockClassifier, classifierField)
 
-        val nerExtractorField =
-            SettingsViewModel::class.java.getDeclaredField("nerExtractor").apply {
-                isAccessible = true
-            }.get(viewModel)
-        assertSame(mockNerExtractor, nerExtractorField)
+        // NerExtractor is NOT eagerly instantiated on creation
+        verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
+
+        // When provider is invoked on-demand, NerExtractor is loaded
+        val resolvedExtractor = viewModel.nerExtractorProvider.invoke()
+        assertSame(mockNerExtractor, resolvedExtractor)
+        verify(exactly = 1) { MlModelFactory.getNerExtractor(any()) }
+    }
+
+    @Test
+    fun create_withCustomNerExtractorProvider_passesProviderToViewModel() {
+        val mockSettingsRepo: ISettingsRepository =
+            mockk(relaxed = true) {
+                every { getDailyReportEnabled() } returns flowOf(false)
+                every { getWeeklySummaryEnabled() } returns flowOf(true)
+                every { getMonthlySummaryEnabled() } returns flowOf(true)
+                every { getAppLockEnabled() } returns flowOf(false)
+                every { getUnknownTransactionPopupEnabled() } returns flowOf(true)
+                every { getAutoCaptureNotificationEnabled() } returns flowOf(true)
+                every { getDailyReportTime() } returns flowOf(Pair(9, 0))
+                every { getWeeklyReportTime() } returns flowOf(Triple(Calendar.MONDAY, 9, 0))
+                every { getMonthlyReportTime() } returns flowOf(Triple(1, 9, 0))
+                every { getSelectedTheme() } returns flowOf(AppTheme.SYSTEM_DEFAULT)
+                every { getAutoBackupEnabled() } returns flowOf(true)
+                every { getAutoBackupNotificationEnabled() } returns flowOf(false)
+                every { getPrivacyModeEnabled() } returns flowOf(false)
+                every { getSimulatorPrivacyModeEnabled() } returns flowOf(false)
+                every { getLastBackupTimestamp() } returns flowOf(0L)
+                every { getHasSeenOnboarding() } returns flowOf(false)
+                every { getIsFirstLaunchComplete() } returns flowOf(false)
+                every { getSmsScanStartDate() } returns flowOf(0L)
+            }
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setTransactionRepository(mockk(relaxed = true))
+        ServiceLocator.setMerchantMappingRepository(mockk(relaxed = true))
+        ServiceLocator.setAccountRepository(mockk(relaxed = true))
+        ServiceLocator.setCategoryRepository(mockk(relaxed = true))
+        ServiceLocator.setSmsRepository(mockk(relaxed = true))
+
+        mockkObject(MlModelFactory)
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(any()) } returns mockClassifier
+
+        val customExtractor: NerExtractor = mockk(relaxed = true)
+        val customProvider: () -> NerExtractor = { customExtractor }
+
+        val factory = SettingsViewModelFactory(application, mockk(relaxed = true), nerExtractorProvider = customProvider)
+        val viewModel = factory.create(SettingsViewModel::class.java)
+
+        assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())
+        verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
     }
 
     @Test
