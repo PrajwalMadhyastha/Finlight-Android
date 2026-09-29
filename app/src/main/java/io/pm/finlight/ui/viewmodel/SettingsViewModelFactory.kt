@@ -29,21 +29,40 @@ class SettingsViewModelFactory(
             val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(
-                application,
-                settingsRepository,
-                db,
-                transactionRepository,
-                merchantMappingRepository,
-                accountRepository,
-                categoryRepository,
-                smsRepository,
-                transactionViewModel,
-                smsClassifier,
-                nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
-                transactionRunner,
-                dispatchers = dispatcherProvider,
-            ) as T
+            val viewModel =
+                if (nerExtractorProvider != null) {
+                    SettingsViewModel(
+                        application,
+                        settingsRepository,
+                        db,
+                        transactionRepository,
+                        merchantMappingRepository,
+                        accountRepository,
+                        categoryRepository,
+                        smsRepository,
+                        transactionViewModel,
+                        smsClassifier,
+                        nerExtractorProvider = nerExtractorProvider,
+                        transactionRunner = transactionRunner,
+                        dispatchers = dispatcherProvider,
+                    )
+                } else {
+                    SettingsViewModel(
+                        application,
+                        settingsRepository,
+                        db,
+                        transactionRepository,
+                        merchantMappingRepository,
+                        accountRepository,
+                        categoryRepository,
+                        smsRepository,
+                        transactionViewModel,
+                        smsClassifier,
+                        transactionRunner = transactionRunner,
+                        dispatchers = dispatcherProvider,
+                    )
+                }
+            return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

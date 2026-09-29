@@ -1925,6 +1925,42 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `rescanSmsWithNewRule does not invoke nerExtractor extract when custom rules match`() =
+        runTest {
+            val sms = SmsMessage(1, "SENDER", "spent Rs 100 on Food", 1L)
+
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "on (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            viewModel.rescanSmsWithNewRule { }
+            advanceUntilIdle()
+
+            assertEquals(1, providerInvocationCount)
+            verify(nerExtractor).close()
+            verify(nerExtractor, never()).extract(anyString())
+        }
+
+    @Test
     fun `rescanSmsWithNewRule does not invoke nerExtractorProvider when no SMS found`() =
         runTest {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(emptyList())

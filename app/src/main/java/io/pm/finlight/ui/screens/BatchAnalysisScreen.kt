@@ -45,9 +45,9 @@ data class BatchStatus(
 class BatchAnalysisViewModel(
     private val context: Context,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(context) },
 ) : ViewModel() {
     private val classifier = MlModelFactory.getClassifier(context)
-    private val nerExtractor: SmsEntityExtractor = MlModelFactory.getNerExtractor(context)
     var status by mutableStateOf(BatchStatus())
         private set
 
@@ -64,23 +64,25 @@ class BatchAnalysisViewModel(
 
                 var processedCount = 0
 
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val bufferedIn = BufferedInputStream(inputStream)
-                    bufferedIn.mark(10)
-                    val firstByte = bufferedIn.read()
-                    bufferedIn.reset()
+                nerExtractorProvider().use { nerExtractor ->
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        val bufferedIn = BufferedInputStream(inputStream)
+                        bufferedIn.mark(10)
+                        val firstByte = bufferedIn.read()
+                        bufferedIn.reset()
 
-                    if (firstByte == '<'.code) {
-                        processedCount =
-                            processXmlStream(bufferedIn, jsonWriter) { count ->
-                                // Update UI every 50 items
-                                if (count % 50 == 0) updateStatus { it.copy(processed = count) }
-                            }
-                    } else {
-                        processedCount =
-                            processJsonStream(bufferedIn, jsonWriter) { count ->
-                                if (count % 50 == 0) updateStatus { it.copy(processed = count) }
-                            }
+                        if (firstByte == '<'.code) {
+                            processedCount =
+                                processXmlStream(bufferedIn, jsonWriter, nerExtractor) { count ->
+                                    // Update UI every 50 items
+                                    if (count % 50 == 0) updateStatus { it.copy(processed = count) }
+                                }
+                        } else {
+                            processedCount =
+                                processJsonStream(bufferedIn, jsonWriter, nerExtractor) { count ->
+                                    if (count % 50 == 0) updateStatus { it.copy(processed = count) }
+                                }
+                        }
                     }
                 }
 
@@ -102,6 +104,7 @@ class BatchAnalysisViewModel(
     private fun processXmlStream(
         input: InputStream,
         writer: JsonWriter,
+        nerExtractor: SmsEntityExtractor,
         onProgress: suspend (Int) -> Unit,
     ): Int {
         var count = 0
@@ -116,7 +119,7 @@ class BatchAnalysisViewModel(
                 val date = parser.getAttributeValue(null, "date")?.toLongOrNull() ?: 0L
                 val body = parser.getAttributeValue(null, "body") ?: ""
 
-                processSingleItem(address, body, date, writer)
+                processSingleItem(address, body, date, writer, nerExtractor)
                 count++
                 runBlocking { onProgress(count) }
             }
@@ -129,6 +132,7 @@ class BatchAnalysisViewModel(
     private fun processJsonStream(
         input: InputStream,
         writer: JsonWriter,
+        nerExtractor: SmsEntityExtractor,
         onProgress: suspend (Int) -> Unit,
     ): Int {
         var count = 0
@@ -159,7 +163,7 @@ class BatchAnalysisViewModel(
                 }
                 reader.endObject()
 
-                processSingleItem(address, body, date, writer)
+                processSingleItem(address, body, date, writer, nerExtractor)
                 count++
                 runBlocking { onProgress(count) }
             }
@@ -176,6 +180,7 @@ class BatchAnalysisViewModel(
         body: String,
         date: Long,
         writer: JsonWriter,
+        nerExtractor: SmsEntityExtractor,
     ) {
         val score = classifier.classify(body)
 
@@ -249,7 +254,6 @@ class BatchAnalysisViewModel(
     override fun onCleared() {
         super.onCleared()
         classifier.close()
-        nerExtractor.close()
     }
 }
 

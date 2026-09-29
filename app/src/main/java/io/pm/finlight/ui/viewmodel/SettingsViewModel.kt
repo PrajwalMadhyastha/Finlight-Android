@@ -16,6 +16,7 @@ import android.app.backup.BackupManager
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -58,6 +59,7 @@ class SettingsViewModel(
     private val smsRepository: ISmsRepository,
     private val transactionViewModel: TransactionViewModel,
     private val smsClassifier: SmsClassifier,
+    @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
     private val transactionRunner: TransactionRunner,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
@@ -369,18 +371,30 @@ class SettingsViewModel(
                             withContext(dispatchers.default) {
                                 rawMessages.map { sms ->
                                     async {
-                                        val potential =
-                                            SmsParser.parse(
-                                                sms,
-                                                existingMappings,
-                                                customSmsRuleProvider,
-                                                merchantRenameRuleProvider,
-                                                ignoreRuleProvider,
-                                                merchantCategoryMappingProvider,
-                                                categoryFinderProvider,
-                                                smsParseTemplateProvider,
-                                                nerEntities = nerExtractor.extract(sms.body),
+                                        val customRuleResult =
+                                            SmsParser.parseWithOnlyCustomRules(
+                                                sms = sms,
+                                                customSmsRuleProvider = customSmsRuleProvider,
+                                                merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                                merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                                categoryFinderProvider = categoryFinderProvider,
                                             )
+                                        val potential =
+                                            if (customRuleResult is ParseResult.Success) {
+                                                customRuleResult.transaction
+                                            } else {
+                                                SmsParser.parse(
+                                                    sms,
+                                                    existingMappings,
+                                                    customSmsRuleProvider,
+                                                    merchantRenameRuleProvider,
+                                                    ignoreRuleProvider,
+                                                    merchantCategoryMappingProvider,
+                                                    categoryFinderProvider,
+                                                    smsParseTemplateProvider,
+                                                    nerEntities = nerExtractor.extract(sms.body),
+                                                )
+                                            }
                                         if (potential != null) {
                                             val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
                                             Pair(potential, legacyHash)
