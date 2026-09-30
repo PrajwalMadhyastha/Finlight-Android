@@ -9,10 +9,18 @@ package io.pm.finlight
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.ComponentCallbacks2
 import android.os.Build
+import coil.Coil
+import coil.ImageLoader
+import coil.ImageLoaderFactory
+import coil.memory.MemoryCache
 import com.github.mikephil.charting.utils.Utils
+import io.pm.finlight.ml.MlModelFactory
 
-class MainApplication : Application() {
+class MainApplication :
+    Application(),
+    ImageLoaderFactory {
     companion object {
         const val TRANSACTION_CHANNEL_ID = "transaction_channel"
         const val RICH_TRANSACTION_CHANNEL_ID = "rich_transaction_channel"
@@ -23,11 +31,44 @@ class MainApplication : Application() {
         const val GOALS_CHANNEL_ID = "goals_channel"
     }
 
+    override fun newImageLoader(): ImageLoader {
+        return ImageLoader.Builder(this)
+            .memoryCache {
+                MemoryCache.Builder(this)
+                    .maxSizePercent(0.15) // Limit to 15% of app memory
+                    .build()
+            }
+            .respectCacheHeaders(false)
+            .build()
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+        ) {
+            // App moved to background or foreground critical memory pressure: purge decoded bitmaps
+            Coil.imageLoader(this).memoryCache?.clear()
+            // Clear vocabulary cache if loaded
+            MlModelFactory.clearVocabCache()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        Coil.imageLoader(this).memoryCache?.clear()
+        MlModelFactory.clearVocabCache()
+    }
+
     override fun onCreate() {
         super.onCreate()
 
         // --- MIGRATION: Manually load the native SQLCipher library ---
-        System.loadLibrary("sqlcipher")
+        try {
+            System.loadLibrary("sqlcipher")
+        } catch (_: UnsatisfiedLinkError) {
+            // Ignored in Robolectric/JVM unit test environments
+        }
 
         Utils.init(this)
 
