@@ -26,6 +26,9 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import android.util.Base64
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -34,6 +37,7 @@ import kotlinx.serialization.json.encodeToStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -43,6 +47,7 @@ import kotlin.collections.forEach
 
 @OptIn(ExperimentalSerializationApi::class)
 object DataExportService {
+    private val snapshotMutex = Mutex()
     private val json =
         Json {
             prettyPrint = true
@@ -52,77 +57,82 @@ object DataExportService {
         }
 
     suspend fun createBackupSnapshot(context: Context): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
-            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
-            try {
-                val finalBackupData = buildBackupData(context)
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+                val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+                try {
+                    val finalBackupData = buildBackupData(context)
 
-                FileOutputStream(tempFile).buffered().use { fos ->
-                    GZIPOutputStream(fos).use { gzip ->
+                    GZIPOutputStream(FileOutputStream(tempFile).buffered()).use { gzip ->
                         json.encodeToStream(finalBackupData, gzip)
                     }
-                }
 
-                if (!tempFile.renameTo(snapshotFile)) {
-                    if (snapshotFile.exists() && !snapshotFile.delete()) {
-                        tempFile.delete()
-                        return@withContext false
-                    }
                     if (!tempFile.renameTo(snapshotFile)) {
-                        tempFile.delete()
-                        return@withContext false
+                        if (snapshotFile.exists() && !snapshotFile.delete()) {
+                            tempFile.delete()
+                            return@withContext false
+                        }
+                        if (!tempFile.renameTo(snapshotFile)) {
+                            tempFile.delete()
+                            return@withContext false
+                        }
                     }
+                    true
+                } catch (e: CancellationException) {
+                    tempFile.delete()
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
+                    tempFile.delete()
+                    false
                 }
-                true
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
-                tempFile.delete()
-                false
             }
         }
     }
 
     suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
-            if (!snapshotFile.exists()) {
-                Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
-                return@withContext false // No snapshot to restore
-            }
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+                if (!snapshotFile.exists()) {
+                    Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
+                    return@withContext false // No snapshot to restore
+                }
 
-            Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
-            try {
-                // Decompress the Gzip file and stream directly into Json.decodeFromStream
-                val backupData =
-                    FileInputStream(snapshotFile).buffered().use { fis ->
-                        GZIPInputStream(fis).use { gzipStream ->
+                Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
+                try {
+                    // Decompress the Gzip file and stream directly into Json.decodeFromStream
+                    val backupData =
+                        GZIPInputStream(FileInputStream(snapshotFile).buffered()).use { gzipStream ->
                             json.decodeFromStream<AppDataBackup>(gzipStream)
                         }
-                    }
 
-                // Import the data
-                val success = restoreBackupData(context, backupData)
+                    // Import the data
+                    val success = restoreBackupData(context, backupData)
 
-                if (success) {
-                    if (snapshotFile.delete()) {
-                        Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                    if (success) {
+                        if (snapshotFile.delete()) {
+                            Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+                        } else {
+                            Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
+                        }
                     } else {
-                        Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
+                        Log.e("DataExportService", "Restore failed during data import phase.")
                     }
-                } else {
-                    Log.e("DataExportService", "Restore failed during data import phase.")
+                    return@withContext success
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Failed to restore from backup snapshot", e)
+                    // Attempt to delete the corrupted file to prevent future errors
+                    if (!snapshotFile.delete()) {
+                        Log.w("DataExportService", "Failed to delete corrupted snapshot file")
+                    }
+                    return@withContext false
                 }
-                return@withContext success
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Failed to restore from backup snapshot", e)
-                // Attempt to delete the corrupted file to prevent future errors
-                if (!snapshotFile.delete()) {
-                    Log.w("DataExportService", "Failed to delete corrupted snapshot file")
-                }
-                return@withContext false
             }
         }
     }
@@ -255,12 +265,35 @@ object DataExportService {
         )
     }
 
+    suspend fun exportToJson(
+        context: Context,
+        outputStream: OutputStream,
+    ): Boolean {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
+            try {
+                val finalBackupData = buildBackupData(context)
+                outputStream.buffered().use { bos ->
+                    json.encodeToStream(finalBackupData, bos)
+                }
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Error exporting to JSON stream", e)
+                false
+            }
+        }
+    }
+
     suspend fun exportToJsonString(context: Context): String? {
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
                 val finalBackupData = buildBackupData(context)
                 json.encodeToString(finalBackupData)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error exporting to JSON", e)
                 null
@@ -275,17 +308,19 @@ object DataExportService {
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
-                val jsonString =
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.bufferedReader().use { it.readText() }
-                    }
-
-                if (jsonString.isNullOrBlank()) {
-                    Log.e("DataExportService", "Failed to read JSON from URI.")
+                val inputStream = context.contentResolver.openInputStream(uri)
+                if (inputStream == null) {
+                    Log.e("DataExportService", "Failed to open InputStream from URI.")
                     return@withContext false
                 }
+                val backupData =
+                    inputStream.buffered().use { stream ->
+                        json.decodeFromStream<AppDataBackup>(stream)
+                    }
 
-                importDataFromJsonString(context, jsonString)
+                restoreBackupData(context, backupData)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error importing from JSON URI", e)
                 false
@@ -303,25 +338,11 @@ object DataExportService {
             insertBackupEntities(db, backupData)
             restorePreferences(context, backupData)
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("DataExportService", "Error restoring backup data into database", e)
             false
-        }
-    }
-
-    private suspend fun importDataFromJsonString(
-        context: Context,
-        jsonString: String,
-    ): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            try {
-                val backupData = json.decodeFromString<AppDataBackup>(jsonString)
-                restoreBackupData(context, backupData)
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Error processing JSON string during import", e)
-                false
-            }
         }
     }
 
@@ -593,6 +614,8 @@ object DataExportService {
                     }
                 }
                 csvBuilder.toString()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error exporting to CSV", e)
                 null

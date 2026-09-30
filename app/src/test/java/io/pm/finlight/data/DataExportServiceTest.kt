@@ -22,7 +22,10 @@ import io.pm.finlight.data.db.entity.MergeType
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.model.AppDataBackup
 import io.mockk.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -35,8 +38,11 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.OutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -44,6 +50,7 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 // --- FIX: Add missing kotlin.test import ---
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -862,7 +869,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
             val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
             if (snapshotFile.exists()) snapshotFile.delete()
-            if (tempFile.exists()) tempFile.delete()
+            tempFile.writeText("unfinalized garbage bytes in temp file")
+            assertTrue("Pre-condition: temp file exists before error", tempFile.exists())
 
             coEvery { transactionQueryDao.getAllTransactionsSimple() } throws RuntimeException("DB error during snapshot")
 
@@ -871,6 +879,117 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertFalse("Snapshot creation should return false on error", success)
             assertFalse("Snapshot file should not be created on error", snapshotFile.exists())
             assertFalse("Temporary file should be cleaned up on error", tempFile.exists())
+        }
+
+    @Test
+    fun `createBackupSnapshot cleans up temp file when serialization exception occurs during streaming`() =
+        runTest {
+            setupMockData()
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            if (snapshotFile.exists()) snapshotFile.delete()
+            if (tempFile.exists()) tempFile.delete()
+
+            // Return a transaction with NaN amount to cause SerializationException during json.encodeToStream
+            coEvery {
+                transactionQueryDao.getAllTransactionsSimple()
+            } returns flowOf(listOf(Transaction(id = 1, description = "NaN Tx", amount = Double.NaN, date = 1L, accountId = 1, categoryId = 1, notes = null)))
+
+            val success = DataExportService.createBackupSnapshot(context)
+
+            assertFalse("Snapshot creation should fail on serialization error", success)
+            assertFalse("Snapshot file should not exist on serialization error", snapshotFile.exists())
+            assertFalse("Temporary file should be cleaned up on serialization error", tempFile.exists())
+        }
+
+    @Test
+    fun `createBackupSnapshot propagates CancellationException and cleans up temp file`() =
+        runTest {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            if (snapshotFile.exists()) snapshotFile.delete()
+            tempFile.writeText("partial snapshot content before cancellation")
+            assertTrue("Pre-condition: temp file exists before cancellation", tempFile.exists())
+
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws CancellationException("Snapshot cancelled")
+
+            assertFailsWith<CancellationException> {
+                DataExportService.createBackupSnapshot(context)
+            }
+
+            assertFalse("Snapshot file should not be created on cancellation", snapshotFile.exists())
+            assertFalse("Temporary file should be cleaned up on cancellation", tempFile.exists())
+        }
+
+    @Test
+    fun `concurrent createBackupSnapshot invocations execute safely without corrupting files`() =
+        runTest {
+            setupMockData()
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+
+            val results =
+                (1..5).map {
+                    async {
+                        DataExportService.createBackupSnapshot(context)
+                    }
+                }.awaitAll()
+
+            assertTrue("All concurrent snapshot creations should succeed", results.all { it })
+            assertTrue("Snapshot file should exist after concurrent writes", snapshotFile.exists())
+            assertFalse("Temporary file should not exist after concurrent writes", tempFile.exists())
+
+            val jsonString = GZIPInputStream(snapshotFile.inputStream()).bufferedReader().use { it.readText() }
+            val restoredData = Json.decodeFromString<AppDataBackup>(jsonString)
+            assertEquals("Test Tx", restoredData.transactions.first().description)
+            snapshotFile.delete()
+        }
+
+    @Test
+    fun `createBackupSnapshot returns false when destination is an undeletable directory`() =
+        runTest {
+            setupMockData()
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            if (snapshotFile.exists()) snapshotFile.delete()
+            if (tempFile.exists()) tempFile.delete()
+
+            // Create non-empty directory at snapshot destination so delete() fails on POSIX
+            snapshotFile.mkdir()
+            val childFile = File(snapshotFile, "child_file")
+            childFile.createNewFile()
+
+            try {
+                val success = DataExportService.createBackupSnapshot(context)
+                assertFalse("createBackupSnapshot should return false when destination is an undeletable directory", success)
+                assertFalse("temp file should be deleted on failure", tempFile.exists())
+            } finally {
+                childFile.delete()
+                snapshotFile.delete()
+            }
+        }
+
+    @Test
+    fun `createBackupSnapshot recovers when snapshot destination is initially an empty directory`() =
+        runTest {
+            setupMockData()
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            if (snapshotFile.exists()) snapshotFile.delete()
+            if (tempFile.exists()) tempFile.delete()
+
+            // Create empty directory at snapshot destination
+            snapshotFile.mkdir()
+            assertTrue("Pre-condition: snapshot destination is an empty directory", snapshotFile.isDirectory)
+
+            try {
+                val success = DataExportService.createBackupSnapshot(context)
+                assertTrue("createBackupSnapshot should recover and succeed after deleting empty directory", success)
+                assertTrue("Snapshot file should exist as a regular file", snapshotFile.isFile)
+                assertFalse("temp file should be cleaned up", tempFile.exists())
+            } finally {
+                snapshotFile.delete()
+            }
         }
 
     @Test
@@ -1115,6 +1234,52 @@ class DataExportServiceTest : BaseViewModelTest() {
                 context.filesDir.setWritable(true)
                 snapshotFile.delete()
             }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot logs warning when corrupted snapshot file deletion fails`() =
+        runTest {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            snapshotFile.writeBytes(byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06))
+
+            try {
+                context.filesDir.setWritable(false)
+                val success = DataExportService.restoreFromBackupSnapshot(context)
+                assertFalse("Restore should fail on corrupted snapshot file", success)
+                assertTrue("Snapshot file should still exist when deletion fails", snapshotFile.exists())
+            } finally {
+                context.filesDir.setWritable(true)
+                snapshotFile.delete()
+            }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot propagates CancellationException and does not delete snapshot file`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions = emptyList(),
+                    accounts = emptyList(),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(Json.encodeToString(AppDataBackup.serializer(), backupData).toByteArray())
+                }
+            }
+            assertTrue("Pre-condition: snapshot file exists", snapshotFile.exists())
+
+            coEvery { splitTransactionDao.deleteAll() } throws CancellationException("Restore cancelled")
+
+            assertFailsWith<CancellationException> {
+                DataExportService.restoreFromBackupSnapshot(context)
+            }
+
+            assertTrue("Snapshot file must not be deleted on coroutine cancellation", snapshotFile.exists())
+            snapshotFile.delete()
         }
 
     // --- NEW: Test for regular transactions ---
@@ -1562,5 +1727,93 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertEquals(TransactionStatus.CONFIRMED, txns[0].status)
 
             tempFile.delete()
+        }
+
+    @Test
+    fun `exportToJson streams all data correctly to output stream`() =
+        runTest {
+            setupMockData()
+            val outputStream = ByteArrayOutputStream()
+
+            val success = DataExportService.exportToJson(context, outputStream)
+
+            assertTrue("exportToJson should succeed", success)
+            val jsonString = outputStream.toString("UTF-8")
+            val backupData = Json.decodeFromString<AppDataBackup>(jsonString)
+            assertEquals("Test Tx", backupData.transactions.first().description)
+            assertEquals("Test Acc", backupData.accounts.first().name)
+            assertEquals("Test Cat", backupData.categories.first().name)
+        }
+
+    @Test
+    fun `exportToJson returns false and handles stream error gracefully`() =
+        runTest {
+            setupMockData()
+            val failingStream =
+                object : OutputStream() {
+                    override fun write(b: Int) {
+                        throw IOException("Disk full")
+                    }
+                }
+
+            val success = DataExportService.exportToJson(context, failingStream)
+
+            assertFalse("exportToJson should return false on stream error", success)
+        }
+
+    @Test
+    fun `exportToJson propagates CancellationException`() =
+        runTest {
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws CancellationException("Export cancelled")
+
+            assertFailsWith<CancellationException> {
+                DataExportService.exportToJson(context, ByteArrayOutputStream())
+            }
+        }
+
+    @Test
+    fun `exportToJsonString propagates CancellationException`() =
+        runTest {
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws CancellationException("Export cancelled")
+
+            assertFailsWith<CancellationException> {
+                DataExportService.exportToJsonString(context)
+            }
+        }
+
+    @Test
+    fun `importDataFromJson propagates CancellationException`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions = emptyList(),
+                    accounts = emptyList(),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val tempFile = File(context.cacheDir, "test_cancel_import.json")
+            tempFile.writeText(Json.encodeToString(AppDataBackup.serializer(), backupData))
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            coEvery { splitTransactionDao.deleteAll() } throws CancellationException("Import cancelled")
+
+            try {
+                assertFailsWith<CancellationException> {
+                    DataExportService.importDataFromJson(context, uri)
+                }
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+    @Test
+    fun `exportToCsvString propagates CancellationException`() =
+        runTest {
+            coEvery { transactionQueryDao.getAllTransactions() } throws CancellationException("CSV export cancelled")
+
+            assertFailsWith<CancellationException> {
+                DataExportService.exportToCsvString(context)
+            }
         }
 }

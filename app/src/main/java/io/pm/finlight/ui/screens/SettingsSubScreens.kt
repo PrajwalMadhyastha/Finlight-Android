@@ -486,20 +486,22 @@ fun DataSettingsScreen(
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.CreateDocument("application/json"),
             onResult = { uri ->
-                uri?.let {
+                uri?.let { targetUri ->
                     scope.launch {
-                        val jsonString = DataExportService.exportToJsonString(context)
-                        if (jsonString != null) {
-                            try {
-                                context.contentResolver.openOutputStream(it)?.use { outputStream ->
-                                    outputStream.write(jsonString.toByteArray())
+                        try {
+                            val outputStream = context.contentResolver.openOutputStream(targetUri)
+                            if (outputStream != null) {
+                                val success = DataExportService.exportToJson(context, outputStream)
+                                if (success) {
+                                    Toast.makeText(context, "Data exported successfully!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Error exporting data.", Toast.LENGTH_LONG).show()
                                 }
-                                Toast.makeText(context, "Data exported successfully!", Toast.LENGTH_LONG).show()
-                            } catch (e: Exception) {
+                            } else {
                                 Toast.makeText(context, "Error saving file.", Toast.LENGTH_LONG).show()
                             }
-                        } else {
-                            Toast.makeText(context, "Error exporting data.", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Error saving file.", Toast.LENGTH_LONG).show()
                         }
                     }
                 }
