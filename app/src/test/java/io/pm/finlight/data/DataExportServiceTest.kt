@@ -320,6 +320,8 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertTrue("Snapshot creation should be successful", success)
             assertTrue("Snapshot file should exist", snapshotFile.exists())
             assertTrue("Snapshot file should not be empty", snapshotFile.length() > 0)
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            assertFalse("Temporary snapshot file should not exist after successful creation", tempFile.exists())
 
             // Optional: Verify content by decompressing
             val jsonString = GZIPInputStream(snapshotFile.inputStream()).bufferedReader().use { it.readText() }
@@ -832,6 +834,287 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             // Assert
             assertFalse("Restore should fail if no snapshot file exists", success)
+        }
+
+    @Test
+    fun `createBackupSnapshot overwrites existing snapshot file atomically`() =
+        runTest {
+            setupMockData()
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            snapshotFile.writeText("pre-existing old snapshot content")
+
+            val success = DataExportService.createBackupSnapshot(context)
+
+            assertTrue("Snapshot creation should be successful", success)
+            assertTrue("Snapshot file should exist", snapshotFile.exists())
+            assertFalse("Temporary snapshot file should not exist", tempFile.exists())
+
+            // Verify content is fresh gzipped JSON
+            val jsonString = GZIPInputStream(snapshotFile.inputStream()).bufferedReader().use { it.readText() }
+            val backupData = Json.decodeFromString<AppDataBackup>(jsonString)
+            assertEquals("Test Tx", backupData.transactions.first().description)
+        }
+
+    @Test
+    fun `createBackupSnapshot cleans up temp file when exception occurs`() =
+        runTest {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            if (snapshotFile.exists()) snapshotFile.delete()
+            if (tempFile.exists()) tempFile.delete()
+
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws RuntimeException("DB error during snapshot")
+
+            val success = DataExportService.createBackupSnapshot(context)
+
+            assertFalse("Snapshot creation should return false on error", success)
+            assertFalse("Snapshot file should not be created on error", snapshotFile.exists())
+            assertFalse("Temporary file should be cleaned up on error", tempFile.exists())
+        }
+
+    @Test
+    fun `createBackupSnapshot and restoreFromBackupSnapshot maintain 100 percent data fidelity across all entities`() =
+        runTest {
+            setupMockData()
+            val recurringPattern =
+                RecurringPattern(
+                    smsSignature = "sig_abc",
+                    description = "Netflix",
+                    amount = 15.99,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = null,
+                    occurrences = 3,
+                    firstSeen = 1000L,
+                    lastSeen = 2000L,
+                )
+            val deletedHash = DeletedSmsHash(smsHash = "deleted_hash_123")
+            val mergeRecord =
+                MergeRecord(
+                    id = 1,
+                    parentTxnId = 1,
+                    originalParentAmount = 100.0,
+                    originalParentDate = 1000L,
+                    originalParentNotes = null,
+                    childDescription = "Child Tx",
+                    childAmount = 50.0,
+                    childDate = 1000L,
+                    childAccountId = 1,
+                    childCategoryId = 1,
+                )
+            coEvery { recurringPatternDao.getAllPatterns() } returns listOf(recurringPattern)
+            coEvery { deletedSmsHashDao.getAll() } returns listOf(deletedHash)
+            coEvery { mergeRecordDao.getAll() } returns listOf(mergeRecord)
+
+            // Setup mocks for restore
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { splitTransactionDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+            coJustRun { customSmsRuleDao.insertAll(any()) }
+            coJustRun { merchantRenameRuleDao.insertAll(any()) }
+            coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+            coJustRun { ignoreRuleDao.insertAll(any()) }
+            coJustRun { smsParseTemplateDao.insertAll(any()) }
+            coJustRun { recurringPatternDao.insert(any()) }
+            coJustRun { deletedSmsHashDao.insertAll(any()) }
+            coJustRun { mergeRecordDao.insertAll(any()) }
+
+            // 1. Create snapshot using streaming
+            val createSuccess = DataExportService.createBackupSnapshot(context)
+            assertTrue("Snapshot creation should succeed", createSuccess)
+
+            // 2. Restore snapshot using streaming
+            val restoreSuccess = DataExportService.restoreFromBackupSnapshot(context)
+            assertTrue("Restore should succeed", restoreSuccess)
+
+            // 3. Verify all entities restored
+            coVerify { transactionWriteDao.insertAll(match { it.size == 1 && it[0].description == "Test Tx" }) }
+            coVerify { accountDao.insertAll(match { it.size == 1 && it[0].name == "Test Acc" }) }
+            coVerify { categoryDao.insertAll(match { it.size == 1 && it[0].name == "Test Cat" }) }
+            coVerify { budgetDao.insertAll(match { it.size == 1 && it[0].amount == 500.0 }) }
+            coVerify { merchantMappingDao.insertAll(match { it.size == 1 && it[0].merchantName == "Test Merchant" }) }
+            coVerify { splitTransactionDao.insertAll(match { it.size == 1 && it[0].amount == 50.0 }) }
+            coVerify { customSmsRuleDao.insertAll(match { it.size == 1 && it[0].triggerPhrase == "test" }) }
+            coVerify { merchantRenameRuleDao.insertAll(match { it.size == 1 && it[0].newName == "New" }) }
+            coVerify { merchantCategoryMappingDao.insertAll(match { it.size == 1 && it[0].parsedName == "Old" }) }
+            coVerify { ignoreRuleDao.insertAll(match { it.size == 1 && it[0].pattern == "ignore" }) }
+            coVerify { smsParseTemplateDao.insertAll(match { it.size == 1 && it[0].correctedMerchantName == "merchant" }) }
+            coVerify { tagDao.insertAll(match { it.size == 1 && it[0].name == "Test Tag" }) }
+            coVerify { transactionWriteDao.addTagsToTransaction(match { it.size == 1 && it[0].transactionId == 1 }) }
+            coVerify { goalDao.insertAll(match { it.size == 1 && it[0].name == "Test Goal" }) }
+            coVerify { tripDao.insertAll(any()) }
+            coVerify { accountAliasDao.insertAll(any()) }
+            coVerify { recurringPatternDao.insert(recurringPattern) }
+            coVerify { deletedSmsHashDao.insertAll(listOf(deletedHash)) }
+            coVerify { mergeRecordDao.insertAll(listOf(mergeRecord)) }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot successfully restores legacy gzip snapshot file`() =
+        runTest {
+            // Legacy snapshot created with byte array in-memory serialization
+            val backupData =
+                AppDataBackup(
+                    transactions =
+                        listOf(
+                            Transaction(id = 99, description = "Legacy Tx", amount = 99.0, date = 1L, accountId = 1, categoryId = 1, notes = null),
+                        ),
+                    accounts = listOf(Account(id = 1, name = "Legacy Acc", type = "Bank")),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val jsonString = Json.encodeToString(AppDataBackup.serializer(), backupData)
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(jsonString.toByteArray(Charsets.UTF_8))
+                }
+            }
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+
+            assertTrue("Restore of legacy snapshot should succeed", success)
+            assertFalse("Snapshot file should be deleted upon success", snapshotFile.exists())
+            coVerify { transactionWriteDao.insertAll(match { it[0].description == "Legacy Tx" }) }
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot handles corrupted gzip file gracefully and deletes it`() =
+        runTest {
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            snapshotFile.writeBytes(byteArrayOf(0x01, 0x02, 0x03, 0x04, 0x05, 0x06))
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+
+            assertFalse("Restore should fail on corrupted snapshot file", success)
+            assertFalse("Corrupted snapshot file should be deleted", snapshotFile.exists())
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot handles database insertion failure gracefully`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions = emptyList(),
+                    accounts = emptyList(),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(Json.encodeToString(AppDataBackup.serializer(), backupData).toByteArray())
+                }
+            }
+
+            coEvery { splitTransactionDao.deleteAll() } throws RuntimeException("DB disk full")
+
+            val success = DataExportService.restoreFromBackupSnapshot(context)
+
+            assertFalse("Restore should fail when DB operations fail", success)
+        }
+
+    @Test
+    fun `restoreFromBackupSnapshot succeeds even if snapshot file deletion fails`() =
+        runTest {
+            val backupData =
+                AppDataBackup(
+                    transactions = emptyList(),
+                    accounts = emptyList(),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            FileOutputStream(snapshotFile).use { fos ->
+                GZIPOutputStream(fos).use { gzip ->
+                    gzip.write(Json.encodeToString(AppDataBackup.serializer(), backupData).toByteArray())
+                }
+            }
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            try {
+                context.filesDir.setWritable(false)
+                val success = DataExportService.restoreFromBackupSnapshot(context)
+                assertTrue("Restore should still report success even if file deletion fails", success)
+            } finally {
+                context.filesDir.setWritable(true)
+                snapshotFile.delete()
+            }
         }
 
     // --- NEW: Test for regular transactions ---
