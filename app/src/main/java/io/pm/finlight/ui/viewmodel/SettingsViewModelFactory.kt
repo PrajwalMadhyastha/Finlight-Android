@@ -8,10 +8,12 @@ import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.SmsEntityExtractor
 
 class SettingsViewModelFactory(
     private val application: Application,
     private val transactionViewModel: TransactionViewModel,
+    private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SettingsViewModel::class.java)) {
@@ -24,25 +26,43 @@ class SettingsViewModelFactory(
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val smsRepository = ServiceLocator.provideSmsRepository(application)
             val smsClassifier = MlModelFactory.getClassifier(application)
-            val nerExtractor = MlModelFactory.getNerExtractor(application)
             val transactionRunner = RoomTransactionRunner()
 
             @Suppress("UNCHECKED_CAST")
-            return SettingsViewModel(
-                application,
-                settingsRepository,
-                db,
-                transactionRepository,
-                merchantMappingRepository,
-                accountRepository,
-                categoryRepository,
-                smsRepository,
-                transactionViewModel,
-                smsClassifier,
-                nerExtractor,
-                transactionRunner,
-                dispatchers = dispatcherProvider,
-            ) as T
+            val viewModel =
+                if (nerExtractorProvider != null) {
+                    SettingsViewModel(
+                        application,
+                        settingsRepository,
+                        db,
+                        transactionRepository,
+                        merchantMappingRepository,
+                        accountRepository,
+                        categoryRepository,
+                        smsRepository,
+                        transactionViewModel,
+                        smsClassifier,
+                        nerExtractorProvider = nerExtractorProvider,
+                        transactionRunner = transactionRunner,
+                        dispatchers = dispatcherProvider,
+                    )
+                } else {
+                    SettingsViewModel(
+                        application,
+                        settingsRepository,
+                        db,
+                        transactionRepository,
+                        merchantMappingRepository,
+                        accountRepository,
+                        categoryRepository,
+                        smsRepository,
+                        transactionViewModel,
+                        smsClassifier,
+                        transactionRunner = transactionRunner,
+                        dispatchers = dispatcherProvider,
+                    )
+                }
+            return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

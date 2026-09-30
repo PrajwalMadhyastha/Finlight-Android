@@ -365,7 +365,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `onCleared closes dependencies`() =
+    fun `onCleared closes smsClassifier but does not hold persistent nerExtractor`() =
         runTest {
             setupDefaultDaoBehaviors()
             initializeViewModel()
@@ -386,7 +386,66 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             method.invoke(viewModel)
 
             verify(smsClassifier).close()
+            verify(nerExtractor, never()).close()
+        }
+
+    @Test
+    fun `refreshScan invokes nerExtractorProvider and closes extractor on completion`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
+            `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
+            `when`(nerExtractor.extract(anyString())).thenReturn(emptyMap())
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            viewModel =
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    db = db,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = countingProvider,
+                    transactionViewModel = transactionViewModel,
+                )
+
+            advanceUntilIdle()
+
+            assertEquals(1, providerInvocationCount)
             verify(nerExtractor).close()
+        }
+
+    @Test
+    fun `refreshScan does not invoke nerExtractorProvider when no SMS found`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            whenever(smsRepository.fetchAllSms(null)).thenReturn(emptyList())
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            viewModel =
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    db = db,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = countingProvider,
+                    transactionViewModel = transactionViewModel,
+                )
+
+            advanceUntilIdle()
+
+            assertEquals(0, providerInvocationCount)
+            verify(nerExtractor, never()).close()
         }
 
     @Test
@@ -554,5 +613,91 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh falls back to classifier and nerExtractor when no custom rules match, invoking and closing nerExtractor`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms = SmsMessage(1, "VM-HDFCBK", "Spent Rs 500 at Swiggy on Card XX1234", 1L)
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(smsClassifier.classify(sms.body)).thenReturn(0.95f)
+            `when`(nerExtractor.extract(sms.body)).thenReturn(
+                mapOf(
+                    "AMOUNT" to io.pm.finlight.core.NerEntity("500", 0.95f),
+                    "MERCHANT" to io.pm.finlight.core.NerEntity("Swiggy", 0.9f),
+                ),
+            )
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            viewModel =
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    db = db,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = countingProvider,
+                    transactionViewModel = transactionViewModel,
+                )
+            advanceUntilIdle()
+
+            val initialProviderCount = providerInvocationCount
+
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            assertEquals(initialProviderCount + 1, providerInvocationCount)
+            verify(nerExtractor, times(2)).close()
+
+            val finalState = viewModel.uiState.value
+            assertFalse(finalState.isLoading)
+            val result = finalState.debugResults.find { it.smsMessage.id == 1L }
+            assertNotNull(result)
+            assertTrue(
+                "Result should be Success or parsed, was: ${result?.parseResult}",
+                result?.parseResult is ParseResult.Success,
+            )
+        }
+
+    @Test
+    fun `runAutoImportAndRefresh sets IgnoredByClassifier when classifier confidence below threshold`() =
+        runTest {
+            setupDefaultDaoBehaviors()
+            val sms = SmsMessage(1, "VM-UNKNOWN", "Random non-transactional text", 1L)
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(smsClassifier.classify(sms.body)).thenReturn(0.05f)
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+
+            viewModel =
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    db = db,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = { nerExtractor },
+                    transactionViewModel = transactionViewModel,
+                )
+            advanceUntilIdle()
+
+            viewModel.runAutoImportAndRefresh()
+            advanceUntilIdle()
+
+            val finalState = viewModel.uiState.value
+            assertFalse(finalState.isLoading)
+            val result = finalState.debugResults.find { it.smsMessage.id == 1L }
+            assertNotNull(result)
+            assertTrue(
+                "Result should be IgnoredByClassifier, was: ${result?.parseResult}",
+                result?.parseResult is ParseResult.IgnoredByClassifier,
+            )
+            assertEquals(0.05f, (result?.parseResult as ParseResult.IgnoredByClassifier).confidence, 0.001f)
+            verify(nerExtractor, atLeastOnce()).close()
         }
 }
