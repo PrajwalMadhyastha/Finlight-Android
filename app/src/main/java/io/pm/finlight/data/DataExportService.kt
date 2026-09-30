@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
-// REASON: FEATURE (Backup Phase 2) - The export and import functions have been
-// updated to handle all the new Phase 2 entities. The service now correctly
-// backs up and restores Tags, Goals, Trips, AccountAliases, and their
-// relationships, making the app's "intelligence" fully restorable.
+// REASON: FIX (Issue #324) - Resolved audit findings by enforcing foreign key
+// compliant deletion/insertion ordering, enclosing database restoration in a
+// Room transaction, safeguarding stream lifecycle and file descriptors,
+// synchronizing import with snapshotMutex, and centralizing snapshot file paths.
 // =================================================================================
 package io.pm.finlight.data
 
@@ -12,6 +12,7 @@ import android.net.Uri
 import android.util.Log
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
+import androidx.room.withTransaction
 import io.pm.finlight.data.model.AppDataBackup
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.FormatUtils
@@ -26,12 +27,18 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import android.util.Base64
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.io.ByteArrayOutputStream
+import kotlinx.serialization.json.decodeFromStream
+import kotlinx.serialization.json.encodeToStream
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.io.OutputStream
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -39,7 +46,11 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.GZIPOutputStream
 import kotlin.collections.forEach
 
+@OptIn(ExperimentalSerializationApi::class)
 object DataExportService {
+    const val SNAPSHOT_FILE_NAME = "backup_snapshot.gz"
+
+    private val snapshotMutex = Mutex()
     private val json =
         Json {
             prettyPrint = true
@@ -48,202 +59,273 @@ object DataExportService {
             coerceInputValues = true
         }
 
+    fun getSnapshotFile(context: Context): File = File(context.filesDir, SNAPSHOT_FILE_NAME)
+
     suspend fun createBackupSnapshot(context: Context): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            try {
-                val jsonString = exportToJsonString(context) ?: return@withContext false
-
-                // Compress the JSON string using Gzip
-                val outputStream = ByteArrayOutputStream()
-                GZIPOutputStream(outputStream).use { gzip ->
-                    gzip.write(jsonString.toByteArray())
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                val snapshotFile = getSnapshotFile(context)
+                val tempFile = File(context.filesDir, "$SNAPSHOT_FILE_NAME.tmp")
+                try {
+                    writeBackupDataToTemp(context, tempFile)
+                    commitTempSnapshot(tempFile, snapshotFile)
+                } catch (e: CancellationException) {
+                    safeDelete(tempFile)
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
+                    safeDelete(tempFile)
+                    false
                 }
-                val compressedData = outputStream.toByteArray()
-
-                // Save the compressed data to a specific file in internal storage
-                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
-                FileOutputStream(snapshotFile).use { fos ->
-                    fos.write(compressedData)
-                }
-                true
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
-                false
             }
         }
     }
 
+    private suspend fun writeBackupDataToTemp(
+        context: Context,
+        tempFile: File,
+    ) {
+        val finalBackupData = buildBackupData(context)
+        GZIPOutputStream(FileOutputStream(tempFile).buffered()).use { gzip ->
+            json.encodeToStream(finalBackupData, gzip)
+        }
+    }
+
+    private fun commitTempSnapshot(
+        tempFile: File,
+        snapshotFile: File,
+    ): Boolean {
+        if (tempFile.renameTo(snapshotFile)) {
+            return true
+        }
+        if (snapshotFile.exists() && !safeDelete(snapshotFile)) {
+            safeDelete(tempFile)
+            return false
+        }
+        if (!tempFile.renameTo(snapshotFile)) {
+            safeDelete(tempFile)
+            return false
+        }
+        return true
+    }
+
     suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
-            if (!snapshotFile.exists()) {
-                Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
-                return@withContext false // No snapshot to restore
-            }
-
-            Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
-            try {
-                // Decompress the Gzip file
-                val jsonString = GZIPInputStream(FileInputStream(snapshotFile)).bufferedReader().use { it.readText() }
-
-                // Import the data from the JSON string
-                val success = importDataFromJsonString(context, jsonString)
-
-                if (success) {
-                    if (snapshotFile.delete()) {
-                        Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
-                    } else {
-                        Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
-                    }
-                } else {
-                    Log.e("DataExportService", "Restore failed during data import phase.")
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                val snapshotFile = getSnapshotFile(context)
+                if (!snapshotFile.exists()) {
+                    Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
+                    return@withContext false // No snapshot to restore
                 }
-                return@withContext success
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Failed to restore from backup snapshot", e)
-                // Attempt to delete the corrupted file to prevent future errors
-                if (!snapshotFile.delete()) {
-                    Log.w("DataExportService", "Failed to delete corrupted snapshot file")
+
+                Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
+                try {
+                    val backupData = readBackupFromSnapshot(snapshotFile)
+                    val success = restoreBackupData(context, backupData)
+                    handleSnapshotPostRestore(snapshotFile, success)
+                    success
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Failed to restore from backup snapshot", e)
+                    safeDelete(snapshotFile)
+                    false
                 }
-                return@withContext false
             }
         }
+    }
+
+    private fun readBackupFromSnapshot(snapshotFile: File): AppDataBackup {
+        return GZIPInputStream(FileInputStream(snapshotFile).buffered()).use { gzipStream ->
+            json.decodeFromStream<AppDataBackup>(gzipStream)
+        }
+    }
+
+    private fun handleSnapshotPostRestore(
+        snapshotFile: File,
+        success: Boolean,
+    ) {
+        if (!success) {
+            Log.e("DataExportService", "Restore failed during data import phase.")
+            return
+        }
+        if (safeDelete(snapshotFile)) {
+            Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+        } else {
+            Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
+        }
+    }
+
+    private fun safeDelete(file: File): Boolean {
+        if (!file.exists()) {
+            return true
+        }
+        val deleted = file.delete()
+        if (!deleted) {
+            Log.w("DataExportService", "Failed to delete file: ${file.path}")
+        }
+        return deleted
     }
 
     fun getCsvTemplateString(): String {
         return "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags\n"
     }
 
+    internal suspend fun buildBackupData(context: Context): AppDataBackup {
+        val db = AppDatabase.getInstance(context)
+
+        val backupData =
+            AppDataBackup(
+                transactions = db.transactionQueryDao().getAllTransactionsSimple().first(),
+                accounts = db.accountDao().getAllAccountsSnapshot(),
+                categories = db.categoryDao().getAllCategoriesSnapshot(),
+                budgets = db.budgetDao().getAllBudgets().first(),
+                merchantMappings = db.merchantMappingDao().getAllMappings().first(),
+                splitTransactions = db.splitTransactionDao().getAllSplits().first(),
+                // --- Phase 1: Export Core Parsing Intelligence ---
+                customSmsRules = db.customSmsRuleDao().getAllRulesList(),
+                merchantRenameRules = db.merchantRenameRuleDao().getAllRulesList(),
+                merchantCategoryMappings = db.merchantCategoryMappingDao().getAll(),
+                ignoreRules = db.ignoreRuleDao().getAllList(),
+                smsParseTemplates = db.smsParseTemplateDao().getAllTemplates(),
+                // --- Phase 2: Export Remaining App Intelligence ---
+                tags = db.tagDao().getAllTagsList(),
+                transactionTagCrossRefs = db.transactionQueryDao().getAllCrossRefs(),
+                goals = db.goalDao().getAll(),
+                goalTransactionLinks = db.goalTransactionLinkDao().getAll(),
+                trips = db.tripDao().getAll(),
+                accountAliases = db.accountAliasDao().getAll(),
+                // --- Phase 3: Export App-Learned Recurring Patterns ---
+                recurringPatterns = db.recurringPatternDao().getAllPatterns(),
+                // --- Phase 5: Export SMS Lifecycle & Merge History ---
+                deletedSmsHashes = db.deletedSmsHashDao().getAll(),
+                mergeRecords = db.mergeRecordDao().getAll(),
+            )
+
+        // --- Phase 4 & 6: Export User Profile, Budgets, & Preferences ---
+        val prefs =
+            try {
+                context.financeSettingsDataStore.data.first()
+            } catch (e: Exception) {
+                null
+            }
+        val userName = prefs?.get(stringPreferencesKey("user_name"))
+        val homeCurrency = prefs?.get(stringPreferencesKey("home_currency_code"))
+        val overallBudgets = mutableMapOf<String, Float>()
+        prefs?.asMap()?.forEach { (key, value) ->
+            if (key.name.startsWith("overall_budget_") && value is Float) {
+                val yearMonth = key.name.removePrefix("overall_budget_")
+                overallBudgets[yearMonth] = value
+            }
+        }
+        val calendar = Calendar.getInstance()
+        val currentMonthKey = String.format(Locale.ROOT, "%d_%02d", calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1)
+        val currentBudget = overallBudgets[currentMonthKey] ?: overallBudgets.entries.maxByOrNull { it.key }?.value
+
+        val selectedAppTheme = prefs?.get(stringPreferencesKey("selected_app_theme"))
+        val dashboardCardOrder = prefs?.get(stringPreferencesKey("dashboard_card_order"))
+        val travelModeSettings = prefs?.get(stringPreferencesKey("travel_mode_settings"))
+        val smsScanStartDate = prefs?.get(longPreferencesKey("sms_scan_start_date"))
+        val dismissedMergeSuggestions = prefs?.get(stringSetPreferencesKey("dismissed_merge_suggestions")) ?: emptySet()
+        val excludedIncomeMonths = prefs?.get(stringSetPreferencesKey("excluded_income_months")) ?: emptySet()
+        val excludedExpenseMonths = prefs?.get(stringSetPreferencesKey("excluded_expense_months")) ?: emptySet()
+        val appLockEnabled = prefs?.get(booleanPreferencesKey("app_lock_enabled"))
+        val privacyModeEnabled = prefs?.get(booleanPreferencesKey("privacy_mode_enabled"))
+
+        val dailyReportEnabled = prefs?.get(booleanPreferencesKey("daily_report_enabled"))
+        val dailyReportHour = prefs?.get(intPreferencesKey("daily_report_hour"))
+        val dailyReportMinute = prefs?.get(intPreferencesKey("daily_report_minute"))
+        val weeklySummaryEnabled = prefs?.get(booleanPreferencesKey("weekly_summary_enabled"))
+        val weeklyReportDay = prefs?.get(intPreferencesKey("weekly_report_day"))
+        val weeklyReportHour = prefs?.get(intPreferencesKey("weekly_report_hour"))
+        val weeklyReportMinute = prefs?.get(intPreferencesKey("weekly_report_minute"))
+        val monthlySummaryEnabled = prefs?.get(booleanPreferencesKey("monthly_summary_enabled"))
+        val monthlyReportDay = prefs?.get(intPreferencesKey("monthly_report_day"))
+        val monthlyReportHour = prefs?.get(intPreferencesKey("monthly_report_hour"))
+        val monthlyReportMinute = prefs?.get(intPreferencesKey("monthly_report_minute"))
+        val autocaptureNotificationEnabled = prefs?.get(booleanPreferencesKey("autocapture_notification_enabled"))
+        val unknownTransactionPopupEnabled = prefs?.get(booleanPreferencesKey("unknown_transaction_popup_enabled"))
+
+        val profilePictureUri = prefs?.get(stringPreferencesKey("profile_picture_uri"))
+        val profilePictureBase64 =
+            if (profilePictureUri != null) {
+                try {
+                    val picFile = File(profilePictureUri)
+                    if (picFile.exists() && picFile.length() in 1..(5 * 1024 * 1024)) {
+                        Base64.encodeToString(picFile.readBytes(), Base64.NO_WRAP)
+                    } else {
+                        null
+                    }
+                } catch (e: Exception) {
+                    Log.w("DataExportService", "Failed to encode profile picture", e)
+                    null
+                }
+            } else {
+                null
+            }
+
+        return backupData.copy(
+            userName = userName,
+            homeCurrency = homeCurrency,
+            overallBudget = currentBudget,
+            overallBudgets = overallBudgets,
+            selectedAppTheme = selectedAppTheme,
+            dashboardCardOrder = dashboardCardOrder,
+            travelModeSettings = travelModeSettings,
+            smsScanStartDate = smsScanStartDate,
+            dismissedMergeSuggestions = dismissedMergeSuggestions,
+            excludedIncomeMonths = excludedIncomeMonths,
+            excludedExpenseMonths = excludedExpenseMonths,
+            appLockEnabled = appLockEnabled,
+            privacyModeEnabled = privacyModeEnabled,
+            dailyReportEnabled = dailyReportEnabled,
+            dailyReportHour = dailyReportHour,
+            dailyReportMinute = dailyReportMinute,
+            weeklySummaryEnabled = weeklySummaryEnabled,
+            weeklyReportDay = weeklyReportDay,
+            weeklyReportHour = weeklyReportHour,
+            weeklyReportMinute = weeklyReportMinute,
+            monthlySummaryEnabled = monthlySummaryEnabled,
+            monthlyReportDay = monthlyReportDay,
+            monthlyReportHour = monthlyReportHour,
+            monthlyReportMinute = monthlyReportMinute,
+            autocaptureNotificationEnabled = autocaptureNotificationEnabled,
+            unknownTransactionPopupEnabled = unknownTransactionPopupEnabled,
+            profilePictureBase64 = profilePictureBase64,
+        )
+    }
+
+    suspend fun exportToJson(
+        context: Context,
+        outputStream: OutputStream,
+    ): Boolean {
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        return withContext(dispatcherProvider.io) {
+            try {
+                val finalBackupData = buildBackupData(context)
+                outputStream.buffered().use { bos ->
+                    json.encodeToStream(finalBackupData, bos)
+                }
+                true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e("DataExportService", "Error exporting to JSON stream", e)
+                false
+            }
+        }
+    }
+
     suspend fun exportToJsonString(context: Context): String? {
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
-                val db = AppDatabase.getInstance(context)
-
-                val backupData =
-                    AppDataBackup(
-                        transactions = db.transactionQueryDao().getAllTransactionsSimple().first(),
-                        accounts = db.accountDao().getAllAccountsSnapshot(),
-                        categories = db.categoryDao().getAllCategoriesSnapshot(),
-                        budgets = db.budgetDao().getAllBudgets().first(),
-                        merchantMappings = db.merchantMappingDao().getAllMappings().first(),
-                        splitTransactions = db.splitTransactionDao().getAllSplits().first(),
-                        // --- Phase 1: Export Core Parsing Intelligence ---
-                        customSmsRules = db.customSmsRuleDao().getAllRulesList(),
-                        merchantRenameRules = db.merchantRenameRuleDao().getAllRulesList(),
-                        merchantCategoryMappings = db.merchantCategoryMappingDao().getAll(),
-                        ignoreRules = db.ignoreRuleDao().getAllList(),
-                        smsParseTemplates = db.smsParseTemplateDao().getAllTemplates(),
-                        // --- Phase 2: Export Remaining App Intelligence ---
-                        tags = db.tagDao().getAllTagsList(),
-                        transactionTagCrossRefs = db.transactionQueryDao().getAllCrossRefs(),
-                        goals = db.goalDao().getAll(),
-                        goalTransactionLinks = db.goalTransactionLinkDao().getAll(),
-                        trips = db.tripDao().getAll(),
-                        accountAliases = db.accountAliasDao().getAll(),
-                        // --- Phase 3: Export App-Learned Recurring Patterns ---
-                        recurringPatterns = db.recurringPatternDao().getAllPatterns(),
-                        // --- Phase 5: Export SMS Lifecycle & Merge History ---
-                        deletedSmsHashes = db.deletedSmsHashDao().getAll(),
-                        mergeRecords = db.mergeRecordDao().getAll(),
-                    )
-
-                // --- Phase 4 & 6: Export User Profile, Budgets, & Preferences ---
-                val prefs =
-                    try {
-                        context.financeSettingsDataStore.data.first()
-                    } catch (e: Exception) {
-                        null
-                    }
-                val userName = prefs?.get(stringPreferencesKey("user_name"))
-                val homeCurrency = prefs?.get(stringPreferencesKey("home_currency_code"))
-                val overallBudgets = mutableMapOf<String, Float>()
-                prefs?.asMap()?.forEach { (key, value) ->
-                    if (key.name.startsWith("overall_budget_") && value is Float) {
-                        val yearMonth = key.name.removePrefix("overall_budget_")
-                        overallBudgets[yearMonth] = value
-                    }
-                }
-                val calendar = Calendar.getInstance()
-                val currentMonthKey = String.format(Locale.ROOT, "%d_%02d", calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1)
-                val currentBudget = overallBudgets[currentMonthKey] ?: overallBudgets.entries.maxByOrNull { it.key }?.value
-
-                val selectedAppTheme = prefs?.get(stringPreferencesKey("selected_app_theme"))
-                val dashboardCardOrder = prefs?.get(stringPreferencesKey("dashboard_card_order"))
-                val travelModeSettings = prefs?.get(stringPreferencesKey("travel_mode_settings"))
-                val smsScanStartDate = prefs?.get(longPreferencesKey("sms_scan_start_date"))
-                val dismissedMergeSuggestions = prefs?.get(stringSetPreferencesKey("dismissed_merge_suggestions")) ?: emptySet()
-                val excludedIncomeMonths = prefs?.get(stringSetPreferencesKey("excluded_income_months")) ?: emptySet()
-                val excludedExpenseMonths = prefs?.get(stringSetPreferencesKey("excluded_expense_months")) ?: emptySet()
-                val appLockEnabled = prefs?.get(booleanPreferencesKey("app_lock_enabled"))
-                val privacyModeEnabled = prefs?.get(booleanPreferencesKey("privacy_mode_enabled"))
-
-                val dailyReportEnabled = prefs?.get(booleanPreferencesKey("daily_report_enabled"))
-                val dailyReportHour = prefs?.get(intPreferencesKey("daily_report_hour"))
-                val dailyReportMinute = prefs?.get(intPreferencesKey("daily_report_minute"))
-                val weeklySummaryEnabled = prefs?.get(booleanPreferencesKey("weekly_summary_enabled"))
-                val weeklyReportDay = prefs?.get(intPreferencesKey("weekly_report_day"))
-                val weeklyReportHour = prefs?.get(intPreferencesKey("weekly_report_hour"))
-                val weeklyReportMinute = prefs?.get(intPreferencesKey("weekly_report_minute"))
-                val monthlySummaryEnabled = prefs?.get(booleanPreferencesKey("monthly_summary_enabled"))
-                val monthlyReportDay = prefs?.get(intPreferencesKey("monthly_report_day"))
-                val monthlyReportHour = prefs?.get(intPreferencesKey("monthly_report_hour"))
-                val monthlyReportMinute = prefs?.get(intPreferencesKey("monthly_report_minute"))
-                val autocaptureNotificationEnabled = prefs?.get(booleanPreferencesKey("autocapture_notification_enabled"))
-                val unknownTransactionPopupEnabled = prefs?.get(booleanPreferencesKey("unknown_transaction_popup_enabled"))
-
-                val profilePictureUri = prefs?.get(stringPreferencesKey("profile_picture_uri"))
-                val profilePictureBase64 =
-                    if (profilePictureUri != null) {
-                        try {
-                            val picFile = File(profilePictureUri)
-                            if (picFile.exists() && picFile.length() in 1..(5 * 1024 * 1024)) {
-                                Base64.encodeToString(picFile.readBytes(), Base64.NO_WRAP)
-                            } else {
-                                null
-                            }
-                        } catch (e: Exception) {
-                            Log.w("DataExportService", "Failed to encode profile picture", e)
-                            null
-                        }
-                    } else {
-                        null
-                    }
-
-                val finalBackupData =
-                    backupData.copy(
-                        userName = userName,
-                        homeCurrency = homeCurrency,
-                        overallBudget = currentBudget,
-                        overallBudgets = overallBudgets,
-                        selectedAppTheme = selectedAppTheme,
-                        dashboardCardOrder = dashboardCardOrder,
-                        travelModeSettings = travelModeSettings,
-                        smsScanStartDate = smsScanStartDate,
-                        dismissedMergeSuggestions = dismissedMergeSuggestions,
-                        excludedIncomeMonths = excludedIncomeMonths,
-                        excludedExpenseMonths = excludedExpenseMonths,
-                        appLockEnabled = appLockEnabled,
-                        privacyModeEnabled = privacyModeEnabled,
-                        dailyReportEnabled = dailyReportEnabled,
-                        dailyReportHour = dailyReportHour,
-                        dailyReportMinute = dailyReportMinute,
-                        weeklySummaryEnabled = weeklySummaryEnabled,
-                        weeklyReportDay = weeklyReportDay,
-                        weeklyReportHour = weeklyReportHour,
-                        weeklyReportMinute = weeklyReportMinute,
-                        monthlySummaryEnabled = monthlySummaryEnabled,
-                        monthlyReportDay = monthlyReportDay,
-                        monthlyReportHour = monthlyReportHour,
-                        monthlyReportMinute = monthlyReportMinute,
-                        autocaptureNotificationEnabled = autocaptureNotificationEnabled,
-                        unknownTransactionPopupEnabled = unknownTransactionPopupEnabled,
-                        profilePictureBase64 = profilePictureBase64,
-                    )
-
+                val finalBackupData = buildBackupData(context)
                 json.encodeToString(finalBackupData)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error exporting to JSON", e)
                 null
@@ -255,61 +337,65 @@ object DataExportService {
         context: Context,
         uri: Uri,
     ): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            try {
-                val jsonString =
-                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                        inputStream.bufferedReader().use { it.readText() }
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    if (inputStream == null) {
+                        Log.e("DataExportService", "Failed to open InputStream from URI.")
+                        return@withContext false
                     }
+                    val backupData =
+                        inputStream.buffered().use { stream ->
+                            json.decodeFromStream<AppDataBackup>(stream)
+                        }
 
-                if (jsonString.isNullOrBlank()) {
-                    Log.e("DataExportService", "Failed to read JSON from URI.")
-                    return@withContext false
+                    restoreBackupData(context, backupData)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Error importing from JSON URI", e)
+                    false
                 }
-
-                importDataFromJsonString(context, jsonString)
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Error importing from JSON URI", e)
-                false
             }
         }
     }
 
-    private suspend fun importDataFromJsonString(
+    private suspend fun restoreBackupData(
         context: Context,
-        jsonString: String,
+        backupData: AppDataBackup,
     ): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            try {
-                val backupData = json.decodeFromString<AppDataBackup>(jsonString)
-                val db = AppDatabase.getInstance(context)
-
+        return try {
+            val db = AppDatabase.getInstance(context)
+            db.withTransaction {
                 clearDatabase(db)
                 insertBackupEntities(db, backupData)
-                restorePreferences(context, backupData)
-                true
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Error processing JSON string during import", e)
-                false
             }
+            restorePreferences(context, backupData)
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("DataExportService", "Error restoring backup data into database", e)
+            false
         }
     }
 
     private suspend fun clearDatabase(db: AppDatabase) {
         // Clear all data in the correct order (respecting foreign keys)
+        db.mergeRecordDao().deleteAll()
+        db.goalTransactionLinkDao().deleteAll()
         db.splitTransactionDao().deleteAll()
         db.transactionWriteDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
-        db.tagDao().deleteAll() // Must be after transactions
+        db.tripDao().deleteAll()
+        db.goalDao().deleteAll()
+        db.accountAliasDao().deleteAll()
+        db.tagDao().deleteAll()
         db.accountDao().deleteAll()
         db.categoryDao().deleteAll()
         db.budgetDao().deleteAll()
         db.merchantMappingDao().deleteAll()
-        db.goalDao().deleteAll()
-        db.goalTransactionLinkDao().deleteAll()
-        db.tripDao().deleteAll()
-        db.accountAliasDao().deleteAll()
         // --- Phase 1: Clear Core Parsing Intelligence Tables ---
         db.customSmsRuleDao().deleteAll()
         db.merchantRenameRuleDao().deleteAll()
@@ -318,28 +404,32 @@ object DataExportService {
         db.smsParseTemplateDao().deleteAll()
         // --- Phase 3: Clear App-Learned Recurring Patterns ---
         db.recurringPatternDao().deleteAll()
-        // --- Phase 5: Clear SMS Lifecycle Deny-List & Merge Records ---
+        // --- Phase 5: Clear SMS Lifecycle Deny-List ---
         db.deletedSmsHashDao().deleteAll()
-        db.mergeRecordDao().deleteAll()
     }
 
     private suspend fun insertBackupEntities(
         db: AppDatabase,
-        backupData: AppDataBackup
+        backupData: AppDataBackup,
     ) {
-        // Insert new data
+        // Base entities (no foreign key dependencies)
         db.accountDao().insertAll(backupData.accounts)
         db.categoryDao().insertAll(backupData.categories)
+        db.tagDao().insertAll(backupData.tags)
         db.budgetDao().insertAll(backupData.budgets)
         db.merchantMappingDao().insertAll(backupData.merchantMappings)
-        db.tagDao().insertAll(backupData.tags)
-        db.goalDao().insertAll(backupData.goals)
-        db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
-        db.tripDao().insertAll(backupData.trips)
+
+        // Entities depending on base entities
         db.accountAliasDao().insertAll(backupData.accountAliases)
+        db.goalDao().insertAll(backupData.goals)
+        db.tripDao().insertAll(backupData.trips)
         db.transactionWriteDao().insertAll(backupData.transactions)
+
+        // Entities depending on transactions and tags/goals
         db.splitTransactionDao().insertAll(backupData.splitTransactions)
         db.transactionWriteDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
+        db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
+        db.mergeRecordDao().insertAll(backupData.mergeRecords)
 
         // --- Phase 1: Insert Core Parsing Intelligence Data ---
         db.customSmsRuleDao().insertAll(backupData.customSmsRules)
@@ -350,9 +440,8 @@ object DataExportService {
         // --- Phase 3: Insert App-Learned Recurring Patterns ---
         backupData.recurringPatterns.forEach { db.recurringPatternDao().insert(it) }
 
-        // --- Phase 5: Insert SMS Lifecycle & Merge History ---
+        // --- Phase 5: Insert SMS Lifecycle Deny-List ---
         db.deletedSmsHashDao().insertAll(backupData.deletedSmsHashes)
-        db.mergeRecordDao().insertAll(backupData.mergeRecords)
     }
 
     private suspend fun restorePreferences(
@@ -565,6 +654,8 @@ object DataExportService {
                     }
                 }
                 csvBuilder.toString()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("DataExportService", "Error exporting to CSV", e)
                 null

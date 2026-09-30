@@ -14,27 +14,40 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.SmsEntityExtractor
 
 class SmsDebugViewModelFactory(
     private val application: Application,
     private val transactionViewModel: TransactionViewModel,
+    private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
             val smsRepository = ServiceLocator.provideSmsRepository(application)
             val db = AppDatabase.getInstance(application)
             val smsClassifier = MlModelFactory.getClassifier(application)
-            val nerExtractor = MlModelFactory.getNerExtractor(application)
 
             @Suppress("UNCHECKED_CAST")
-            return SmsDebugViewModel(
-                application,
-                smsRepository,
-                db,
-                smsClassifier,
-                nerExtractor,
-                transactionViewModel,
-            ) as T
+            val viewModel =
+                if (nerExtractorProvider != null) {
+                    SmsDebugViewModel(
+                        application = application,
+                        smsRepository = smsRepository,
+                        db = db,
+                        smsClassifier = smsClassifier,
+                        nerExtractorProvider = nerExtractorProvider,
+                        transactionViewModel = transactionViewModel,
+                    )
+                } else {
+                    SmsDebugViewModel(
+                        application = application,
+                        smsRepository = smsRepository,
+                        db = db,
+                        smsClassifier = smsClassifier,
+                        transactionViewModel = transactionViewModel,
+                    )
+                }
+            return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
