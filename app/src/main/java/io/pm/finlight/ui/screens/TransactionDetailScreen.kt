@@ -751,13 +751,17 @@ fun TransactionDetailScreen(
 
                 if (showImageViewer != null) {
                     Dialog(onDismissRequest = { showImageViewer = null }) {
-                        AsyncImage(
-                            model =
-                                ImageRequest.Builder(LocalContext.current)
+                        val context = LocalContext.current
+                        val imageRequest =
+                            remember(showImageViewer) {
+                                ImageRequest.Builder(context)
                                     .data(showImageViewer)
                                     .size(1920, 1920)
                                     .crossfade(true)
-                                    .build(),
+                                    .build()
+                            }
+                        AsyncImage(
+                            model = imageRequest,
                             contentDescription = "Full screen image",
                             modifier =
                                 Modifier
@@ -1559,14 +1563,18 @@ private fun TransactionActionsCard(
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     items(images) { image ->
+                        val context = LocalContext.current
+                        val imageRequest =
+                            remember(image.imageUri) {
+                                ImageRequest.Builder(context)
+                                    .data(File(image.imageUri))
+                                    .size(256, 256)
+                                    .crossfade(true)
+                                    .build()
+                            }
                         Box {
                             AsyncImage(
-                                model =
-                                    ImageRequest.Builder(LocalContext.current)
-                                        .data(File(image.imageUri))
-                                        .size(256, 256)
-                                        .crossfade(true)
-                                        .build(),
+                                model = imageRequest,
                                 contentDescription = "Attachment",
                                 contentScale = ContentScale.Crop,
                                 modifier =

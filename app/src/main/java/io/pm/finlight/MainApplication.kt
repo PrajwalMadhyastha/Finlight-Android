@@ -20,8 +20,7 @@ import io.pm.finlight.ml.MlModelFactory
 
 class MainApplication :
     Application(),
-    ImageLoaderFactory,
-    ComponentCallbacks2 {
+    ImageLoaderFactory {
     companion object {
         const val TRANSACTION_CHANNEL_ID = "transaction_channel"
         const val RICH_TRANSACTION_CHANNEL_ID = "rich_transaction_channel"
@@ -45,12 +44,20 @@ class MainApplication :
 
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
-        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
-            // App moved to background: immediately purge decoded bitmaps
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN ||
+            level == ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL
+        ) {
+            // App moved to background or foreground critical memory pressure: purge decoded bitmaps
             Coil.imageLoader(this).memoryCache?.clear()
             // Clear vocabulary cache if loaded
             MlModelFactory.clearVocabCache()
         }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        Coil.imageLoader(this).memoryCache?.clear()
+        MlModelFactory.clearVocabCache()
     }
 
     override fun onCreate() {

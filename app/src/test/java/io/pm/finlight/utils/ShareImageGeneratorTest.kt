@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
+import androidx.core.content.IntentCompat
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
@@ -86,7 +87,7 @@ class ShareImageGeneratorTest {
         val startedIntent = shadowOf(activity).nextStartedActivity
         assertNotNull("An intent should have been dispatched", startedIntent)
         assertEquals(Intent.ACTION_CHOOSER, startedIntent.action)
-        val targetIntent = startedIntent.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)
+        val targetIntent = IntentCompat.getParcelableExtra(startedIntent, Intent.EXTRA_INTENT, Intent::class.java)
         assertNotNull(targetIntent)
         assertEquals(Intent.ACTION_SEND, targetIntent?.action)
         assertEquals("image/png", targetIntent?.type)

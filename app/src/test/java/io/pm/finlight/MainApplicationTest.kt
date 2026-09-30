@@ -3,10 +3,12 @@ package io.pm.finlight
 import android.content.ComponentCallbacks2
 import android.content.Context
 import android.content.res.AssetManager
+import android.graphics.Bitmap
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import coil.Coil
+import coil.memory.MemoryCache
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -36,6 +38,8 @@ class MainApplicationTest {
     @After
     fun tearDown() {
         MlModelFactory.clearVocabCache()
+        Coil.imageLoader(app).memoryCache?.clear()
+        Coil.reset()
     }
 
     @Test
@@ -64,11 +68,75 @@ class MainApplicationTest {
         // Populate Coil memory cache
         val imageLoader = app.newImageLoader()
         Coil.setImageLoader(imageLoader)
+        val bitmap = Bitmap.createBitmap(50, 50, Bitmap.Config.ARGB_8888)
+        imageLoader.memoryCache?.set(MemoryCache.Key("test_bitmap"), MemoryCache.Value(bitmap))
+        assertTrue("Memory cache size should be greater than zero before trim", (imageLoader.memoryCache?.size ?: 0) > 0)
 
         // Trigger onTrimMemory with TRIM_MEMORY_UI_HIDDEN
         app.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN)
 
+        // Verify Coil cache was cleared
+        assertEquals(0, imageLoader.memoryCache?.size)
+
         // Verify MlModelFactory cache was evicted - next call re-opens the asset
+        val vocabAfter = MlModelFactory.getClassifierVocab(mockContext)
+        assertEquals(3, vocabAfter.size)
+        verify(exactly = 2) { mockAssets.open("vocab.txt") }
+    }
+
+    @Test
+    fun `onTrimMemory with TRIM_MEMORY_RUNNING_CRITICAL clears Coil and ML vocab caches`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("vocab.txt") } answers {
+            ByteArrayInputStream("food\nfuel\ngrocery".toByteArray())
+        }
+
+        val vocabBefore = MlModelFactory.getClassifierVocab(mockContext)
+        assertEquals(3, vocabBefore.size)
+        verify(exactly = 1) { mockAssets.open("vocab.txt") }
+
+        val imageLoader = app.newImageLoader()
+        Coil.setImageLoader(imageLoader)
+        val bitmap = Bitmap.createBitmap(50, 50, Bitmap.Config.ARGB_8888)
+        imageLoader.memoryCache?.set(MemoryCache.Key("critical_bitmap"), MemoryCache.Value(bitmap))
+        assertTrue("Memory cache size should be greater than zero before trim", (imageLoader.memoryCache?.size ?: 0) > 0)
+
+        // Trigger onTrimMemory with TRIM_MEMORY_RUNNING_CRITICAL (15)
+        app.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL)
+
+        assertEquals(0, imageLoader.memoryCache?.size)
+
+        val vocabAfter = MlModelFactory.getClassifierVocab(mockContext)
+        assertEquals(3, vocabAfter.size)
+        verify(exactly = 2) { mockAssets.open("vocab.txt") }
+    }
+
+    @Test
+    fun `onLowMemory clears Coil and ML vocab caches`() {
+        val mockContext = mockk<Context>()
+        val mockAssets = mockk<AssetManager>()
+        every { mockContext.assets } returns mockAssets
+        every { mockAssets.open("vocab.txt") } answers {
+            ByteArrayInputStream("food\nfuel\ngrocery".toByteArray())
+        }
+
+        val vocabBefore = MlModelFactory.getClassifierVocab(mockContext)
+        assertEquals(3, vocabBefore.size)
+        verify(exactly = 1) { mockAssets.open("vocab.txt") }
+
+        val imageLoader = app.newImageLoader()
+        Coil.setImageLoader(imageLoader)
+        val bitmap = Bitmap.createBitmap(50, 50, Bitmap.Config.ARGB_8888)
+        imageLoader.memoryCache?.set(MemoryCache.Key("low_memory_bitmap"), MemoryCache.Value(bitmap))
+        assertTrue("Memory cache size should be greater than zero before low memory", (imageLoader.memoryCache?.size ?: 0) > 0)
+
+        // Trigger onLowMemory
+        app.onLowMemory()
+
+        assertEquals(0, imageLoader.memoryCache?.size)
+
         val vocabAfter = MlModelFactory.getClassifierVocab(mockContext)
         assertEquals(3, vocabAfter.size)
         verify(exactly = 2) { mockAssets.open("vocab.txt") }
@@ -86,9 +154,16 @@ class MainApplicationTest {
         MlModelFactory.getClassifierVocab(mockContext)
         verify(exactly = 1) { mockAssets.open("vocab.txt") }
 
+        val imageLoader = app.newImageLoader()
+        Coil.setImageLoader(imageLoader)
+        val bitmap = Bitmap.createBitmap(50, 50, Bitmap.Config.ARGB_8888)
+        imageLoader.memoryCache?.set(MemoryCache.Key("complete_bitmap"), MemoryCache.Value(bitmap))
+        assertTrue((imageLoader.memoryCache?.size ?: 0) > 0)
+
         // Test with TRIM_MEMORY_COMPLETE (80)
         app.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_COMPLETE)
 
+        assertEquals(0, imageLoader.memoryCache?.size)
         MlModelFactory.getClassifierVocab(mockContext)
         verify(exactly = 2) { mockAssets.open("vocab.txt") }
     }
@@ -105,8 +180,16 @@ class MainApplicationTest {
         val vocabBefore = MlModelFactory.getClassifierVocab(mockContext)
         verify(exactly = 1) { mockAssets.open("vocab.txt") }
 
-        // Test with TRIM_MEMORY_RUNNING_MODERATE (5 < 20)
+        val imageLoader = app.newImageLoader()
+        Coil.setImageLoader(imageLoader)
+        val bitmap = Bitmap.createBitmap(50, 50, Bitmap.Config.ARGB_8888)
+        imageLoader.memoryCache?.set(MemoryCache.Key("retained_bitmap"), MemoryCache.Value(bitmap))
+        assertTrue((imageLoader.memoryCache?.size ?: 0) > 0)
+
+        // Test with TRIM_MEMORY_RUNNING_MODERATE (5 < 20 and != 15)
         app.onTrimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE)
+
+        assertTrue("Memory cache should retain bitmap on moderate trim", (imageLoader.memoryCache?.size ?: 0) > 0)
 
         val vocabAfter = MlModelFactory.getClassifierVocab(mockContext)
         assertSame("Vocabulary map reference should remain cached", vocabBefore, vocabAfter)
