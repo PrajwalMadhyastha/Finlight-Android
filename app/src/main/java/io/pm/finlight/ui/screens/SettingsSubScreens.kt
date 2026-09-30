@@ -491,7 +491,10 @@ fun DataSettingsScreen(
                         try {
                             val outputStream = context.contentResolver.openOutputStream(targetUri)
                             if (outputStream != null) {
-                                val success = DataExportService.exportToJson(context, outputStream)
+                                val success =
+                                    outputStream.use { stream ->
+                                        DataExportService.exportToJson(context, stream)
+                                    }
                                 if (success) {
                                     Toast.makeText(context, "Data exported successfully!", Toast.LENGTH_LONG).show()
                                 } else {

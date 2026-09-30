@@ -25,7 +25,7 @@ class FinlightBackupAgent : BackupAgentHelper() {
         private const val DATASTORE_BACKUP_KEY = "finlight_datastore_prefs"
 
         // The specific snapshot file we want to back up
-        private const val SNAPSHOT_FILE_NAME = "backup_snapshot.gz"
+        private const val SNAPSHOT_FILE_NAME = DataExportService.SNAPSHOT_FILE_NAME
         private const val FILES_BACKUP_KEY = "finlight_files"
     }
 

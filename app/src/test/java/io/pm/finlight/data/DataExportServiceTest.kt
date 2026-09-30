@@ -10,10 +10,12 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
+import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.data.db.entity.DeletedSmsHash
@@ -116,6 +118,12 @@ class DataExportServiceTest : BaseViewModelTest() {
         every { db.goalTransactionLinkDao() } returns goalTransactionLinkDao
         every { db.deletedSmsHashDao() } returns deletedSmsHashDao
         every { db.mergeRecordDao() } returns mergeRecordDao
+
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
+            val block = secondArg<suspend () -> Any?>()
+            block()
+        }
     }
 
     @After
@@ -317,7 +325,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupMockData()
-            val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+            val snapshotFile = DataExportService.getSnapshotFile(context)
             if (snapshotFile.exists()) snapshotFile.delete()
 
             // Act
@@ -327,14 +335,24 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertTrue("Snapshot creation should be successful", success)
             assertTrue("Snapshot file should exist", snapshotFile.exists())
             assertTrue("Snapshot file should not be empty", snapshotFile.length() > 0)
-            val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+            val tempFile = File(context.filesDir, "${DataExportService.SNAPSHOT_FILE_NAME}.tmp")
             assertFalse("Temporary snapshot file should not exist after successful creation", tempFile.exists())
 
-            // Optional: Verify content by decompressing
+            // Verify content by decompressing and checking multiple entities
             val jsonString = GZIPInputStream(snapshotFile.inputStream()).bufferedReader().use { it.readText() }
             val backupData = Json.decodeFromString<AppDataBackup>(jsonString)
             assertEquals(1, backupData.transactions.size)
             assertEquals("Test Tx", backupData.transactions.first().description)
+            assertEquals(1, backupData.accounts.size)
+            assertEquals("Test Acc", backupData.accounts.first().name)
+            assertEquals(1, backupData.categories.size)
+            assertEquals("Test Cat", backupData.categories.first().name)
+            assertEquals(1, backupData.tags.size)
+            assertEquals("Test Tag", backupData.tags.first().name)
+            assertEquals(1, backupData.goals.size)
+            assertEquals("Test Goal", backupData.goals.first().name)
+            assertEquals(1, backupData.trips.size)
+            assertEquals("Test Trip", backupData.trips.first().name)
         }
 
     @Test
@@ -419,25 +437,26 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertTrue("Restore should be successful", success)
             assertFalse("Snapshot file should be deleted after successful restore", snapshotFile.exists())
 
-            // Verify that the import logic was actually called
             coVerifyOrder {
+                mergeRecordDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
                 splitTransactionDao.deleteAll()
                 transactionWriteDao.deleteAll()
+                tripDao.deleteAll()
+                goalDao.deleteAll()
+                accountAliasDao.deleteAll()
                 tagDao.deleteAll()
                 accountDao.deleteAll()
                 categoryDao.deleteAll()
                 budgetDao.deleteAll()
                 merchantMappingDao.deleteAll()
-                goalDao.deleteAll()
-                goalTransactionLinkDao.deleteAll()
-                tripDao.deleteAll()
-                accountAliasDao.deleteAll()
                 customSmsRuleDao.deleteAll()
                 merchantRenameRuleDao.deleteAll()
                 merchantCategoryMappingDao.deleteAll()
                 ignoreRuleDao.deleteAll()
                 smsParseTemplateDao.deleteAll()
                 recurringPatternDao.deleteAll()
+                deletedSmsHashDao.deleteAll()
             }
 
             coVerify { accountDao.insertAll(backupData.accounts) }
@@ -1808,12 +1827,267 @@ class DataExportServiceTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `exportToCsvString propagates CancellationException`() =
+    fun `SNAPSHOT_FILE_NAME and getSnapshotFile return expected path`() {
+        assertEquals("backup_snapshot.gz", DataExportService.SNAPSHOT_FILE_NAME)
+        assertEquals(File(context.filesDir, "backup_snapshot.gz"), DataExportService.getSnapshotFile(context))
+    }
+
+    @Test
+    fun `importDataFromJson returns false when ContentResolver returns null InputStream`() =
         runTest {
-            coEvery { transactionQueryDao.getAllTransactions() } throws CancellationException("CSV export cancelled")
+            val mockContext = mockk<Application>()
+            val mockContentResolver = mockk<android.content.ContentResolver>()
+            val uri = android.net.Uri.parse("content://mock/test.json")
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            every { mockContext.contentResolver } returns mockContentResolver
+            every { mockContentResolver.openInputStream(uri) } returns null
+            mockkObject(ServiceLocator)
+            every { ServiceLocator.provideDispatcherProvider(mockContext) } returns dispatcherProvider
+
+            val result = DataExportService.importDataFromJson(mockContext, uri)
+            assertFalse("importDataFromJson should return false when openInputStream returns null", result)
+        }
+
+    @Test
+    fun `exportToJson ensures outputStream is closed when buildBackupData fails`() =
+        runTest {
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws RuntimeException("DB crash")
+            var isStreamClosed = false
+            val stream =
+                object : ByteArrayOutputStream() {
+                    override fun close() {
+                        isStreamClosed = true
+                        super.close()
+                    }
+                }
+
+            val success = DataExportService.exportToJson(context, stream)
+            assertFalse(success)
+            assertTrue("outputStream must be closed even when exception occurs during buildBackupData", isStreamClosed)
+        }
+
+    @Test
+    fun `exportToJson ensures outputStream is closed when cancelled`() =
+        runTest {
+            coEvery { transactionQueryDao.getAllTransactionsSimple() } throws CancellationException("Cancelled")
+            var isStreamClosed = false
+            val stream =
+                object : ByteArrayOutputStream() {
+                    override fun close() {
+                        isStreamClosed = true
+                        super.close()
+                    }
+                }
 
             assertFailsWith<CancellationException> {
-                DataExportService.exportToCsvString(context)
+                DataExportService.exportToJson(context, stream)
+            }
+            assertTrue("outputStream must be closed when coroutine cancelled", isStreamClosed)
+        }
+
+    @Test
+    fun `restoreBackupData enforces foreign key ordering for table deletions and insertions`() =
+        runTest {
+            setupMockData()
+            coEvery { recurringPatternDao.getAllPatterns() } returns emptyList()
+            coEvery { deletedSmsHashDao.getAll() } returns emptyList()
+            coEvery { mergeRecordDao.getAll() } returns emptyList()
+
+            // Setup mocks for restore
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { splitTransactionDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+            coJustRun { customSmsRuleDao.insertAll(any()) }
+            coJustRun { merchantRenameRuleDao.insertAll(any()) }
+            coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+            coJustRun { ignoreRuleDao.insertAll(any()) }
+            coJustRun { smsParseTemplateDao.insertAll(any()) }
+            coJustRun { recurringPatternDao.insert(any()) }
+            coJustRun { deletedSmsHashDao.insertAll(any()) }
+            coJustRun { mergeRecordDao.insertAll(any()) }
+
+            val snapshotFile = DataExportService.getSnapshotFile(context)
+            if (snapshotFile.exists()) snapshotFile.delete()
+
+            val createSuccess = DataExportService.createBackupSnapshot(context)
+            assertTrue(createSuccess)
+
+            val restoreSuccess = DataExportService.restoreFromBackupSnapshot(context)
+            assertTrue(restoreSuccess)
+
+            // Verify strict deletion order: junction and child tables before referenced parent tables
+            coVerifyOrder {
+                mergeRecordDao.deleteAll()
+                goalTransactionLinkDao.deleteAll()
+                splitTransactionDao.deleteAll()
+                transactionWriteDao.deleteAll()
+                tripDao.deleteAll()
+                goalDao.deleteAll()
+                accountAliasDao.deleteAll()
+                tagDao.deleteAll()
+                accountDao.deleteAll()
+                categoryDao.deleteAll()
+                budgetDao.deleteAll()
+                merchantMappingDao.deleteAll()
+            }
+
+            // Verify strict insertion order: parent entities before junction/child entities
+            // In particular: account & category before transactions, transactions before goal links & merge records
+            coVerifyOrder {
+                accountDao.insertAll(any())
+                categoryDao.insertAll(any())
+                tagDao.insertAll(any())
+                budgetDao.insertAll(any())
+                merchantMappingDao.insertAll(any())
+                accountAliasDao.insertAll(any())
+                goalDao.insertAll(any())
+                tripDao.insertAll(any())
+                transactionWriteDao.insertAll(any())
+                splitTransactionDao.insertAll(any())
+                transactionWriteDao.addTagsToTransaction(any())
+                goalTransactionLinkDao.insertAll(any())
+                mergeRecordDao.insertAll(any())
+            }
+        }
+
+    @Test
+    fun `restoreBackupData returns false and fails transaction when entity insertion throws`() =
+        runTest {
+            setupMockData()
+            coEvery { recurringPatternDao.getAllPatterns() } returns emptyList()
+            coEvery { deletedSmsHashDao.getAll() } returns emptyList()
+            coEvery { mergeRecordDao.getAll() } returns emptyList()
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coEvery { transactionWriteDao.insertAll(any()) } throws android.database.sqlite.SQLiteConstraintException("FOREIGN KEY constraint failed")
+
+            val snapshotFile = DataExportService.getSnapshotFile(context)
+            if (snapshotFile.exists()) snapshotFile.delete()
+
+            assertTrue(DataExportService.createBackupSnapshot(context))
+
+            val restoreSuccess = DataExportService.restoreFromBackupSnapshot(context)
+            assertFalse("Restore should fail when insert throws SQLiteConstraintException", restoreSuccess)
+        }
+
+    @Test
+    fun `importDataFromJson acquires snapshotMutex and executes safely`() =
+        runTest {
+            setupMockData()
+            val backupData =
+                AppDataBackup(
+                    transactions = emptyList(),
+                    accounts = emptyList(),
+                    categories = emptyList(),
+                    budgets = emptyList(),
+                    merchantMappings = emptyList(),
+                )
+            val tempFile = File(context.cacheDir, "test_mutex_import.json")
+            tempFile.writeText(Json.encodeToString(AppDataBackup.serializer(), backupData))
+            val uri = android.net.Uri.fromFile(tempFile)
+
+            coJustRun { splitTransactionDao.deleteAll() }
+            coJustRun { transactionWriteDao.deleteAll() }
+            coJustRun { tagDao.deleteAll() }
+            coJustRun { accountDao.deleteAll() }
+            coJustRun { categoryDao.deleteAll() }
+            coJustRun { budgetDao.deleteAll() }
+            coJustRun { merchantMappingDao.deleteAll() }
+            coJustRun { goalDao.deleteAll() }
+            coJustRun { goalTransactionLinkDao.deleteAll() }
+            coJustRun { tripDao.deleteAll() }
+            coJustRun { accountAliasDao.deleteAll() }
+            coJustRun { customSmsRuleDao.deleteAll() }
+            coJustRun { merchantRenameRuleDao.deleteAll() }
+            coJustRun { merchantCategoryMappingDao.deleteAll() }
+            coJustRun { ignoreRuleDao.deleteAll() }
+            coJustRun { smsParseTemplateDao.deleteAll() }
+            coJustRun { recurringPatternDao.deleteAll() }
+            coJustRun { deletedSmsHashDao.deleteAll() }
+            coJustRun { mergeRecordDao.deleteAll() }
+
+            coJustRun { accountDao.insertAll(any()) }
+            coJustRun { categoryDao.insertAll(any()) }
+            coJustRun { tagDao.insertAll(any()) }
+            coJustRun { budgetDao.insertAll(any()) }
+            coJustRun { merchantMappingDao.insertAll(any()) }
+            coJustRun { accountAliasDao.insertAll(any()) }
+            coJustRun { goalDao.insertAll(any()) }
+            coJustRun { tripDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.insertAll(any()) }
+            coJustRun { splitTransactionDao.insertAll(any()) }
+            coJustRun { transactionWriteDao.addTagsToTransaction(any()) }
+            coJustRun { goalTransactionLinkDao.insertAll(any()) }
+            coJustRun { mergeRecordDao.insertAll(any()) }
+            coJustRun { customSmsRuleDao.insertAll(any()) }
+            coJustRun { merchantRenameRuleDao.insertAll(any()) }
+            coJustRun { merchantCategoryMappingDao.insertAll(any()) }
+            coJustRun { ignoreRuleDao.insertAll(any()) }
+            coJustRun { smsParseTemplateDao.insertAll(any()) }
+            coJustRun { deletedSmsHashDao.insertAll(any()) }
+
+            try {
+                val success = DataExportService.importDataFromJson(context, uri)
+                assertTrue("importDataFromJson should succeed with valid JSON", success)
+            } finally {
+                tempFile.delete()
             }
         }
 }

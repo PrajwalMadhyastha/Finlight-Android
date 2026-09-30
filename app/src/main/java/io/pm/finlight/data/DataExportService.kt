@@ -1,9 +1,9 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/data/DataExportService.kt
-// REASON: FEATURE (Backup Phase 2) - The export and import functions have been
-// updated to handle all the new Phase 2 entities. The service now correctly
-// backs up and restores Tags, Goals, Trips, AccountAliases, and their
-// relationships, making the app's "intelligence" fully restorable.
+// REASON: FIX (Issue #324) - Resolved audit findings by enforcing foreign key
+// compliant deletion/insertion ordering, enclosing database restoration in a
+// Room transaction, safeguarding stream lifecycle and file descriptors,
+// synchronizing import with snapshotMutex, and centralizing snapshot file paths.
 // =================================================================================
 package io.pm.finlight.data
 
@@ -12,6 +12,7 @@ import android.net.Uri
 import android.util.Log
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
+import androidx.room.withTransaction
 import io.pm.finlight.data.model.AppDataBackup
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.FormatUtils
@@ -47,6 +48,8 @@ import kotlin.collections.forEach
 
 @OptIn(ExperimentalSerializationApi::class)
 object DataExportService {
+    const val SNAPSHOT_FILE_NAME = "backup_snapshot.gz"
+
     private val snapshotMutex = Mutex()
     private val json =
         Json {
@@ -56,12 +59,14 @@ object DataExportService {
             coerceInputValues = true
         }
 
+    fun getSnapshotFile(context: Context): File = File(context.filesDir, SNAPSHOT_FILE_NAME)
+
     suspend fun createBackupSnapshot(context: Context): Boolean {
         return snapshotMutex.withLock {
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
             withContext(dispatcherProvider.io) {
-                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
-                val tempFile = File(context.filesDir, "backup_snapshot.gz.tmp")
+                val snapshotFile = getSnapshotFile(context)
+                val tempFile = File(context.filesDir, "$SNAPSHOT_FILE_NAME.tmp")
                 try {
                     val finalBackupData = buildBackupData(context)
 
@@ -96,7 +101,7 @@ object DataExportService {
         return snapshotMutex.withLock {
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
             withContext(dispatcherProvider.io) {
-                val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+                val snapshotFile = getSnapshotFile(context)
                 if (!snapshotFile.exists()) {
                     Log.d("DataExportService", "No backup snapshot found. Proceeding with normal startup.")
                     return@withContext false // No snapshot to restore
@@ -272,9 +277,11 @@ object DataExportService {
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
-                val finalBackupData = buildBackupData(context)
-                outputStream.buffered().use { bos ->
-                    json.encodeToStream(finalBackupData, bos)
+                outputStream.use { rawStream ->
+                    val finalBackupData = buildBackupData(context)
+                    rawStream.buffered().use { bos ->
+                        json.encodeToStream(finalBackupData, bos)
+                    }
                 }
                 true
             } catch (e: CancellationException) {
@@ -305,25 +312,27 @@ object DataExportService {
         context: Context,
         uri: Uri,
     ): Boolean {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-        return withContext(dispatcherProvider.io) {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                if (inputStream == null) {
-                    Log.e("DataExportService", "Failed to open InputStream from URI.")
-                    return@withContext false
-                }
-                val backupData =
-                    inputStream.buffered().use { stream ->
-                        json.decodeFromStream<AppDataBackup>(stream)
+        return snapshotMutex.withLock {
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+            withContext(dispatcherProvider.io) {
+                try {
+                    val inputStream = context.contentResolver.openInputStream(uri)
+                    if (inputStream == null) {
+                        Log.e("DataExportService", "Failed to open InputStream from URI.")
+                        return@withContext false
                     }
+                    val backupData =
+                        inputStream.buffered().use { stream ->
+                            json.decodeFromStream<AppDataBackup>(stream)
+                        }
 
-                restoreBackupData(context, backupData)
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.e("DataExportService", "Error importing from JSON URI", e)
-                false
+                    restoreBackupData(context, backupData)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("DataExportService", "Error importing from JSON URI", e)
+                    false
+                }
             }
         }
     }
@@ -334,8 +343,10 @@ object DataExportService {
     ): Boolean {
         return try {
             val db = AppDatabase.getInstance(context)
-            clearDatabase(db)
-            insertBackupEntities(db, backupData)
+            db.withTransaction {
+                clearDatabase(db)
+                insertBackupEntities(db, backupData)
+            }
             restorePreferences(context, backupData)
             true
         } catch (e: CancellationException) {
@@ -348,17 +359,18 @@ object DataExportService {
 
     private suspend fun clearDatabase(db: AppDatabase) {
         // Clear all data in the correct order (respecting foreign keys)
+        db.mergeRecordDao().deleteAll()
+        db.goalTransactionLinkDao().deleteAll()
         db.splitTransactionDao().deleteAll()
         db.transactionWriteDao().deleteAll() // Deletes transactions and their tag cross-refs via cascade
-        db.tagDao().deleteAll() // Must be after transactions
+        db.tripDao().deleteAll()
+        db.goalDao().deleteAll()
+        db.accountAliasDao().deleteAll()
+        db.tagDao().deleteAll()
         db.accountDao().deleteAll()
         db.categoryDao().deleteAll()
         db.budgetDao().deleteAll()
         db.merchantMappingDao().deleteAll()
-        db.goalDao().deleteAll()
-        db.goalTransactionLinkDao().deleteAll()
-        db.tripDao().deleteAll()
-        db.accountAliasDao().deleteAll()
         // --- Phase 1: Clear Core Parsing Intelligence Tables ---
         db.customSmsRuleDao().deleteAll()
         db.merchantRenameRuleDao().deleteAll()
@@ -367,28 +379,32 @@ object DataExportService {
         db.smsParseTemplateDao().deleteAll()
         // --- Phase 3: Clear App-Learned Recurring Patterns ---
         db.recurringPatternDao().deleteAll()
-        // --- Phase 5: Clear SMS Lifecycle Deny-List & Merge Records ---
+        // --- Phase 5: Clear SMS Lifecycle Deny-List ---
         db.deletedSmsHashDao().deleteAll()
-        db.mergeRecordDao().deleteAll()
     }
 
     private suspend fun insertBackupEntities(
         db: AppDatabase,
-        backupData: AppDataBackup
+        backupData: AppDataBackup,
     ) {
-        // Insert new data
+        // Base entities (no foreign key dependencies)
         db.accountDao().insertAll(backupData.accounts)
         db.categoryDao().insertAll(backupData.categories)
+        db.tagDao().insertAll(backupData.tags)
         db.budgetDao().insertAll(backupData.budgets)
         db.merchantMappingDao().insertAll(backupData.merchantMappings)
-        db.tagDao().insertAll(backupData.tags)
-        db.goalDao().insertAll(backupData.goals)
-        db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
-        db.tripDao().insertAll(backupData.trips)
+
+        // Entities depending on base entities
         db.accountAliasDao().insertAll(backupData.accountAliases)
+        db.goalDao().insertAll(backupData.goals)
+        db.tripDao().insertAll(backupData.trips)
         db.transactionWriteDao().insertAll(backupData.transactions)
+
+        // Entities depending on transactions and tags/goals
         db.splitTransactionDao().insertAll(backupData.splitTransactions)
         db.transactionWriteDao().addTagsToTransaction(backupData.transactionTagCrossRefs)
+        db.goalTransactionLinkDao().insertAll(backupData.goalTransactionLinks)
+        db.mergeRecordDao().insertAll(backupData.mergeRecords)
 
         // --- Phase 1: Insert Core Parsing Intelligence Data ---
         db.customSmsRuleDao().insertAll(backupData.customSmsRules)
@@ -399,9 +415,8 @@ object DataExportService {
         // --- Phase 3: Insert App-Learned Recurring Patterns ---
         backupData.recurringPatterns.forEach { db.recurringPatternDao().insert(it) }
 
-        // --- Phase 5: Insert SMS Lifecycle & Merge History ---
+        // --- Phase 5: Insert SMS Lifecycle Deny-List ---
         db.deletedSmsHashDao().insertAll(backupData.deletedSmsHashes)
-        db.mergeRecordDao().insertAll(backupData.mergeRecords)
     }
 
     private suspend fun restorePreferences(
