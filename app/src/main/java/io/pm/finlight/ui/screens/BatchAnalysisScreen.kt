@@ -23,8 +23,15 @@ import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModelFactory
 @Composable
 fun BatchAnalysisScreen(navController: androidx.navigation.NavController) {
     val context = LocalContext.current
-    val viewModel: BatchAnalysisViewModel = viewModel(factory = BatchAnalysisViewModelFactory(context))
+    val viewModel: BatchAnalysisViewModel =
+        viewModel(factory = BatchAnalysisViewModelFactory(context.applicationContext))
     val status = viewModel.status
+
+    LaunchedEffect(viewModel.uiEvent) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
 
     val filePickerLauncher =
         rememberLauncherForActivityResult(

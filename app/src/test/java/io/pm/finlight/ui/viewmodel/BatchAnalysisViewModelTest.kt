@@ -15,6 +15,7 @@ import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -55,6 +56,8 @@ class BatchAnalysisViewModelTest : BaseViewModelTest() {
         contextWrapper =
             object : ContextWrapper(baseContext) {
                 override fun getContentResolver(): ContentResolver = this@BatchAnalysisViewModelTest.contentResolver
+
+                override fun getApplicationContext(): Context = this
             }
     }
 
@@ -222,18 +225,30 @@ class BatchAnalysisViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `processFile handles openInputStream failure gracefully`() =
+    fun `processFile handles openInputStream failure gracefully and does not allocate extractor`() =
         runTest {
             val uri = mock(Uri::class.java)
             `when`(contentResolver.openInputStream(uri)).thenThrow(java.io.FileNotFoundException("Storage read error"))
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
 
             val viewModel =
                 BatchAnalysisViewModel(
                     context = contextWrapper,
                     dispatcherProvider = testDispatcherProvider,
-                    nerExtractorProvider = { nerExtractor },
+                    nerExtractorProvider = countingProvider,
                     classifier = classifier,
                 )
+
+            val emittedEvents = mutableListOf<String>()
+            val job =
+                launch {
+                    viewModel.uiEvent.collect { emittedEvents.add(it) }
+                }
 
             viewModel.processFile(uri)
             advanceUntilIdle()
@@ -242,19 +257,31 @@ class BatchAnalysisViewModelTest : BaseViewModelTest() {
             assertFalse(finalStatus.isRunning)
             assertEquals(0, finalStatus.processed)
             assertNull(finalStatus.resultFile)
+            assertEquals("Error: Storage read error", finalStatus.errorMessage)
+            assertEquals(listOf("Error: Storage read error"), emittedEvents)
+            assertEquals(0, providerInvocationCount)
+            verify(nerExtractor, never()).close()
+
+            job.cancel()
         }
 
     @Test
-    fun `processFile handles null openInputStream gracefully`() =
+    fun `processFile handles null openInputStream gracefully and does not allocate extractor`() =
         runTest {
             val uri = mock(Uri::class.java)
             `when`(contentResolver.openInputStream(uri)).thenReturn(null)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
 
             val viewModel =
                 BatchAnalysisViewModel(
                     context = contextWrapper,
                     dispatcherProvider = testDispatcherProvider,
-                    nerExtractorProvider = { nerExtractor },
+                    nerExtractorProvider = countingProvider,
                     classifier = classifier,
                 )
 
@@ -265,6 +292,9 @@ class BatchAnalysisViewModelTest : BaseViewModelTest() {
             assertFalse(finalStatus.isRunning)
             assertEquals(0, finalStatus.processed)
             assertNotNull(finalStatus.resultFile)
+            assertNull(finalStatus.errorMessage)
+            assertEquals(0, providerInvocationCount)
+            verify(nerExtractor, never()).close()
         }
 
     @Test
