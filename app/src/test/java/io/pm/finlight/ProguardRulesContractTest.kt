@@ -78,6 +78,15 @@ class ProguardRulesContractTest {
     }
 
     @Test
+    fun `proguard rules preserve kotlin text RegexOption enum`() {
+        val content = proguardRulesFile.readText()
+        assertTrue(
+            "Must preserve kotlin.text.RegexOption enum to prevent release runtime crash",
+            content.contains("-keep class kotlin.text.RegexOption { *; }"),
+        )
+    }
+
+    @Test
     fun `proguard rules preserve kotlinx serialization companions and serializers`() {
         val content = proguardRulesFile.readText()
         assertTrue("Companion keep rule must be present", content.contains("*** Companion;"))

@@ -7,6 +7,7 @@
 
 # --- General Android & Kotlin ---
 -keep class kotlin.jvm.internal.DefaultConstructorMarker
+-keep class kotlin.text.RegexOption { *; }
 -keepattributes Signature
 -keepattributes InnerClasses
 -keepattributes *Annotation*

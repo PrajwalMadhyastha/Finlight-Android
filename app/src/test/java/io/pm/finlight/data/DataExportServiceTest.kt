@@ -1849,7 +1849,7 @@ class DataExportServiceTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `exportToJson ensures outputStream is closed when buildBackupData fails`() =
+    fun `exportToJson does not close caller-owned stream when buildBackupData fails`() =
         runTest {
             coEvery { transactionQueryDao.getAllTransactionsSimple() } throws RuntimeException("DB crash")
             var isStreamClosed = false
@@ -1863,11 +1863,11 @@ class DataExportServiceTest : BaseViewModelTest() {
 
             val success = DataExportService.exportToJson(context, stream)
             assertFalse(success)
-            assertTrue("outputStream must be closed even when exception occurs during buildBackupData", isStreamClosed)
+            assertFalse("Caller owns stream lifecycle; exportToJson should not close it on failure", isStreamClosed)
         }
 
     @Test
-    fun `exportToJson ensures outputStream is closed when cancelled`() =
+    fun `exportToJson does not close caller-owned stream when cancelled`() =
         runTest {
             coEvery { transactionQueryDao.getAllTransactionsSimple() } throws CancellationException("Cancelled")
             var isStreamClosed = false
@@ -1882,7 +1882,7 @@ class DataExportServiceTest : BaseViewModelTest() {
             assertFailsWith<CancellationException> {
                 DataExportService.exportToJson(context, stream)
             }
-            assertTrue("outputStream must be closed when coroutine cancelled", isStreamClosed)
+            assertFalse("Caller owns stream lifecycle; exportToJson should not close it on cancellation", isStreamClosed)
         }
 
     @Test
