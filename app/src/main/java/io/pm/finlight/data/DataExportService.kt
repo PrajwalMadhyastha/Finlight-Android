@@ -68,33 +68,46 @@ object DataExportService {
                 val snapshotFile = getSnapshotFile(context)
                 val tempFile = File(context.filesDir, "$SNAPSHOT_FILE_NAME.tmp")
                 try {
-                    val finalBackupData = buildBackupData(context)
-
-                    GZIPOutputStream(FileOutputStream(tempFile).buffered()).use { gzip ->
-                        json.encodeToStream(finalBackupData, gzip)
-                    }
-
-                    if (!tempFile.renameTo(snapshotFile)) {
-                        if (snapshotFile.exists() && !snapshotFile.delete()) {
-                            tempFile.delete()
-                            return@withContext false
-                        }
-                        if (!tempFile.renameTo(snapshotFile)) {
-                            tempFile.delete()
-                            return@withContext false
-                        }
-                    }
-                    true
+                    writeBackupDataToTemp(context, tempFile)
+                    commitTempSnapshot(tempFile, snapshotFile)
                 } catch (e: CancellationException) {
-                    tempFile.delete()
+                    safeDelete(tempFile)
                     throw e
                 } catch (e: Exception) {
                     Log.e("DataExportService", "Failed to create compressed backup snapshot", e)
-                    tempFile.delete()
+                    safeDelete(tempFile)
                     false
                 }
             }
         }
+    }
+
+    private suspend fun writeBackupDataToTemp(
+        context: Context,
+        tempFile: File,
+    ) {
+        val finalBackupData = buildBackupData(context)
+        GZIPOutputStream(FileOutputStream(tempFile).buffered()).use { gzip ->
+            json.encodeToStream(finalBackupData, gzip)
+        }
+    }
+
+    private fun commitTempSnapshot(
+        tempFile: File,
+        snapshotFile: File,
+    ): Boolean {
+        if (tempFile.renameTo(snapshotFile)) {
+            return true
+        }
+        if (snapshotFile.exists() && !safeDelete(snapshotFile)) {
+            safeDelete(tempFile)
+            return false
+        }
+        if (!tempFile.renameTo(snapshotFile)) {
+            safeDelete(tempFile)
+            return false
+        }
+        return true
     }
 
     suspend fun restoreFromBackupSnapshot(context: Context): Boolean {
@@ -109,37 +122,51 @@ object DataExportService {
 
                 Log.d("DataExportService", "Backup snapshot found. Starting restore process.")
                 try {
-                    // Decompress the Gzip file and stream directly into Json.decodeFromStream
-                    val backupData =
-                        GZIPInputStream(FileInputStream(snapshotFile).buffered()).use { gzipStream ->
-                            json.decodeFromStream<AppDataBackup>(gzipStream)
-                        }
-
-                    // Import the data
+                    val backupData = readBackupFromSnapshot(snapshotFile)
                     val success = restoreBackupData(context, backupData)
-
-                    if (success) {
-                        if (snapshotFile.delete()) {
-                            Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
-                        } else {
-                            Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
-                        }
-                    } else {
-                        Log.e("DataExportService", "Restore failed during data import phase.")
-                    }
-                    return@withContext success
+                    handleSnapshotPostRestore(snapshotFile, success)
+                    success
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     Log.e("DataExportService", "Failed to restore from backup snapshot", e)
-                    // Attempt to delete the corrupted file to prevent future errors
-                    if (!snapshotFile.delete()) {
-                        Log.w("DataExportService", "Failed to delete corrupted snapshot file")
-                    }
-                    return@withContext false
+                    safeDelete(snapshotFile)
+                    false
                 }
             }
         }
+    }
+
+    private fun readBackupFromSnapshot(snapshotFile: File): AppDataBackup {
+        return GZIPInputStream(FileInputStream(snapshotFile).buffered()).use { gzipStream ->
+            json.decodeFromStream<AppDataBackup>(gzipStream)
+        }
+    }
+
+    private fun handleSnapshotPostRestore(
+        snapshotFile: File,
+        success: Boolean,
+    ) {
+        if (!success) {
+            Log.e("DataExportService", "Restore failed during data import phase.")
+            return
+        }
+        if (safeDelete(snapshotFile)) {
+            Log.d("DataExportService", "Restore successful. Snapshot file deleted.")
+        } else {
+            Log.w("DataExportService", "Restore successful, but failed to delete snapshot file.")
+        }
+    }
+
+    private fun safeDelete(file: File): Boolean {
+        if (!file.exists()) {
+            return true
+        }
+        val deleted = file.delete()
+        if (!deleted) {
+            Log.w("DataExportService", "Failed to delete file: ${file.path}")
+        }
+        return deleted
     }
 
     fun getCsvTemplateString(): String {
