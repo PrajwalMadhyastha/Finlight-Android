@@ -22,6 +22,7 @@ import android.graphics.Bitmap
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
+import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.HorizontalDivider
@@ -60,7 +61,7 @@ object ShareImageGenerator {
     /**
      * Renders the TransactionSnapshotContent composable to a Bitmap.
      */
-    private fun createBitmapFromComposable(
+    internal fun createBitmapFromComposable(
         context: Context,
         transactionsWithData: List<TransactionSnapshotData>,
         fields: Set<ShareableField>,
@@ -99,13 +100,25 @@ object ShareImageGenerator {
             container.layout(0, 0, container.measuredWidth, container.measuredHeight)
 
             val bitmap = Bitmap.createBitmap(container.measuredWidth, container.measuredHeight, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
-            container.draw(canvas)
-            return bitmap
+            var drawSuccess = false
+            try {
+                val canvas = android.graphics.Canvas(bitmap)
+                container.draw(canvas)
+                drawSuccess = true
+                return bitmap
+            } finally {
+                if (!drawSuccess) {
+                    bitmap.recycle()
+                }
+            }
         } finally {
             root.removeView(container)
         }
     }
+
+    @VisibleForTesting
+    internal var bitmapProvider: (Context, List<TransactionSnapshotData>, Set<ShareableField>) -> Bitmap =
+        ::createBitmapFromComposable
 
     /**
      * Saves the bitmap to a file and triggers the Android share sheet.
@@ -115,25 +128,28 @@ object ShareImageGenerator {
         transactionsWithData: List<TransactionSnapshotData>,
         fields: Set<ShareableField>,
     ) {
-        val bitmap = createBitmapFromComposable(context, transactionsWithData, fields)
-
-        val cachePath = File(context.cacheDir, "images")
-        cachePath.mkdirs()
-        val file = File(cachePath, "transaction_snapshot.png")
-        val fileOutputStream = FileOutputStream(file)
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
-        fileOutputStream.close()
-
-        val contentUri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
-
-        // --- FIX: Use Kotlin property access syntax for 'type' ---
-        val shareIntent =
-            Intent(Intent.ACTION_SEND).apply {
-                type = "image/png"
-                putExtra(Intent.EXTRA_STREAM, contentUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val bitmap = bitmapProvider(context, transactionsWithData, fields)
+        try {
+            val cachePath = File(context.cacheDir, "images")
+            cachePath.mkdirs()
+            val file = File(cachePath, "transaction_snapshot.png")
+            FileOutputStream(file).use { fileOutputStream ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, fileOutputStream)
             }
-        context.startActivity(Intent.createChooser(shareIntent, "Share Transactions"))
+
+            val contentUri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
+
+            // --- FIX: Use Kotlin property access syntax for 'type' ---
+            val shareIntent =
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, contentUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            context.startActivity(Intent.createChooser(shareIntent, "Share Transactions"))
+        } finally {
+            bitmap.recycle()
+        }
     }
 }
 

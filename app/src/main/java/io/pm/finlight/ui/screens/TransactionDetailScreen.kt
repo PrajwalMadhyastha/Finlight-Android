@@ -77,6 +77,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.R
@@ -751,7 +752,12 @@ fun TransactionDetailScreen(
                 if (showImageViewer != null) {
                     Dialog(onDismissRequest = { showImageViewer = null }) {
                         AsyncImage(
-                            model = showImageViewer,
+                            model =
+                                ImageRequest.Builder(LocalContext.current)
+                                    .data(showImageViewer)
+                                    .size(1920, 1920)
+                                    .crossfade(true)
+                                    .build(),
                             contentDescription = "Full screen image",
                             modifier =
                                 Modifier
@@ -1555,7 +1561,12 @@ private fun TransactionActionsCard(
                     items(images) { image ->
                         Box {
                             AsyncImage(
-                                model = File(image.imageUri),
+                                model =
+                                    ImageRequest.Builder(LocalContext.current)
+                                        .data(File(image.imageUri))
+                                        .size(256, 256)
+                                        .crossfade(true)
+                                        .build(),
                                 contentDescription = "Attachment",
                                 contentScale = ContentScale.Crop,
                                 modifier =

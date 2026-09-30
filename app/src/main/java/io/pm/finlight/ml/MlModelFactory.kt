@@ -11,7 +11,6 @@
 package io.pm.finlight.ml
 
 import android.content.Context
-import androidx.annotation.VisibleForTesting
 import org.json.JSONObject
 import org.tensorflow.lite.Interpreter
 import java.nio.ByteBuffer
@@ -62,7 +61,10 @@ object MlModelFactory {
             interpreterFactory = interpreterFactory,
         )
 
-    @VisibleForTesting
+    /**
+     * Clears cached vocabularies and label maps to release memory when system memory is constrained
+     * (e.g., during onTrimMemory with TRIM_MEMORY_UI_HIDDEN).
+     */
     fun clearVocabCache() {
         synchronized(this) {
             classifierVocab = null
