@@ -304,11 +304,9 @@ object DataExportService {
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
-                outputStream.use { rawStream ->
-                    val finalBackupData = buildBackupData(context)
-                    rawStream.buffered().use { bos ->
-                        json.encodeToStream(finalBackupData, bos)
-                    }
+                val finalBackupData = buildBackupData(context)
+                outputStream.buffered().use { bos ->
+                    json.encodeToStream(finalBackupData, bos)
                 }
                 true
             } catch (e: CancellationException) {
