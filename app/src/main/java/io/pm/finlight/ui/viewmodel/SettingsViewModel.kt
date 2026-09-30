@@ -64,6 +64,37 @@ class SettingsViewModel(
     private val transactionRunner: TransactionRunner,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
+    // Secondary constructor for backward compatibility
+    constructor(
+        application: Application,
+        settingsRepository: ISettingsRepository,
+        db: AppDatabase,
+        transactionRepository: ITransactionRepository,
+        merchantMappingRepository: IMerchantMappingRepository,
+        accountRepository: IAccountRepository,
+        categoryRepository: ICategoryRepository,
+        smsRepository: ISmsRepository,
+        transactionViewModel: TransactionViewModel,
+        smsClassifier: SmsClassifier,
+        nerExtractor: SmsEntityExtractor,
+        transactionRunner: TransactionRunner,
+        dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+    ) : this(
+        application = application,
+        settingsRepository = settingsRepository,
+        db = db,
+        transactionRepository = transactionRepository,
+        merchantMappingRepository = merchantMappingRepository,
+        accountRepository = accountRepository,
+        categoryRepository = categoryRepository,
+        smsRepository = smsRepository,
+        transactionViewModel = transactionViewModel,
+        smsClassifier = smsClassifier,
+        nerExtractorProvider = { nerExtractor },
+        transactionRunner = transactionRunner,
+        dispatchers = dispatchers,
+    )
+
     private val context = application
     private val tagDao = db.tagDao()
     private val splitTransactionDao = db.splitTransactionDao()

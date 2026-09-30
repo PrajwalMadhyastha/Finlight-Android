@@ -2125,4 +2125,27 @@ class SettingsViewModelTest : BaseViewModelTest() {
         verify(smsClassifier).close()
         verify(nerExtractor, never()).close()
     }
+
+    @Test
+    fun `secondary constructor accepts direct SmsEntityExtractor instance`() {
+        val vm =
+            SettingsViewModel(
+                applicationContext,
+                settingsRepository,
+                db,
+                transactionRepository,
+                merchantMappingRepository,
+                accountRepository,
+                categoryRepository,
+                smsRepository,
+                transactionViewModel,
+                smsClassifier,
+                nerExtractor = nerExtractor,
+                transactionRunner = transactionRunner,
+                dispatchers = TestDispatcherProvider(testDispatcher),
+            )
+
+        val extractedNer = vm.nerExtractorProvider()
+        assertEquals(nerExtractor, extractedNer)
+    }
 }
