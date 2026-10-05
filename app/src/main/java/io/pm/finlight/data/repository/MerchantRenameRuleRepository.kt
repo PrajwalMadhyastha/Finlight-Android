@@ -48,4 +48,8 @@ class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) :
     override suspend fun deleteByOriginalName(originalName: String) {
         dao.deleteByOriginalName(originalName)
     }
+
+    override suspend fun getRuleByOriginalName(originalName: String): MerchantRenameRule? {
+        return dao.getRuleByOriginalName(originalName)
+    }
 }

@@ -655,11 +655,22 @@ class SettingsViewModel(
     ) {
         if (originalName.isBlank() || newName.isBlank()) return
         viewModelScope.launch {
+            val existingRule = db.merchantRenameRuleDao().getRuleByOriginalName(originalName)
             if (originalName.equals(newName, ignoreCase = true)) {
                 db.merchantRenameRuleDao().deleteByOriginalName(originalName)
+                transactionRepository.updateDescriptionByOriginalDescription(
+                    originalDesc = originalName,
+                    newDescription = originalName,
+                    oldDescription = existingRule?.newName,
+                )
             } else {
                 val rule = MerchantRenameRule(originalName = originalName, newName = newName)
                 db.merchantRenameRuleDao().insert(rule)
+                transactionRepository.updateDescriptionByOriginalDescription(
+                    originalDesc = originalName,
+                    newDescription = newName,
+                    oldDescription = existingRule?.newName,
+                )
             }
         }
     }

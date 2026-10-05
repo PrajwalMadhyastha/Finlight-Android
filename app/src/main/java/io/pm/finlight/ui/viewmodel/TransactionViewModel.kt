@@ -31,7 +31,6 @@ import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.HeuristicCategorizer
 import io.pm.finlight.utils.ShareImageGenerator
-import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -235,8 +234,6 @@ class TransactionViewModel(
         settingsRepository.getGoalIncomeThreshold()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 5000)
 
-    val merchantAliases: StateFlow<Map<String, String>>
-
     val transactionsForSelectedMonth: StateFlow<List<TransactionDetails>>
     val monthlyIncome: StateFlow<Double>
     val monthlyExpenses: StateFlow<Double>
@@ -387,11 +384,6 @@ class TransactionViewModel(
                     initialValue = null,
                 )
 
-        merchantAliases =
-            merchantRenameRuleRepository.getAliasesAsMap()
-                .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
-
         transactionsForSelectedMonth =
             combinedState.flatMapLatest { (calendar, filters) ->
                 val monthStart =
@@ -422,8 +414,6 @@ class TransactionViewModel(
                         _uiEvent.send("Failed to load transactions.")
                         emit(emptyList())
                     }
-            }.combine(merchantAliases) { transactions, aliases ->
-                transactions.applyAliases(aliases)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         val financialSummaryFlow =
@@ -937,9 +927,6 @@ class TransactionViewModel(
 
     fun findTransactionDetailsById(id: Int): Flow<TransactionDetails?> {
         return transactionRepository.getTransactionDetailsById(id)
-            .combine(merchantAliases) { details, aliases ->
-                details?.let { listOf(it).applyAliases(aliases).firstOrNull() }
-            }
     }
 
     private fun loadVisitCount(

@@ -442,6 +442,9 @@ object DataExportService {
 
         // --- Phase 5: Insert SMS Lifecycle Deny-List ---
         db.deletedSmsHashDao().insertAll(backupData.deletedSmsHashes)
+
+        // --- Phase 6: Synchronize transaction descriptions with restored rename rules ---
+        db.transactionWriteDao().syncDescriptionsWithRenameRules()
     }
 
     private suspend fun restorePreferences(

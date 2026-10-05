@@ -297,4 +297,161 @@ class TransactionWriteDaoTest {
             assertEquals(1, remaining.size)
             assertEquals(id2, remaining.first().id)
         }
+
+    @Test
+    fun testUpdateDescriptionByOriginalDescription_guardsManualOverrides() =
+        runTest {
+            val matchingTxn =
+                Transaction(
+                    description = "AMZN PAY",
+                    originalDescription = "AMZN PAY",
+                    amount = 100.0,
+                    date = 1000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val manualOverrideTxn =
+                Transaction(
+                    description = "Birthday Gift",
+                    originalDescription = "AMZN PAY",
+                    amount = 50.0,
+                    date = 2000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val matchId = writeDao.insert(matchingTxn).toInt()
+            val overrideId = writeDao.insert(manualOverrideTxn).toInt()
+
+            val updatedRows =
+                writeDao.updateDescriptionByOriginalDescription(
+                    originalDesc = "AMZN PAY",
+                    newDescription = "Amazon Pay",
+                )
+            assertEquals(1, updatedRows)
+
+            val updatedMatch = queryDao.getTransactionById(matchId).first()
+            assertNotNull(updatedMatch)
+            assertEquals("Amazon Pay", updatedMatch.description)
+
+            val preservedOverride = queryDao.getTransactionById(overrideId).first()
+            assertNotNull(preservedOverride)
+            assertEquals("Birthday Gift", preservedOverride.description)
+        }
+
+    @Test
+    fun testUpdateDescriptionByOriginalDescription_supportsOldDescription() =
+        runTest {
+            val oldAliasTxn =
+                Transaction(
+                    description = "Amazon",
+                    originalDescription = "AMZN PAY",
+                    amount = 100.0,
+                    date = 1000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val manualOverrideTxn =
+                Transaction(
+                    description = "Office Supplies",
+                    originalDescription = "AMZN PAY",
+                    amount = 50.0,
+                    date = 2000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val aliasId = writeDao.insert(oldAliasTxn).toInt()
+            val overrideId = writeDao.insert(manualOverrideTxn).toInt()
+
+            val updatedRows =
+                writeDao.updateDescriptionByOriginalDescription(
+                    originalDesc = "AMZN PAY",
+                    newDescription = "Amazon Pay",
+                    oldDescription = "Amazon",
+                )
+            assertEquals(1, updatedRows)
+
+            val updatedAlias = queryDao.getTransactionById(aliasId).first()
+            assertNotNull(updatedAlias)
+            assertEquals("Amazon Pay", updatedAlias.description)
+
+            val preservedOverride = queryDao.getTransactionById(overrideId).first()
+            assertNotNull(preservedOverride)
+            assertEquals("Office Supplies", preservedOverride.description)
+        }
+
+    @Test
+    fun testSyncDescriptionsWithRenameRules() =
+        runTest {
+            dbRule.db.merchantRenameRuleDao().insert(
+                MerchantRenameRule(originalName = "AMZN PAY", newName = "Amazon Pay"),
+            )
+
+            val unrenamedTxn =
+                Transaction(
+                    description = "AMZN PAY",
+                    originalDescription = "AMZN PAY",
+                    amount = 100.0,
+                    date = 1000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val manualOverrideTxn =
+                Transaction(
+                    description = "Books",
+                    originalDescription = "AMZN PAY",
+                    amount = 40.0,
+                    date = 2000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+            val otherTxn =
+                Transaction(
+                    description = "UBER",
+                    originalDescription = "UBER",
+                    amount = 20.0,
+                    date = 3000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    source = "SMS",
+                )
+
+            val unrenamedId = writeDao.insert(unrenamedTxn).toInt()
+            val overrideId = writeDao.insert(manualOverrideTxn).toInt()
+            val otherId = writeDao.insert(otherTxn).toInt()
+
+            val syncedCount = writeDao.syncDescriptionsWithRenameRules()
+            assertEquals(1, syncedCount)
+
+            val syncedTxn = queryDao.getTransactionById(unrenamedId).first()
+            assertNotNull(syncedTxn)
+            assertEquals("Amazon Pay", syncedTxn.description)
+
+            val preservedTxn = queryDao.getTransactionById(overrideId).first()
+            assertNotNull(preservedTxn)
+            assertEquals("Books", preservedTxn.description)
+
+            val untouchedTxn = queryDao.getTransactionById(otherId).first()
+            assertNotNull(untouchedTxn)
+            assertEquals("UBER", untouchedTxn.description)
+        }
 }

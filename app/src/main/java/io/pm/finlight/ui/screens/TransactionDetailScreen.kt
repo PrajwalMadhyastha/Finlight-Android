@@ -2313,12 +2313,15 @@ private fun RetrospectiveUpdateSheetContent(
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onToggleSelectAll),
             ) {
                 val allSelected = state.selectedIds.size == state.similarTransactions.size
                 Checkbox(
                     checked = allSelected,
-                    onCheckedChange = { onToggleSelectAll() },
+                    onCheckedChange = null,
                     colors =
                         CheckboxDefaults.colors(
                             checkedColor = MaterialTheme.colorScheme.primary,

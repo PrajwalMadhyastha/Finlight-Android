@@ -28,7 +28,7 @@ import org.mockito.Mockito.`when` as whenever
 
 class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
     @Test
-    fun `transactionsForSelectedMonth flow emits data from repository and applies aliases`() =
+    fun `transactionsForSelectedMonth flow emits data from repository directly`() =
         runTest {
             // ARRANGE
             val transaction =
@@ -43,11 +43,9 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                     notes = null,
                 )
             val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
-            val aliases = mapOf("amzn" to "Amazon")
             whenever(
                 transactionRepository.getTransactionDetailsForRange(any<Long>(), any<Long>(), anyOrNull(), anyOrNull(), anyOrNull()),
             ).thenReturn(flowOf(listOf(transactionDetails)))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
 
             // ACT
             initializeViewModel()
@@ -57,7 +55,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                 advanceUntilIdle()
                 val result = expectMostRecentItem()
                 assertEquals(1, result.size)
-                assertEquals("Amazon", result.first().transaction.description)
+                assertEquals("amzn", result.first().transaction.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -152,7 +150,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `findTransactionDetailsById applies aliases`() =
+    fun `findTransactionDetailsById emits data from repository directly`() =
         runTest {
             // Arrange
             val transactionId = 1
@@ -168,15 +166,8 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                     notes = null,
                 )
             val mockDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
-            val aliases = mapOf("amzn" to "Amazon")
-
             whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(mockDetails))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
 
-            // --- THIS IS THE FIX ---
-            // Re-initialize the ViewModel *after* the test-specific mock for getAliasesAsMap is set.
-            // This ensures the `merchantAliases` StateFlow in the ViewModel's init block
-            // collects the correct map (with "Amazon") instead of the default `emptyMap()`.
             initializeViewModel()
 
             // Act
@@ -184,7 +175,7 @@ class TransactionViewModelFlowsTest : TransactionViewModelBaseSetup() {
                 // Assert
                 val result = awaitItem()
                 assertNotNull(result)
-                assertEquals("Amazon", result!!.transaction.description)
+                assertEquals("amzn", result!!.transaction.description)
                 cancelAndIgnoreRemainingEvents()
             }
             verify(transactionRepository).getTransactionDetailsById(transactionId)

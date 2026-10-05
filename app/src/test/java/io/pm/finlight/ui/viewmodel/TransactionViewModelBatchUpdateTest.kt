@@ -787,4 +787,32 @@ class TransactionViewModelBatchUpdateTest : TransactionViewModelBaseSetup() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `performBatchUpdate with deselected past transactions saves future rule without updating past transactions`() =
+        runTest {
+            setupRetroSheet(initialDesc = "Starbucks", newDesc = "Starbucks Coffee", numSimilar = 2)
+
+            // Deselect all past transactions
+            viewModel.toggleRetroUpdateSelectAll()
+            assertEquals(emptySet<Int>(), viewModel.retroUpdateSheetState.first()?.selectedIds)
+            assertTrue(viewModel.retroUpdateSheetState.first()?.updateFutureTransactions == true)
+
+            viewModel.navigateBackEvent.test {
+                viewModel.performBatchUpdate()
+                advanceUntilIdle()
+
+                // Future rule is inserted into repository
+                verify(merchantRenameRuleRepository).insert(
+                    MerchantRenameRule(originalName = "Starbucks", newName = "Starbucks Coffee"),
+                )
+                // Past transactions are NOT updated in database
+                verify(transactionRepository, never()).updateDescriptionForIds(any(), any())
+
+                // Navigation triggered and sheet cleared
+                assertNull(viewModel.retroUpdateSheetState.first())
+                awaitItem()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }
