@@ -277,4 +277,13 @@ interface ITransactionRepository {
         primaryTxnId: Int,
         secondaryTxnId: Int,
     )
+
+    fun getPendingTransactionsFlow(): Flow<List<Transaction>>
+
+    suspend fun confirmTransaction(
+        transactionId: Int,
+        confirmedAmount: Double? = null,
+    )
+
+    suspend fun skipTransaction(transactionId: Int)
 }

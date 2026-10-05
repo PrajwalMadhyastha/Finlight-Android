@@ -12,4 +12,10 @@ interface IRecurringTransactionRepository {
     suspend fun update(recurringTransaction: RecurringTransaction)
 
     suspend fun delete(recurringTransaction: RecurringTransaction)
+
+    suspend fun updateLastRunAndSkipCount(
+        ruleId: Int,
+        lastRunDate: Long,
+        skipCount: Int,
+    )
 }

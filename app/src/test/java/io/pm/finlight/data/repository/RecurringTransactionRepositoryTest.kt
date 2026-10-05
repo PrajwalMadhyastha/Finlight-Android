@@ -14,10 +14,10 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
+import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.verify
 import org.robolectric.annotation.Config
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -111,5 +111,22 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
             repository.delete(rule)
             // Assert
             verify(recurringTransactionDao).delete(rule)
+        }
+
+    @Test
+    fun `updateLastRunAndSkipCount calls DAO methods in order`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val lastRunDate = 1700000000000L
+            val skipCount = 2
+
+            // Act
+            repository.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+
+            // Assert
+            val inOrder = inOrder(recurringTransactionDao)
+            inOrder.verify(recurringTransactionDao).updateLastRunDate(ruleId, lastRunDate)
+            inOrder.verify(recurringTransactionDao).updateSkipCount(ruleId, skipCount)
         }
 }

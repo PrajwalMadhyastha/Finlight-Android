@@ -12,6 +12,10 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.data.db.dao.TransactionReimbursementDao
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -124,6 +128,111 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             verify(transactionDao).updateTransferLinkStatus(1, 2, true)
             verify(transactionDao).updateTransferLinkStatus(2, 1, true)
+        }
+
+    // ── Pending Transactions, Confirmation & Skip Tests ─────────────────────────
+
+    @Test
+    fun `getPendingTransactionsFlow delegates to transactionQueryDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val pendingList =
+                listOf(
+                    Transaction(
+                        id = 1,
+                        description = "Pending Bill",
+                        amount = 100.0,
+                        date = 1000L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                        status = TransactionStatus.PENDING,
+                    ),
+                )
+            whenever(transactionDao.getPendingTransactions()).thenReturn(flowOf(pendingList))
+
+            repository.getPendingTransactionsFlow().test {
+                val item = awaitItem()
+                assertEquals(pendingList, item)
+                awaitComplete()
+            }
+
+            verify(transactionDao).getPendingTransactions()
+        }
+
+    @Test
+    fun `confirmTransaction without confirmedAmount only calls confirmTransaction atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42)
+
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount updates amount and confirms atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+
+            val inOrder = inOrder(transactionDao)
+            inOrder.verify(transactionDao).updateAmount(42, 150.0)
+            inOrder.verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `skipTransaction delegates to transactionWriteDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.skipTransaction(transactionId = 42)
+
+            verify(transactionDao).skipTransaction(42)
+        }
+
+    @Test
+    fun `domain dao constructor delegates pending flow, confirm, and skip properly`() =
+        runTest {
+            val writeDao = mock(TransactionWriteDao::class.java)
+            val queryDao = mock(TransactionQueryDao::class.java)
+            val analyticsDao = mock(TransactionAnalyticsDao::class.java)
+            val reimbursementDao = mock(TransactionReimbursementDao::class.java)
+            val repo =
+                TransactionRepository(
+                    transactionWriteDao = writeDao,
+                    transactionQueryDao = queryDao,
+                    transactionAnalyticsDao = analyticsDao,
+                    transactionReimbursementDao = reimbursementDao,
+                    db = db,
+                    dispatcherProvider = testDispatcherProvider,
+                )
+
+            whenever(queryDao.getPendingTransactions()).thenReturn(flowOf(emptyList()))
+            repo.getPendingTransactionsFlow().test {
+                assertEquals(emptyList(), awaitItem())
+                awaitComplete()
+            }
+            verify(queryDao).getPendingTransactions()
+
+            repo.confirmTransaction(transactionId = 99, confirmedAmount = 200.0)
+            val inOrder = inOrder(writeDao)
+            inOrder.verify(writeDao).updateAmount(99, 200.0)
+            inOrder.verify(writeDao).confirmTransaction(99)
+
+            repo.confirmTransaction(transactionId = 100, confirmedAmount = null)
+            verify(writeDao, never()).updateAmount(eq(100), any())
+            verify(writeDao).confirmTransaction(100)
+
+            repo.skipTransaction(transactionId = 101)
+            verify(writeDao).skipTransaction(101)
         }
 
     // ── Reimbursement / Offset Feature Tests ──────────────────────────────────
