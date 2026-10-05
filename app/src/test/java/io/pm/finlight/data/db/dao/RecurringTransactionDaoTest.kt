@@ -94,6 +94,70 @@ class RecurringTransactionDaoTest {
         }
 
     @Test
+    fun `updateLastRunAndSkipCount updates both timestamp and skipCount atomically`() =
+        runTest {
+            // Arrange
+            val ruleId =
+                recurringTransactionDao.insert(
+                    RecurringTransaction(
+                        description = "Spotify",
+                        amount = 129.0,
+                        transactionType = TransactionType.EXPENSE,
+                        recurrenceInterval = "Monthly",
+                        startDate = 0L,
+                        accountId = 1,
+                        categoryId = null,
+                        skipCount = 0,
+                    ),
+                ).toInt()
+
+            val newTimestamp = 1700000000000L
+            val newSkipCount = 3
+
+            // Act
+            recurringTransactionDao.updateLastRunAndSkipCount(ruleId, newTimestamp, newSkipCount)
+
+            // Assert
+            val updatedRule = recurringTransactionDao.getRuleById(ruleId)
+            assertNotNull(updatedRule)
+            assertEquals(newTimestamp, updatedRule?.lastRunDate)
+            assertEquals(newSkipCount, updatedRule?.skipCount)
+        }
+
+    @Test
+    fun `getRuleById returns correct rule`() =
+        runTest {
+            // Arrange
+            val ruleId =
+                recurringTransactionDao.insert(
+                    RecurringTransaction(
+                        description = "Gym",
+                        amount = 45.0,
+                        transactionType = TransactionType.EXPENSE,
+                        recurrenceInterval = "Monthly",
+                        startDate = 0L,
+                        accountId = 1,
+                        categoryId = null,
+                    ),
+                ).toInt()
+
+            // Act
+            val result = recurringTransactionDao.getRuleById(ruleId)
+
+            // Assert
+            assertNotNull(result)
+            assertEquals(ruleId, result?.id)
+            assertEquals("Gym", result?.description)
+        }
+
+    @Test
+    fun `getRuleById returns null for non-existent id`() =
+        runTest {
+            val result = recurringTransactionDao.getRuleById(9999)
+            assertNull(result)
+        }
+
+    @Test
     fun `update modifies rule correctly`() =
         runTest {
             // Arrange

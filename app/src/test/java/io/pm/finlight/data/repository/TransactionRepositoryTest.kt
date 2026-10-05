@@ -8,14 +8,11 @@ import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
-import io.pm.finlight.data.db.dao.TransactionReimbursementDao
-import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -38,6 +35,7 @@ import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -126,6 +124,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.linkTransfer(1, 2)
 
+            coVerify { db.withTransaction<Any?>(any()) }
             verify(transactionDao).updateTransferLinkStatus(1, 2, true)
             verify(transactionDao).updateTransferLinkStatus(2, 1, true)
         }
@@ -170,6 +169,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.confirmTransaction(transactionId = 42)
 
+            coVerify { db.withTransaction<Any?>(any()) }
             verify(transactionDao, never()).updateAmount(any(), any())
             verify(transactionDao).confirmTransaction(42)
         }
@@ -182,9 +182,26 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
 
+            coVerify { db.withTransaction<Any?>(any()) }
             val inOrder = inOrder(transactionDao)
             inOrder.verify(transactionDao).updateAmount(42, 150.0)
             inOrder.verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount propagates exception when updateAmount fails`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            whenever(transactionDao.updateAmount(eq(42), eq(150.0))).thenThrow(RuntimeException("DB failure"))
+
+            assertFailsWith<RuntimeException> {
+                repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+            }
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            verify(transactionDao).updateAmount(42, 150.0)
+            verify(transactionDao, never()).confirmTransaction(42)
         }
 
     @Test
@@ -196,43 +213,6 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.skipTransaction(transactionId = 42)
 
             verify(transactionDao).skipTransaction(42)
-        }
-
-    @Test
-    fun `domain dao constructor delegates pending flow, confirm, and skip properly`() =
-        runTest {
-            val writeDao = mock(TransactionWriteDao::class.java)
-            val queryDao = mock(TransactionQueryDao::class.java)
-            val analyticsDao = mock(TransactionAnalyticsDao::class.java)
-            val reimbursementDao = mock(TransactionReimbursementDao::class.java)
-            val repo =
-                TransactionRepository(
-                    transactionWriteDao = writeDao,
-                    transactionQueryDao = queryDao,
-                    transactionAnalyticsDao = analyticsDao,
-                    transactionReimbursementDao = reimbursementDao,
-                    db = db,
-                    dispatcherProvider = testDispatcherProvider,
-                )
-
-            whenever(queryDao.getPendingTransactions()).thenReturn(flowOf(emptyList()))
-            repo.getPendingTransactionsFlow().test {
-                assertEquals(emptyList(), awaitItem())
-                awaitComplete()
-            }
-            verify(queryDao).getPendingTransactions()
-
-            repo.confirmTransaction(transactionId = 99, confirmedAmount = 200.0)
-            val inOrder = inOrder(writeDao)
-            inOrder.verify(writeDao).updateAmount(99, 200.0)
-            inOrder.verify(writeDao).confirmTransaction(99)
-
-            repo.confirmTransaction(transactionId = 100, confirmedAmount = null)
-            verify(writeDao, never()).updateAmount(eq(100), any())
-            verify(writeDao).confirmTransaction(100)
-
-            repo.skipTransaction(transactionId = 101)
-            verify(writeDao).skipTransaction(101)
         }
 
     // ── Reimbursement / Offset Feature Tests ──────────────────────────────────

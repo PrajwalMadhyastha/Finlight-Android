@@ -14,9 +14,10 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
-import org.mockito.Mockito.inOrder
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -114,7 +115,47 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `updateLastRunAndSkipCount calls DAO methods in order`() =
+    fun `getRuleById calls DAO`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val expectedRule =
+                RecurringTransaction(
+                    id = ruleId,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                )
+            `when`(recurringTransactionDao.getRuleById(ruleId)).thenReturn(expectedRule)
+
+            // Act
+            val result = repository.getRuleById(ruleId)
+
+            // Assert
+            assertEquals(expectedRule, result)
+            verify(recurringTransactionDao).getRuleById(ruleId)
+        }
+
+    @Test
+    fun `updateLastRunDate calls DAO`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val lastRunDate = 1700000000000L
+
+            // Act
+            repository.updateLastRunDate(ruleId, lastRunDate)
+
+            // Assert
+            verify(recurringTransactionDao).updateLastRunDate(ruleId, lastRunDate)
+        }
+
+    @Test
+    fun `updateLastRunAndSkipCount calls DAO`() =
         runTest {
             // Arrange
             val ruleId = 5
@@ -125,8 +166,6 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
             repository.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
 
             // Assert
-            val inOrder = inOrder(recurringTransactionDao)
-            inOrder.verify(recurringTransactionDao).updateLastRunDate(ruleId, lastRunDate)
-            inOrder.verify(recurringTransactionDao).updateSkipCount(ruleId, skipCount)
+            verify(recurringTransactionDao).updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
         }
 }
