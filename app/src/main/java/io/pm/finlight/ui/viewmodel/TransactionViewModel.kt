@@ -1453,27 +1453,8 @@ class TransactionViewModel(
         try {
             if (newDescription.isNotBlank()) {
                 val transaction = transactionRepository.getTransactionById(id).firstOrNull()
-                if (transaction != null && transaction.sourceSmsId != null && transaction.originalDescription != null) {
-                    val original = transaction.originalDescription
-                    if (original.isNotBlank() && !original.equals(newDescription, ignoreCase = true)) {
-                        val originalSms = smsRepository.getSmsDetailsById(transaction.sourceSmsId)
-                        if (originalSms != null) {
-                            val merchantIndex = originalSms.body.indexOf(original)
-                            if (merchantIndex != -1) {
-                                createAndStoreTemplate(
-                                    smsBody = originalSms.body,
-                                    transaction = transaction,
-                                    correctedMerchant = newDescription,
-                                    originalMerchantStartIndex = merchantIndex,
-                                    originalMerchantEndIndex = merchantIndex + original.length,
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // We do not automatically update global MerchantRenameRule here.
-                // Global rules should only be updated via performBatchUpdate when applying to all similar transactions.
+                // We do not automatically update global MerchantRenameRule or SmsParseTemplate here.
+                // Global rules should only be updated via performBatchUpdate when applying to future transactions.
 
                 if (transaction != null && transaction.originalDescription != null) {
                     if (transaction.originalDescription.equals(newDescription, ignoreCase = true)) {
@@ -1986,6 +1967,11 @@ class TransactionViewModel(
                 // --- FIX (#224/#225): Gate on explicit checkbox, not on isAllSelected.
                 // This means any partial selection + future toggle ON will correctly save the rule.
                 if (state.updateFutureTransactions) {
+                    var effectiveCategoryId: Int? = state.newCategoryId
+                    if (effectiveCategoryId == null && state.originalDescription.isNotBlank()) {
+                        effectiveCategoryId = merchantCategoryMappingRepository.getCategoryIdForMerchant(state.originalDescription)
+                    }
+
                     state.newDescription?.let { newDesc ->
                         val originalDesc = state.originalDescription
                         if (originalDesc.isNotBlank() && !originalDesc.equals(newDesc, ignoreCase = true)) {
@@ -1995,6 +1981,32 @@ class TransactionViewModel(
                             ruleSaved = true
                             savedCanonical = newDesc
                             savedOriginal = originalDesc
+
+                            // Propagate category mapping to newDesc
+                            if (effectiveCategoryId != null) {
+                                merchantCategoryMappingRepository.insert(
+                                    MerchantCategoryMapping(parsedName = newDesc, categoryId = effectiveCategoryId)
+                                )
+                                Log.d(TAG, "Smart Update: propagated category mapping '$newDesc' -> $effectiveCategoryId.")
+                            }
+
+                            // Store SMS parse template only when user opted in to update future transactions
+                            val initialTxn = initialTransactionStateForRetroUpdate
+                            if (initialTxn != null && initialTxn.sourceSmsId != null) {
+                                val originalSms = smsRepository.getSmsDetailsById(initialTxn.sourceSmsId)
+                                if (originalSms != null) {
+                                    val merchantIndex = originalSms.body.indexOf(originalDesc, ignoreCase = true)
+                                    if (merchantIndex != -1) {
+                                        createAndStoreTemplate(
+                                            smsBody = originalSms.body,
+                                            transaction = initialTxn,
+                                            correctedMerchant = newDesc,
+                                            originalMerchantStartIndex = merchantIndex,
+                                            originalMerchantEndIndex = merchantIndex + originalDesc.length,
+                                        )
+                                    }
+                                }
+                            }
                         } else if (originalDesc.isNotBlank() && originalDesc.equals(newDesc, ignoreCase = true)) {
                             // User reverted name — remove any existing rule.
                             merchantRenameRuleRepository.deleteByOriginalName(originalDesc)

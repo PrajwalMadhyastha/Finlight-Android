@@ -50,4 +50,11 @@ class MerchantCategoryMappingRepositoryTest : BaseViewModelTest() {
             repository.getAllMappings()
             verify(merchantCategoryMappingDao).getAllMappingsFlow()
         }
+
+    @Test
+    fun `getCategoryIdForMerchant calls DAO getCategoryIdForMerchant`() =
+        runTest {
+            repository.getCategoryIdForMerchant("Zomato")
+            verify(merchantCategoryMappingDao).getCategoryIdForMerchant("Zomato")
+        }
 }
