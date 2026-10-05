@@ -48,6 +48,22 @@ class MerchantCategoryMappingDaoTest {
         }
 
     @Test
+    fun `getCategoryIdForMerchant retrieves correct category ID case-insensitively`() =
+        runTest {
+            // Arrange
+            val mapping = MerchantCategoryMapping(parsedName = "Zomato", categoryId = 4)
+            merchantCategoryMappingDao.insert(mapping)
+
+            // Act
+            val categoryIdLower = merchantCategoryMappingDao.getCategoryIdForMerchant("zomato")
+            val categoryIdUpper = merchantCategoryMappingDao.getCategoryIdForMerchant("ZOMATO")
+
+            // Assert
+            assertEquals(4, categoryIdLower)
+            assertEquals(4, categoryIdUpper)
+        }
+
+    @Test
     fun `getAll returns all mappings`() =
         runTest {
             // Arrange

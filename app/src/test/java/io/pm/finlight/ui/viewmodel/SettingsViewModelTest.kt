@@ -1365,6 +1365,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule calls dao insert when names are different`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "AMZN"
             val newName = "Amazon"
@@ -1375,6 +1376,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).insert(MerchantRenameRule(originalName, newName))
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, newName, null)
             verify(merchantRenameRuleDao, never()).deleteByOriginalName(anyString())
         }
 
@@ -1382,6 +1384,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule calls dao delete when names are same`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "Amazon"
             val newName = "Amazon" // Same name
@@ -1392,6 +1395,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
             verify(merchantRenameRuleDao, never()).insert(any())
         }
 
@@ -1399,6 +1403,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule is case-insensitive for delete check`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "Amazon"
             val newName = "amazon" // Same name, different case
@@ -1409,6 +1414,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
             verify(merchantRenameRuleDao, never()).insert(any())
         }
 

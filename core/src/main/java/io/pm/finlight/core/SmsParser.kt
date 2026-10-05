@@ -540,18 +540,23 @@ object SmsParser {
     ): Triple<PotentialTransaction, Pair<String, Int>?, Pair<String, String>?> {
         val renameRules = merchantRenameRuleProvider.getAllRules()
 
-        val originalMerchant = MerchantCleaner.clean(txn.merchantName)
+        val rawMerchant = txn.originalMerchantName?.takeIf { it.isNotBlank() } ?: txn.merchantName
+        val originalMerchant = rawMerchant?.let { MerchantCleaner.clean(it) }
         var finalCategoryId: Int? = txn.categoryId
 
         var newCategoryAlias: Pair<String, Int>? = null
         var newRenameAlias: Pair<String, String>? = null
 
+        var originalMerchantHadDirectMapping = false
         // --- Step 1: Prioritize Category Learning (using original merchant name) ---
         if (finalCategoryId == null && originalMerchant != null) {
             // First, try direct mapping.
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(originalMerchant)
-            
-            // --- NEW: Token Overlap Similarity Fallback ---
+            if (finalCategoryId != null) {
+                originalMerchantHadDirectMapping = true
+            }
+
+            // --- Token Overlap Similarity Fallback ---
             if (finalCategoryId == null) {
                 var bestOverlap = 0.0
                 var bestJaccard = 0.0
@@ -559,7 +564,7 @@ object SmsParser {
 
                 for ((legacyString, catId) in merchantCategoryMappingProvider.getAllMappings()) {
                     val overlap = StringSimilarity.calculateTokenOverlapScore(legacyString, originalMerchant)
-                    if (overlap >= 0.85) { 
+                    if (overlap >= 0.85) {
                         val jaccard = StringSimilarity.calculateJaccardIndex(legacyString, originalMerchant)
                         if (overlap > bestOverlap || (overlap == bestOverlap && jaccard > bestJaccard)) {
                             bestOverlap = overlap
@@ -568,16 +573,11 @@ object SmsParser {
                         }
                     }
                 }
-                
+
                 if (bestCategoryId != null) {
                     finalCategoryId = bestCategoryId
                     newCategoryAlias = Pair(originalMerchant, bestCategoryId)
                 }
-            }
-
-            // If no mapping, try keyword-based heuristic.
-            if (finalCategoryId == null) {
-                finalCategoryId = findCategoryIdByKeyword(originalMerchant, categoryFinderProvider)
             }
         }
 
@@ -604,10 +604,12 @@ object SmsParser {
                     }
                 }
             }
-                
+
             if (bestNewName != null) {
                 finalMerchantName = bestNewName
-                newRenameAlias = Pair(originalMerchant, bestNewName)
+                if (!bestNewName.equals(originalMerchant, ignoreCase = true)) {
+                    newRenameAlias = Pair(originalMerchant, bestNewName)
+                }
             }
         }
 
@@ -639,15 +641,53 @@ object SmsParser {
             if (bestCandidate != null) {
                 finalMerchantName = bestCandidate
                 // Record alias so the auto-heal path persists a direct rule for this variant.
-                newRenameAlias = Pair(originalMerchant, bestCandidate)
+                if (!bestCandidate.equals(originalMerchant, ignoreCase = true)) {
+                    newRenameAlias = Pair(originalMerchant, bestCandidate)
+                }
             }
         }
 
-        finalMerchantName = finalMerchantName ?: originalMerchant
+        finalMerchantName = finalMerchantName ?: (if (txn.originalMerchantName != null) txn.merchantName else null) ?: originalMerchant
 
         // --- Step 3: If we still haven't found a category, try again with the RENAMED merchant name ---
         if (finalCategoryId == null && finalMerchantName != null) {
             finalCategoryId = merchantCategoryMappingProvider.getCategoryIdForMerchant(finalMerchantName)
+        }
+
+        // --- Step 3b: Cross-lookup category via rename rules ---
+        if (finalCategoryId == null && finalMerchantName != null) {
+            for (rule in renameRules) {
+                if (rule.newName.equals(finalMerchantName, ignoreCase = true)) {
+                    val catId = merchantCategoryMappingProvider.getCategoryIdForMerchant(rule.originalName)
+                    if (catId != null) {
+                        finalCategoryId = catId
+                        break
+                    }
+                }
+            }
+        }
+        if (finalCategoryId == null && originalMerchant != null) {
+            for (rule in renameRules) {
+                if (rule.originalName.equals(originalMerchant, ignoreCase = true)) {
+                    val catId = merchantCategoryMappingProvider.getCategoryIdForMerchant(rule.newName)
+                    if (catId != null) {
+                        finalCategoryId = catId
+                        break
+                    }
+                }
+            }
+        }
+
+        // --- Step 3c: Keyword-based heuristic fallback ---
+        if (finalCategoryId == null && originalMerchant != null) {
+            finalCategoryId = findCategoryIdByKeyword(originalMerchant, categoryFinderProvider)
+        }
+        if (finalCategoryId == null && finalMerchantName != null) {
+            finalCategoryId = findCategoryIdByKeyword(finalMerchantName, categoryFinderProvider)
+        }
+
+        if (newCategoryAlias == null && originalMerchant != null && finalCategoryId != null && !originalMerchantHadDirectMapping) {
+            newCategoryAlias = Pair(originalMerchant, finalCategoryId)
         }
 
         // --- Step 4: Construct the final transaction object with all enrichments ---
@@ -927,12 +967,31 @@ object SmsParser {
             val amount = amountStr.replace(",", "").toDoubleOrNull() ?: return null
             if (amount <= 0.0 || amount.isNaN() || amount.isInfinite()) return null
 
+            // Extract the raw merchant from the SMS body using template indices
+            val rawOriginalMerchant = if (template.originalMerchantStartIndex in 0 until template.originalMerchantEndIndex &&
+                template.originalMerchantEndIndex <= template.originalSmsBody.length
+            ) {
+                val fromOriginal = template.originalSmsBody.substring(
+                    template.originalMerchantStartIndex,
+                    template.originalMerchantEndIndex
+                )
+                val indexInNew = newSmsBody.indexOf(fromOriginal, ignoreCase = true)
+                if (indexInNew != -1) {
+                    newSmsBody.substring(indexInNew, indexInNew + fromOriginal.length)
+                } else {
+                    fromOriginal
+                }
+            } else {
+                null
+            }
+
             return PotentialTransaction(
                 sourceSmsId = originalSms.id,
                 smsSender = originalSms.sender,
                 amount = amount,
                 transactionType = if (EXPENSE_KEYWORDS_REGEX.containsMatchIn(template.originalSmsBody)) "expense" else "income",
                 merchantName = merchant,
+                originalMerchantName = rawOriginalMerchant,
                 originalMessage = newSmsBody,
                 date = originalSms.date
             )

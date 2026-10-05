@@ -20,12 +20,11 @@ import org.robolectric.annotation.Config
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DashboardViewModelAliasTest : DashboardViewModelTest() {
     @Test
-    fun `recentTransactionsState applies alias when current description matches original`() =
+    fun `recentTransactions emits description from repository directly without in-memory override`() =
         runTest {
             val transactionId = 1
             val original = "VIJAYALAKSH"
             val currentDesc = "VIJAYALAKSH"
-            val alias = "Food in Office"
 
             val transaction =
                 Transaction(
@@ -36,12 +35,11 @@ class DashboardViewModelAliasTest : DashboardViewModelTest() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(details)))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(original.lowercase() to alias)))
 
             // Re-initialize viewmodel to pick up mocked flows
             initializeViewModel()
@@ -49,18 +47,17 @@ class DashboardViewModelAliasTest : DashboardViewModelTest() {
             viewModel.recentTransactions.test {
                 val state = awaitItem()
                 val result = state.firstOrNull()
-                assertEquals("Alias should be applied", alias, result?.transaction?.description)
+                assertEquals("Description should come directly from repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `recentTransactionsState ignores alias when current description was manually changed`() =
+    fun `recentTransactions preserves manually changed description from repository`() =
         runTest {
             val transactionId = 1
             val original = "VIJAYALAKSH"
             val currentDesc = "Food in Office" // Manually modified by user
-            val alias = "Badminton" // Existing rule for VIJAYALAKSH, e.g. from mistake
 
             val transaction =
                 Transaction(
@@ -71,30 +68,28 @@ class DashboardViewModelAliasTest : DashboardViewModelTest() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(details)))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(original.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.recentTransactions.test {
                 val state = awaitItem()
                 val result = state.firstOrNull()
-                assertEquals("Alias should NOT be applied", currentDesc, result?.transaction?.description)
+                assertEquals("Description should match repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `recentTransactionsState applies alias when original is null and currentDesc matches key`() =
+    fun `recentTransactions emits description when original is null`() =
         runTest {
             val transactionId = 1
             val original = null
             val currentDesc = "Food in Office"
-            val alias = "Badminton"
 
             val transaction =
                 Transaction(
@@ -105,19 +100,18 @@ class DashboardViewModelAliasTest : DashboardViewModelTest() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(details)))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(currentDesc.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.recentTransactions.test {
                 val state = awaitItem()
                 val result = state.firstOrNull()
-                assertEquals("Alias should be applied", alias, result?.transaction?.description)
+                assertEquals("Description should match repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

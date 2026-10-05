@@ -74,11 +74,12 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Verify the suggestion card is displayed
+        // Scroll and verify the suggestion card is displayed
+        composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(hasText("Merge Suggestion"))
         composeTestRule.onNodeWithText("Merge Suggestion").assertIsDisplayed()
 
         // Click dismiss
-        composeTestRule.onNodeWithContentDescription("Dismiss").performClick()
+        composeTestRule.onNodeWithTag("dismiss_merge_suggestion_button").performClick()
 
         // Verify card disappears
         composeTestRule.waitUntil(timeoutMillis = 5000) {
@@ -97,7 +98,8 @@ class MergeTransactionFeatureTest {
             composeTestRule.onAllNodesWithText("Merge Suggestion").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Verify the suggestion card is displayed
+        // Scroll and verify the suggestion card is displayed
+        composeTestRule.onNodeWithTag("dashboard_lazy_column").performScrollToNode(hasText("Merge Suggestion"))
         composeTestRule.onNodeWithText("Merge Suggestion").assertIsDisplayed()
 
         // Click merge

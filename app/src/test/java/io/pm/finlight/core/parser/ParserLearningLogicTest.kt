@@ -8,7 +8,9 @@
 package io.pm.finlight.core.parser
 
 import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
+import io.pm.finlight.SmsParseTemplate
 import io.pm.finlight.SmsParser
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -144,5 +146,120 @@ class ParserLearningLogicTest : BaseSmsParserTest() {
             // Finally, assert that the resulting transaction has BOTH the correct learned category AND the renamed merchant.
             assertEquals(expectedCategoryId, result?.categoryId)
             assertEquals(expectedFinalMerchant, result?.merchantName)
+        }
+
+    @Test
+    fun `test_heuristicTemplate_preservesOriginalMerchantAndLearnsCategory`() =
+        runBlocking {
+            val originalBody = "You spent Rs. 500 at Taaza Thindi on 01-Jan-25."
+            val incomingBody = "You spent Rs. 750 at Taaza Thindi on 02-Jan-25."
+            val mockSms = SmsMessage(10L, "TestSender", incomingBody, System.currentTimeMillis())
+
+            val signature = SmsParser.generateSmsSignature(incomingBody)
+            val template =
+                SmsParseTemplate(
+                    templateSignature = signature,
+                    correctedMerchantName = "Newthing",
+                    originalSmsBody = originalBody,
+                    originalAmountStartIndex = 14,
+                    originalAmountEndIndex = 17,
+                    originalMerchantStartIndex = originalBody.indexOf("Taaza Thindi"),
+                    originalMerchantEndIndex = originalBody.indexOf("Taaza Thindi") + "Taaza Thindi".length,
+                )
+
+            setupTest()
+            Mockito.`when`(mockSmsParseTemplateDao.getTemplatesBySignature(signature))
+                .thenReturn(listOf(template))
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant("Taaza Thindi"))
+                .thenReturn(4)
+
+            val result =
+                SmsParser.parseWithReason(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull("Result should not be null", result)
+            val success = result as ParseResult.Success
+            assertEquals("Newthing", success.transaction.merchantName)
+            assertEquals("Taaza Thindi", success.transaction.originalMerchantName)
+            assertEquals(4, success.transaction.categoryId)
+        }
+
+    @Test
+    fun `test_categoryFallback_crossLookupViaRenameRule_newNameMatches`() =
+        runBlocking {
+            val originalMerchant = "SWIGGY INSTAMART"
+            val canonicalName = "Swiggy"
+            val expectedCategoryId = 2
+            val smsBody = "You spent Rs. 350 at $originalMerchant on 01-Jan-25."
+            val mockSms = SmsMessage(2L, "TestSender", smsBody, System.currentTimeMillis())
+
+            val renameRules =
+                listOf(
+                    MerchantRenameRule(originalName = originalMerchant, newName = canonicalName),
+                    MerchantRenameRule(originalName = "SWIGGY BANGALORE", newName = canonicalName),
+                )
+            setupTest(renameRules = renameRules)
+
+            // Direct lookups for SWIGGY INSTAMART and Swiggy fail (null), but SWIGGY BANGALORE has category 2
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant(originalMerchant)).thenReturn(null)
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant(canonicalName)).thenReturn(null)
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant("SWIGGY BANGALORE")).thenReturn(expectedCategoryId)
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull(result)
+            assertEquals(canonicalName, result?.merchantName)
+            assertEquals(expectedCategoryId, result?.categoryId)
+        }
+
+    @Test
+    fun `test_categoryFallback_crossLookupViaRenameRule_originalNameMatches`() =
+        runBlocking {
+            val originalMerchant = "SWIGGY BANGALORE"
+            val canonicalName = "Swiggy"
+            val expectedCategoryId = 2
+            val smsBody = "You spent Rs. 350 at $originalMerchant on 01-Jan-25."
+            val mockSms = SmsMessage(3L, "TestSender", smsBody, System.currentTimeMillis())
+
+            val renameRules = listOf(MerchantRenameRule(originalName = originalMerchant, newName = canonicalName))
+            setupTest(renameRules = renameRules)
+
+            // Direct lookup for SWIGGY BANGALORE fails, but Swiggy (rule.newName) has category 2
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant(originalMerchant)).thenReturn(null)
+            Mockito.`when`(mockMerchantCategoryMappingDao.getCategoryIdForMerchant(canonicalName)).thenReturn(expectedCategoryId)
+
+            val result =
+                SmsParser.parse(
+                    mockSms,
+                    emptyMappings,
+                    customSmsRuleProvider,
+                    merchantRenameRuleProvider,
+                    ignoreRuleProvider,
+                    merchantCategoryMappingProvider,
+                    categoryFinderProvider,
+                    smsParseTemplateProvider,
+                )
+
+            assertNotNull(result)
+            assertEquals(canonicalName, result?.merchantName)
+            assertEquals(expectedCategoryId, result?.categoryId)
         }
 }

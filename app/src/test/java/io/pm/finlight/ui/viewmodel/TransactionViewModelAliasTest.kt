@@ -11,12 +11,11 @@ import org.mockito.Mockito.`when` as whenever
 
 class TransactionViewModelAliasTest : TransactionViewModelBaseSetup() {
     @Test
-    fun `findTransactionDetailsById applies alias when current description matches original`() =
+    fun `findTransactionDetailsById emits description from repository directly without in-memory override`() =
         runTest {
             val transactionId = 1
             val original = "VIJAYALAKSH"
             val currentDesc = "VIJAYALAKSH"
-            val alias = "Food in Office"
 
             val transaction =
                 Transaction(
@@ -27,29 +26,27 @@ class TransactionViewModelAliasTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(details))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(original.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.findTransactionDetailsById(transactionId).test {
                 val result = awaitItem()
-                assertEquals("Alias should be applied because description matches original", alias, result?.transaction?.description)
+                assertEquals("Description should come directly from repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `findTransactionDetailsById ignores alias when current description was manually changed`() =
+    fun `findTransactionDetailsById preserves manually overridden description from repository`() =
         runTest {
             val transactionId = 1
             val original = "VIJAYALAKSH"
             val currentDesc = "Food in Office" // Manually modified by user
-            val alias = "Badminton" // Existing rule for VIJAYALAKSH, e.g. from mistake
 
             val transaction =
                 Transaction(
@@ -60,28 +57,27 @@ class TransactionViewModelAliasTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(details))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(original.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.findTransactionDetailsById(transactionId).test {
                 val result = awaitItem()
-                assertEquals("Alias should NOT be applied because user manually overrode description", currentDesc, result?.transaction?.description)
+                assertEquals("Description should match repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `findTransactionDetailsById retains alias when current description matches alias`() =
+    fun `findTransactionDetailsById emits alias description when repository stores alias`() =
         runTest {
             val transactionId = 1
             val original = "VIJAYALAKSH"
-            val currentDesc = "Badminton" // Already alias
+            val currentDesc = "Badminton" // Already alias in DB
             val alias = "Badminton"
 
             val transaction =
@@ -93,29 +89,27 @@ class TransactionViewModelAliasTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(details))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(original.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.findTransactionDetailsById(transactionId).test {
                 val result = awaitItem()
-                assertEquals("Alias should be retained", alias, result?.transaction?.description)
+                assertEquals("Description should match repository", alias, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `findTransactionDetailsById applies alias when original is null and currentDesc matches key`() =
+    fun `findTransactionDetailsById emits description when original is null`() =
         runTest {
             val transactionId = 1
             val original = null
             val currentDesc = "Food in Office"
-            val alias = "Badminton"
 
             val transaction =
                 Transaction(
@@ -126,18 +120,17 @@ class TransactionViewModelAliasTest : TransactionViewModelBaseSetup() {
                     accountId = 1,
                     categoryId = 1,
                     originalDescription = original,
-                    notes = null
+                    notes = null,
                 )
             val details = TransactionDetails(transaction, emptyList(), null, null, null, null, null)
 
             whenever(transactionRepository.getTransactionDetailsById(transactionId)).thenReturn(flowOf(details))
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(mapOf(currentDesc.lowercase() to alias)))
 
             initializeViewModel()
 
             viewModel.findTransactionDetailsById(transactionId).test {
                 val result = awaitItem()
-                assertEquals("Alias should be applied", alias, result?.transaction?.description)
+                assertEquals("Description should match repository", currentDesc, result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

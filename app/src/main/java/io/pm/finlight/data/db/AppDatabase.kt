@@ -55,7 +55,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 57,
+    version = 58,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -1065,6 +1065,30 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 57→58: Synchronize transaction descriptions with merchant_rename_rules ---
+        val MIGRATION_57_58 =
+            object : Migration(57, 58) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        UPDATE transactions
+                        SET description = (
+                            SELECT r.newName FROM merchant_rename_rules r
+                            WHERE LOWER(r.originalName) = LOWER(transactions.originalDescription)
+                            LIMIT 1
+                        )
+                        WHERE originalDescription IS NOT NULL
+                          AND description = originalDescription
+                          AND EXISTS (
+                              SELECT 1 FROM merchant_rename_rules r
+                              WHERE LOWER(r.originalName) = LOWER(transactions.originalDescription)
+                          )
+                        """
+                    )
+                    Log.i("Migration_57_58", "Synchronized transaction descriptions with merchant rename rules.")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -1109,6 +1133,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_54_55,
                             MIGRATION_55_56,
                             MIGRATION_56_57,
+                            MIGRATION_57_58,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))
