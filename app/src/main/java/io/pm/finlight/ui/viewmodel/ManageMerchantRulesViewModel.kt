@@ -200,6 +200,7 @@ class ManageMerchantRulesViewModel(
             transactionRepository?.updateDescriptionByOriginalDescription(
                 originalDesc = rule.originalName,
                 newDescription = rule.originalName,
+                oldDescription = rule.newName,
             )
         }
     }
@@ -233,6 +234,7 @@ class ManageMerchantRulesViewModel(
     fun updateRuleAndSync(
         originalName: String,
         newName: String,
+        oldDescription: String? = null,
     ) {
         val trimmedOriginal = originalName.trim()
         val trimmedNew = newName.trim()
@@ -240,6 +242,7 @@ class ManageMerchantRulesViewModel(
             return
         }
         viewModelScope.launch {
+            val existingOld = oldDescription ?: merchantRenameRuleRepository.getRuleByOriginalName(trimmedOriginal)?.newName
             merchantRenameRuleRepository.insert(
                 MerchantRenameRule(
                     originalName = trimmedOriginal,
@@ -249,13 +252,14 @@ class ManageMerchantRulesViewModel(
             transactionRepository?.updateDescriptionByOriginalDescription(
                 originalDesc = trimmedOriginal,
                 newDescription = trimmedNew,
+                oldDescription = existingOld,
             )
         }
     }
 
     /**
      * Creates and saves a new merchant rename rule.
-     * Validates that both names are non-blank and distinct.
+     * Validates that both names are non-blank and distinct, and synchronizes matching transactions.
      */
     fun addRule(
         originalName: String,
@@ -272,6 +276,10 @@ class ManageMerchantRulesViewModel(
                     originalName = trimmedOriginal,
                     newName = trimmedNew,
                 ),
+            )
+            transactionRepository?.updateDescriptionByOriginalDescription(
+                originalDesc = trimmedOriginal,
+                newDescription = trimmedNew,
             )
         }
     }

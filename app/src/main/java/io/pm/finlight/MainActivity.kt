@@ -92,7 +92,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.net.URLDecoder
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
@@ -1489,7 +1488,7 @@ fun SplashScreen(
 
     LaunchedEffect(key1 = true) {
         val isFirstLaunch = !settingsViewModel.isFirstLaunchComplete.first()
-        val snapshotFile = File(context.filesDir, "backup_snapshot.gz")
+        val snapshotFile = DataExportService.getSnapshotFile(context)
         val shouldCheckRestore =
             isFirstLaunch ||
                 withContext(Dispatchers.IO) {

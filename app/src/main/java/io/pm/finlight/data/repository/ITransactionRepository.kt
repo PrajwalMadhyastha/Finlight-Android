@@ -206,7 +206,10 @@ interface ITransactionRepository {
     suspend fun updateDescriptionByOriginalDescription(
         originalDesc: String,
         newDescription: String,
+        oldDescription: String? = null,
     ): Int
+
+    suspend fun syncDescriptionsWithRenameRules(): Int
 
     fun getDailySpendingForDateRange(
         startDate: Long,

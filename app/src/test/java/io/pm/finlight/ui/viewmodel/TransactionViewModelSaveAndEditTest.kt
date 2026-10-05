@@ -965,15 +965,12 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             assertEquals(defaultAccount, viewModel.addTransactionAccount.value)
         }
 
-    // --- NEW: applyAliases Tests via findTransactionDetailsById ---
+    // --- findTransactionDetailsById Repository Passthrough Tests ---
 
     @Test
-    fun `applyAliases does nothing when alias is null`() =
+    fun `findTransactionDetailsById returns raw description when not renamed in repository`() =
         runTest {
             // Arrange
-            val aliases = emptyMap<String, String>()
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-
             val transaction =
                 Transaction(
                     id = 1,
@@ -1001,12 +998,9 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `applyAliases applies alias when description equals originalDescription`() =
+    fun `findTransactionDetailsById returns raw description from repository directly`() =
         runTest {
             // Arrange
-            val aliases = mapOf("gateway" to "Water Charges")
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-
             val transaction =
                 Transaction(
                     id = 1,
@@ -1027,18 +1021,15 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             // Act & Assert
             viewModel.findTransactionDetailsById(1).test {
                 val result = awaitItem()
-                assertEquals("Water Charges", result?.transaction?.description)
+                assertEquals("Gateway", result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
     @Test
-    fun `applyAliases applies alias when description equals alias`() =
+    fun `findTransactionDetailsById returns alias description when stored in repository`() =
         runTest {
             // Arrange
-            val aliases = mapOf("gateway" to "Water Charges")
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-
             // Description is already the alias, meaning it was applied by SmsParser
             val transaction =
                 Transaction(
@@ -1066,12 +1057,9 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
-    fun `applyAliases preserves description when it differs from both originalDescription and alias`() =
+    fun `findTransactionDetailsById preserves custom description from repository`() =
         runTest {
             // Arrange
-            val aliases = mapOf("gateway" to "Water Charges")
-            whenever(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
-
             // Description is DIFFERENT from original ("Gateway") AND alias ("Water Charges")
             val transaction =
                 Transaction(
@@ -1093,7 +1081,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             // Act & Assert
             viewModel.findTransactionDetailsById(1).test {
                 val result = awaitItem()
-                assertEquals("Gas Bill", result?.transaction?.description) // Keep manual exception
+                assertEquals("Gas Bill", result?.transaction?.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

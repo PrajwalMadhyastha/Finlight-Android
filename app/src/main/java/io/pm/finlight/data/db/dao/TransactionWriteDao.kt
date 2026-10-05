@@ -224,6 +224,11 @@ interface TransactionWriteDao {
         UPDATE transactions
         SET description = :newDescription
         WHERE LOWER(originalDescription) = LOWER(:originalDesc)
+        AND (
+            LOWER(description) = LOWER(:originalDesc)
+            OR LOWER(description) = LOWER(:newDescription)
+            OR (:oldDescription IS NOT NULL AND LOWER(description) = LOWER(:oldDescription))
+        )
         AND isExcluded = 0
         AND $SQL_STATUS_ACTIVE
         """,
@@ -231,5 +236,24 @@ interface TransactionWriteDao {
     suspend fun updateDescriptionByOriginalDescription(
         originalDesc: String,
         newDescription: String,
+        oldDescription: String? = null,
     ): Int
+
+    @Query(
+        """
+        UPDATE transactions
+        SET description = (
+            SELECT r.newName FROM merchant_rename_rules r
+            WHERE LOWER(r.originalName) = LOWER(transactions.originalDescription)
+            LIMIT 1
+        )
+        WHERE originalDescription IS NOT NULL
+          AND description = originalDescription
+          AND EXISTS (
+              SELECT 1 FROM merchant_rename_rules r
+              WHERE LOWER(r.originalName) = LOWER(transactions.originalDescription)
+          )
+        """,
+    )
+    suspend fun syncDescriptionsWithRenameRules(): Int
 }

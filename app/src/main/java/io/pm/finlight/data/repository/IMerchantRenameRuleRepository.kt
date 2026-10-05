@@ -10,4 +10,6 @@ interface IMerchantRenameRuleRepository {
     suspend fun insert(rule: MerchantRenameRule)
 
     suspend fun deleteByOriginalName(originalName: String)
+
+    suspend fun getRuleByOriginalName(originalName: String): MerchantRenameRule?
 }

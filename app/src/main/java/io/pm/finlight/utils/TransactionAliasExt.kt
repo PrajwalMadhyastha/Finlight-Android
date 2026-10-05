@@ -5,7 +5,13 @@ import java.util.Locale
 
 /**
  * Applies aliases to a list of TransactionDetails.
+ *
+ * @deprecated Display-time aliasing is deprecated in favor of SQLite as the single source of truth.
  */
+@Deprecated(
+    message = "Display-time aliasing is deprecated in favor of SQLite as the single source of truth.",
+    replaceWith = ReplaceWith("this"),
+)
 fun List<TransactionDetails>.applyAliases(aliases: Map<String, String>): List<TransactionDetails> {
     return this.map { details ->
         val original = details.transaction.originalDescription

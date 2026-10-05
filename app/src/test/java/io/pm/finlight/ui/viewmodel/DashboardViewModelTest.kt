@@ -49,9 +49,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var settingsRepository: SettingsRepository
 
     @Mock
-    protected lateinit var merchantRenameRuleRepository: MerchantRenameRuleRepository
-
-    @Mock
     private lateinit var recurringTransactionDao: RecurringTransactionDao
 
     @Mock
@@ -138,7 +135,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 Mockito.anyLong(),
             ),
         ).thenReturn(flowOf(emptyList()))
-        `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
 
         // --- FIX: Add missing mock for the new dependency ---
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
@@ -157,7 +153,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 accountRepository = accountRepository,
                 budgetDao = budgetDao,
                 settingsRepository = settingsRepository,
-                merchantRenameRuleRepository = merchantRenameRuleRepository,
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
@@ -173,7 +168,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 accountRepository = accountRepository,
                 budgetDao = budgetDao,
                 settingsRepository = settingsRepository,
-                merchantRenameRuleRepository = merchantRenameRuleRepository,
                 timeProvider = timeProvider,
                 recurringTransactionDao = recurringTransactionDao,
                 recurringPatternDao = recurringPatternDao,
@@ -580,7 +574,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `recentTransactions applies merchant aliases correctly`() =
+    fun `recentTransactions emits description from repository directly`() =
         runTest {
             // Arrange
             val transaction =
@@ -595,10 +589,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     notes = null,
                 )
             val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
-            val aliases = mapOf("amzn" to "Amazon")
-
             `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(transactionDetails)))
-            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
             initializeViewModel()
 
             // Assert
@@ -606,7 +597,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
                 val result = awaitItem()
                 assertEquals(1, result.size)
-                assertEquals("Amazon", result.first().transaction.description)
+                assertEquals("amzn", result.first().transaction.description)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -628,10 +619,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     notes = null,
                 )
             val transactionDetails = TransactionDetails(transaction, emptyList(), "Account", "Category", null, null, null)
-            val aliases = mapOf("amzn" to "Amazon")
-
             `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(transactionDetails)))
-            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(aliases))
             initializeViewModel()
 
             // Assert
@@ -832,7 +820,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
 
             // DESC order: child is newer
             `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(childDetails, parentDetails)))
-            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
             initializeViewModel()
 
             viewModel.mergeSuggestion.test {
@@ -855,7 +842,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             val childDetails = TransactionDetails(childTxn, emptyList(), "Account", "Category", null, null, null)
 
             `when`(transactionRepository.recentTransactions).thenReturn(flowOf(listOf(childDetails, parentDetails)))
-            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
             initializeViewModel()
 
             viewModel.mergeSuggestion.test {

@@ -873,4 +873,65 @@ class AppDatabaseMigrationTest {
         assertTrue(cursor4.isNull(0))
         cursor4.close()
     }
+
+    @Test
+    fun migrate57To58_syncsDescriptionsWithMerchantRenameRules() {
+        val testDbName = "migration-57-58-test"
+        val db = helper.createDatabase(testDbName, 57)
+
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Test Account', 'Bank Account')")
+        db.execSQL("INSERT INTO merchant_rename_rules (originalName, newName) VALUES ('AMZN PAY', 'Amazon Pay')")
+
+        // 1. Transaction matching rule with description = originalDescription -> should be updated
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, originalDescription) " +
+                "VALUES (1, 'AMZN PAY', 250.0, 1000, 1, 'expense', 'Auto-Captured', 0, 0, 0, 0, 'cleared', 'AMZN PAY')",
+        )
+
+        // 2. Transaction matching rule with manual override description -> should NOT be updated
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, originalDescription) " +
+                "VALUES (2, 'Gift for Mom', 500.0, 1000, 1, 'expense', 'Auto-Captured', 0, 0, 0, 0, 'cleared', 'AMZN PAY')",
+        )
+
+        // 3. Transaction with no matching rule -> should remain unchanged
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, originalDescription) " +
+                "VALUES (3, 'SWIGGY', 150.0, 1000, 1, 'expense', 'Auto-Captured', 0, 0, 0, 0, 'cleared', 'SWIGGY')",
+        )
+
+        // 4. Transaction with null originalDescription -> should remain unchanged
+        db.execSQL(
+            "INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, mergeDismissed, status, originalDescription) " +
+                "VALUES (4, 'Cash Spend', 50.0, 1000, 1, 'expense', 'Manual Entry', 0, 0, 0, 0, 'cleared', NULL)",
+        )
+
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 58, true, AppDatabase.MIGRATION_57_58)
+
+        // Verify transaction 1 was updated to rule's newName
+        val cursor1 = migratedDb.query("SELECT description FROM transactions WHERE id = 1")
+        assertTrue(cursor1.moveToFirst())
+        assertEquals("Amazon Pay", cursor1.getString(0))
+        cursor1.close()
+
+        // Verify transaction 2 preserved manual override
+        val cursor2 = migratedDb.query("SELECT description FROM transactions WHERE id = 2")
+        assertTrue(cursor2.moveToFirst())
+        assertEquals("Gift for Mom", cursor2.getString(0))
+        cursor2.close()
+
+        // Verify transaction 3 remained unchanged
+        val cursor3 = migratedDb.query("SELECT description FROM transactions WHERE id = 3")
+        assertTrue(cursor3.moveToFirst())
+        assertEquals("SWIGGY", cursor3.getString(0))
+        cursor3.close()
+
+        // Verify transaction 4 remained unchanged
+        val cursor4 = migratedDb.query("SELECT description FROM transactions WHERE id = 4")
+        assertTrue(cursor4.moveToFirst())
+        assertEquals("Cash Spend", cursor4.getString(0))
+        cursor4.close()
+    }
 }

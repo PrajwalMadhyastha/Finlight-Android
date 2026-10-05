@@ -49,6 +49,6 @@ interface MerchantCategoryMappingDao {
      * @param parsedName The name of the merchant to look up.
      * @return The associated category ID (Int), or null if no mapping exists.
      */
-    @Query("SELECT categoryId FROM merchant_category_mapping WHERE parsedName = :parsedName")
+    @Query("SELECT categoryId FROM merchant_category_mapping WHERE parsedName = :parsedName COLLATE NOCASE LIMIT 1")
     suspend fun getCategoryIdForMerchant(parsedName: String): Int?
 }

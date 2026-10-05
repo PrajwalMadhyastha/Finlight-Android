@@ -404,9 +404,15 @@ class TransactionRepository(
     override suspend fun updateDescriptionByOriginalDescription(
         originalDesc: String,
         newDescription: String,
+        oldDescription: String?,
     ): Int =
         withContext(dispatcherProvider.io) {
-            transactionWriteDao.updateDescriptionByOriginalDescription(originalDesc, newDescription)
+            transactionWriteDao.updateDescriptionByOriginalDescription(originalDesc, newDescription, oldDescription)
+        }
+
+    override suspend fun syncDescriptionsWithRenameRules(): Int =
+        withContext(dispatcherProvider.io) {
+            transactionWriteDao.syncDescriptionsWithRenameRules()
         }
 
     override fun getDailySpendingForDateRange(

@@ -77,6 +77,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.R
@@ -750,8 +751,17 @@ fun TransactionDetailScreen(
 
                 if (showImageViewer != null) {
                     Dialog(onDismissRequest = { showImageViewer = null }) {
+                        val context = LocalContext.current
+                        val imageRequest =
+                            remember(showImageViewer) {
+                                ImageRequest.Builder(context)
+                                    .data(showImageViewer)
+                                    .size(1920, 1920)
+                                    .crossfade(true)
+                                    .build()
+                            }
                         AsyncImage(
-                            model = showImageViewer,
+                            model = imageRequest,
                             contentDescription = "Full screen image",
                             modifier =
                                 Modifier
@@ -1553,9 +1563,18 @@ private fun TransactionActionsCard(
                     contentPadding = PaddingValues(vertical = 4.dp),
                 ) {
                     items(images) { image ->
+                        val context = LocalContext.current
+                        val imageRequest =
+                            remember(image.imageUri) {
+                                ImageRequest.Builder(context)
+                                    .data(File(image.imageUri))
+                                    .size(256, 256)
+                                    .crossfade(true)
+                                    .build()
+                            }
                         Box {
                             AsyncImage(
-                                model = File(image.imageUri),
+                                model = imageRequest,
                                 contentDescription = "Attachment",
                                 contentScale = ContentScale.Crop,
                                 modifier =
@@ -2294,12 +2313,15 @@ private fun RetrospectiveUpdateSheetContent(
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onToggleSelectAll),
             ) {
                 val allSelected = state.selectedIds.size == state.similarTransactions.size
                 Checkbox(
                     checked = allSelected,
-                    onCheckedChange = { onToggleSelectAll() },
+                    onCheckedChange = null,
                     colors =
                         CheckboxDefaults.colors(
                             checkedColor = MaterialTheme.colorScheme.primary,

@@ -253,7 +253,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getLastBackupTimestamp()).thenReturn(flowOf(0L))
     }
 
-    private fun initializeViewModel() {
+    private fun initializeViewModel(
+        customNerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    ) {
         viewModel =
             SettingsViewModel(
                 applicationContext,
@@ -266,7 +268,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 smsRepository,
                 transactionViewModel,
                 smsClassifier,
-                nerExtractor,
+                nerExtractorProvider = customNerExtractorProvider ?: { nerExtractor },
                 transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
             )
@@ -1363,6 +1365,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule calls dao insert when names are different`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "AMZN"
             val newName = "Amazon"
@@ -1373,6 +1376,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).insert(MerchantRenameRule(originalName, newName))
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, newName, null)
             verify(merchantRenameRuleDao, never()).deleteByOriginalName(anyString())
         }
 
@@ -1380,6 +1384,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule calls dao delete when names are same`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "Amazon"
             val newName = "Amazon" // Same name
@@ -1390,6 +1395,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
             verify(merchantRenameRuleDao, never()).insert(any())
         }
 
@@ -1397,6 +1403,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `saveMerchantRenameRule is case-insensitive for delete check`() =
         runTest {
             // Arrange
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(0)
             initializeViewModel()
             val originalName = "Amazon"
             val newName = "amazon" // Same name, different case
@@ -1407,6 +1414,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
             verify(merchantRenameRuleDao, never()).insert(any())
         }
 
@@ -1746,7 +1754,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     smsRepository,
                     transactionViewModel,
                     smsClassifier,
-                    nerExtractor,
+                    nerExtractorProvider = { nerExtractor },
                     transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
                 )
@@ -1803,7 +1811,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     smsRepository,
                     transactionViewModel,
                     smsClassifier,
-                    nerExtractor,
+                    nerExtractorProvider = { nerExtractor },
                     transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
                 )
@@ -1885,4 +1893,265 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 eventJob.cancel()
             }
         }
+
+    @Test
+    fun `rescanSmsWithNewRule invokes nerExtractorProvider and closes extractor on completion`() =
+        runTest {
+            val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
+
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            viewModel.rescanSmsWithNewRule { }
+            advanceUntilIdle()
+
+            assertEquals(1, providerInvocationCount)
+            verify(nerExtractor).close()
+        }
+
+    @Test
+    fun `rescanSmsWithNewRule does not invoke nerExtractor extract when custom rules match`() =
+        runTest {
+            val sms = SmsMessage(1, "SENDER", "spent Rs 100 on Food", 1L)
+
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
+            `when`(accountDao.findByName(anyString())).thenReturn(null)
+
+            val rule = CustomSmsRule(1, "spent Rs", "on (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            viewModel.rescanSmsWithNewRule { }
+            advanceUntilIdle()
+
+            assertEquals(1, providerInvocationCount)
+            verify(nerExtractor).close()
+            verify(nerExtractor, never()).extract(anyString())
+        }
+
+    @Test
+    fun `rescanSmsWithNewRule does not invoke nerExtractorProvider when no SMS found`() =
+        runTest {
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(emptyList())
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            viewModel.rescanSmsWithNewRule { }
+            advanceUntilIdle()
+
+            assertEquals(0, providerInvocationCount)
+            verify(nerExtractor, never()).close()
+        }
+
+    @Test
+    fun `rescanSmsWithNewRule closes nerExtractor even when parsing encounters error`() =
+        runTest {
+            val sms = SmsMessage(1, "SENDER", "spent Rs 100", 1L)
+            whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(nerExtractor.extract(anyString())).thenThrow(RuntimeException("NER inference error"))
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            viewModel.rescanSmsWithNewRule { }
+            advanceUntilIdle()
+
+            assertEquals(1, providerInvocationCount)
+            verify(nerExtractor).close()
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings invokes nerExtractorProvider and closes extractor on completion`() =
+        runTest {
+            val sms = SmsMessage(1, "BANK", "Test body", 1L)
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                viewModel.startSmsScanAndIdentifyMappings(null) { }
+                advanceUntilIdle()
+
+                assertEquals(1, providerInvocationCount)
+                verify(nerExtractor).close()
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings does not invoke nerExtractorProvider when no SMS found`() =
+        runTest {
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(emptyList())
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                viewModel.startSmsScanAndIdentifyMappings(null) { }
+                advanceUntilIdle()
+
+                assertEquals(0, providerInvocationCount)
+                verify(nerExtractor, never()).close()
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `startSmsScanAndIdentifyMappings closes nerExtractor even when chunk processing encounters error`() =
+        runTest {
+            val sms = SmsMessage(1, "BANK", "Test body", 1L)
+            whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+            `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
+            `when`(nerExtractor.extract(anyString())).thenThrow(RuntimeException("NER error"))
+
+            org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
+
+            var providerInvocationCount = 0
+            val countingProvider: () -> SmsEntityExtractor = {
+                providerInvocationCount++
+                nerExtractor
+            }
+
+            initializeViewModel(customNerExtractorProvider = countingProvider)
+
+            val eventJob = launch { viewModel.uiEvent.collect() }
+            try {
+                viewModel.startSmsScanAndIdentifyMappings(null) { }
+                advanceUntilIdle()
+
+                assertEquals(1, providerInvocationCount)
+                verify(nerExtractor).close()
+            } finally {
+                eventJob.cancel()
+            }
+        }
+
+    @Test
+    fun `onCleared closes smsClassifier but does not interact with nerExtractor`() {
+        initializeViewModel()
+
+        val onClearedMethod =
+            SettingsViewModel::class.java.getDeclaredMethod("onCleared").apply {
+                isAccessible = true
+            }
+        onClearedMethod.invoke(viewModel)
+
+        verify(smsClassifier).close()
+        verify(nerExtractor, never()).close()
+    }
+
+    @Test
+    fun `secondary constructor accepts direct SmsEntityExtractor instance`() {
+        val vm =
+            SettingsViewModel(
+                applicationContext,
+                settingsRepository,
+                db,
+                transactionRepository,
+                merchantMappingRepository,
+                accountRepository,
+                categoryRepository,
+                smsRepository,
+                transactionViewModel,
+                smsClassifier,
+                nerExtractor = nerExtractor,
+                transactionRunner = transactionRunner,
+                dispatchers = TestDispatcherProvider(testDispatcher),
+            )
+
+        val extractedNer = vm.nerExtractorProvider()
+        assertEquals(nerExtractor, extractedNer)
+    }
 }

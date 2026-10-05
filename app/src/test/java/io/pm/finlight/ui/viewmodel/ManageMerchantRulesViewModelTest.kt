@@ -197,7 +197,7 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
             viewModel.deleteRuleAndSync(ruleToDelete)
 
             verify(merchantRenameRuleRepository).deleteByOriginalName("ZOMATO MEDIA")
-            verify(transactionRepository).updateDescriptionByOriginalDescription("ZOMATO MEDIA", "ZOMATO MEDIA")
+            verify(transactionRepository).updateDescriptionByOriginalDescription("ZOMATO MEDIA", "ZOMATO MEDIA", "Zomato")
         }
 
     @Test
@@ -224,7 +224,7 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
                     newName = "Amazon Pay",
                 ),
             )
-            verify(transactionRepository).updateDescriptionByOriginalDescription("AMZN PAY", "Amazon Pay")
+            verify(transactionRepository).updateDescriptionByOriginalDescription("AMZN PAY", "Amazon Pay", null)
         }
 
     @Test
@@ -247,6 +247,7 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
                     newName = "Uber",
                 ),
             )
+            verify(transactionRepository).updateDescriptionByOriginalDescription("UBER *TRIP", "Uber", null)
         }
 
     @Test

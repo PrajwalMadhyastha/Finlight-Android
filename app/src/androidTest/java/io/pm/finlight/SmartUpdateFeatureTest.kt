@@ -164,4 +164,87 @@ class SmartUpdateFeatureTest {
             composeTestRule.onAllNodesWithText("Transactions").fetchSemanticsNodes().isNotEmpty()
         }
     }
+
+    @Test
+    fun test_smartUpdateSheet_deselectPastTransactions_leavesPastTransactionsUntouched() {
+        val originalDesc = "Target"
+        val updatedDesc = "Target Superstore"
+
+        // 1. Create two transactions with the same description "Target"
+        addTransactionForTest(originalDesc, customAmount = "50.0")
+        addTransactionForTest(originalDesc, customAmount = "75.0")
+
+        // 2. Navigate to Transactions tab
+        composeTestRule.onNodeWithText("Transactions").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(originalDesc).fetchSemanticsNodes().size >= 2
+        }
+
+        // 3. Click the first "Target" transaction
+        composeTestRule.onAllNodes(hasText(originalDesc), useUnmergedTree = true)
+            .onFirst()
+            .onAncestors()
+            .filterToOne(hasClickAction())
+            .performClick()
+
+        // 4. Wait for Detail Screen to load
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithContentDescription("Back").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 5. Click the description to edit
+        composeTestRule.onNode(hasText(originalDesc) and hasClickAction()).performClick()
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Search or enter new merchant").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        val searchInput = composeTestRule.onAllNodes(hasSetTextAction()).onFirst()
+        searchInput.performTextClearance()
+        searchInput.performTextInput(updatedDesc)
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        composeTestRule.waitForIdle()
+
+        // 6. Hit Save to close Merchant Bottom Sheet
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for detail screen to reflect updated merchant
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(updatedDesc).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 7. Press Back to trigger Smart Update Sheet
+        composeTestRule.onNodeWithContentDescription("Back").performClick()
+
+        // 8. Wait for Smart Update Sheet to appear
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Apply Changes").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify "Deselect All" exists and click it
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Deselect All").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Deselect All").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify "Select All" is now shown (confirming past transactions are deselected)
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Select All").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Select All").assertExists()
+
+        // 9. Apply Changes (only future rule is active, 0 past transactions selected)
+        composeTestRule.onNodeWithText("Apply Changes").performClick()
+
+        // 10. Wait for Transactions list
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText(updatedDesc).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // 11. Crucial assertion:
+        // The edited transaction was updated to "Target Superstore"
+        composeTestRule.onNodeWithText(updatedDesc).assertExists()
+        // The deselected past transaction was NOT renamed and remains "Target"!
+        composeTestRule.onNodeWithText(originalDesc).assertExists()
+    }
 }

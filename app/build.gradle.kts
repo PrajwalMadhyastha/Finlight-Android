@@ -203,13 +203,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true // --- UPDATED: Minification is now enabled ---
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
             signingConfig = signingConfigs.getByName("release")
-            // --- NEW: Enable native debug symbol generation ---
             ndk {
                 debugSymbolLevel = "FULL"
             }

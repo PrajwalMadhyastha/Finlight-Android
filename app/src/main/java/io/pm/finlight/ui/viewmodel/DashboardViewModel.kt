@@ -29,7 +29,6 @@ import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
-import io.pm.finlight.utils.applyAliases
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -52,7 +51,6 @@ class DashboardViewModel(
     private val accountRepository: IAccountRepository,
     private val budgetDao: BudgetDao,
     private val settingsRepository: ISettingsRepository,
-    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
     // Added dependency
     private val timeProvider: TimeProvider,
     private val recurringTransactionDao: RecurringTransactionDao,
@@ -98,7 +96,6 @@ class DashboardViewModel(
     val patternSuggestions: StateFlow<List<RecurringPattern>>
 
     val privacyModeEnabled: StateFlow<Boolean>
-    private val merchantAliases: StateFlow<Map<String, String>>
 
     // --- NEW: Smart Transaction Merge ---
     val mergeSuggestion: StateFlow<Pair<TransactionDetails, List<TransactionDetails>>?>
@@ -127,11 +124,6 @@ class DashboardViewModel(
                     started = SharingStarted.WhileSubscribed(5000),
                     initialValue = false,
                 )
-
-        merchantAliases =
-            merchantRenameRuleRepository.getAliasesAsMap()
-                .map { it.mapKeys { (key, _) -> key.lowercase(Locale.getDefault()) } }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
         viewModelScope.launch {
             settingsRepository.getDashboardCardOrder().collect {
@@ -360,9 +352,6 @@ class DashboardViewModel(
 
         recentTransactions =
             transactionRepository.recentTransactions
-                .combine(merchantAliases) { transactions, aliases -> // NEW
-                    transactions.applyAliases(aliases) // NEW
-                }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         mergeSuggestion =

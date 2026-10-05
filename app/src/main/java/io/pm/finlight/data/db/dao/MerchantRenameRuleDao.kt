@@ -28,6 +28,9 @@ interface MerchantRenameRuleDao {
     @Query("SELECT * FROM merchant_rename_rules")
     suspend fun getAllRulesList(): List<MerchantRenameRule>
 
+    @Query("SELECT * FROM merchant_rename_rules WHERE originalName = :originalName COLLATE NOCASE LIMIT 1")
+    suspend fun getRuleByOriginalName(originalName: String): MerchantRenameRule?
+
     @Query("DELETE FROM merchant_rename_rules WHERE originalName = :originalName")
     suspend fun deleteByOriginalName(originalName: String)
 
