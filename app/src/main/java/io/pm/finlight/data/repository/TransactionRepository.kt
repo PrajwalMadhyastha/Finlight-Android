@@ -544,12 +544,19 @@ class TransactionRepository(
     override suspend fun confirmTransaction(
         transactionId: Int,
         confirmedAmount: Double?,
-    ) = withContext(dispatcherProvider.io) {
-        db.withTransaction {
-            if (confirmedAmount != null) {
-                transactionWriteDao.updateAmount(transactionId, confirmedAmount)
+    ) {
+        if (confirmedAmount != null) {
+            require(confirmedAmount > 0.0 && !confirmedAmount.isNaN() && !confirmedAmount.isInfinite()) {
+                "Confirmed amount must be positive and finite, but was: $confirmedAmount"
             }
-            transactionWriteDao.confirmTransaction(transactionId)
+        }
+        withContext(dispatcherProvider.io) {
+            db.withTransaction {
+                if (confirmedAmount != null) {
+                    transactionWriteDao.updateAmount(transactionId, confirmedAmount)
+                }
+                transactionWriteDao.confirmTransaction(transactionId)
+            }
         }
     }
 

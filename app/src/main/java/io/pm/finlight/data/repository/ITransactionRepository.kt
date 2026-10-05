@@ -289,11 +289,12 @@ interface ITransactionRepository {
      * Atomically confirms a draft transaction, optionally updating its amount beforehand
      * (e.g., when the user adjusts a variable bill amount before confirming).
      *
-     * Both the optional amount update and status change to [TransactionStatus.COMPLETED]
+     * Both the optional amount update and status change to [TransactionStatus.CONFIRMED]
      * are executed atomically inside a database transaction on the IO dispatcher.
      *
      * @param transactionId The ID of the pending draft transaction to confirm.
      * @param confirmedAmount The verified transaction amount if modified by the user, or null to keep existing draft amount.
+     * @throws IllegalArgumentException If [confirmedAmount] is non-null and is not positive or finite.
      */
     suspend fun confirmTransaction(
         transactionId: Int,

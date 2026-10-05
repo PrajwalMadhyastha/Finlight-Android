@@ -16,6 +16,9 @@ interface IRecurringTransactionRepository {
     /**
      * Retrieves a recurring transaction rule by its unique identifier.
      *
+     * Unlike [getById], which returns a reactive [Flow] observing rule updates over time,
+     * this is a one-shot suspend function designed for background workers, receivers, and one-off rule evaluations.
+     *
      * @param id The primary key ID of the recurring transaction rule.
      * @return The [RecurringTransaction] matching [id], or null if not found.
      */

@@ -18,6 +18,7 @@ import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -137,6 +138,21 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
 
             // Assert
             assertEquals(expectedRule, result)
+            verify(recurringTransactionDao).getRuleById(ruleId)
+        }
+
+    @Test
+    fun `getRuleById returns null when DAO returns null`() =
+        runTest {
+            // Arrange
+            val ruleId = 99
+            `when`(recurringTransactionDao.getRuleById(ruleId)).thenReturn(null)
+
+            // Act
+            val result = repository.getRuleById(ruleId)
+
+            // Assert
+            assertNull(result)
             verify(recurringTransactionDao).getRuleById(ruleId)
         }
 

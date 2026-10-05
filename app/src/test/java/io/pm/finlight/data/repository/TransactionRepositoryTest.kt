@@ -205,6 +205,24 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `confirmTransaction with invalid confirmedAmount throws IllegalArgumentException without DB interaction`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val invalidAmounts = listOf(0.0, -10.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            for (invalidAmount in invalidAmounts) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = 42, confirmedAmount = invalidAmount)
+                }
+            }
+
+            coVerify(exactly = 0) { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao, never()).confirmTransaction(any())
+        }
+
+    @Test
     fun `skipTransaction delegates to transactionWriteDao`() =
         runTest {
             setupDefaultPropertyMocks()

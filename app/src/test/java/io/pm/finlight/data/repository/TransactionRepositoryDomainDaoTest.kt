@@ -223,6 +223,21 @@ class TransactionRepositoryDomainDaoTest {
         }
 
     @Test
+    fun testConfirmTransactionWithInvalidAmountThrowsIllegalArgumentException() =
+        runTest {
+            val invalidAmounts = listOf(0.0, -50.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            for (invalidAmount in invalidAmounts) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = 42, confirmedAmount = invalidAmount)
+                }
+            }
+
+            coVerify(exactly = 0) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerify(exactly = 0) { writeDao.updateAmount(any(), any()) }
+            coVerify(exactly = 0) { writeDao.confirmTransaction(any()) }
+        }
+
+    @Test
     fun testDelegationToSkipTransaction() =
         runTest {
             coJustRun { writeDao.skipTransaction(any()) }
