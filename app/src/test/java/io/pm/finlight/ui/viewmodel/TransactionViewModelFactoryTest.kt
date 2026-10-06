@@ -9,8 +9,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.ISmsRepository
+import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
@@ -62,7 +65,10 @@ class TransactionViewModelFactoryTest {
         val mockSmsRepo: ISmsRepository = mockk(relaxed = true)
         val mockManageReimbursementUseCase: ManageReimbursementUseCase = mockk(relaxed = true)
         val mockMergeTransactionsUseCase: MergeTransactionsUseCase = mockk(relaxed = true)
+        val mockMerchantCategoryMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
         val mockMerchantMappingRepo: IMerchantMappingRepository = mockk(relaxed = true)
+        val mockMerchantRenameRuleRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        val mockSplitTransactionRepo: ISplitTransactionRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxnRepo)
         ServiceLocator.setAccountRepository(mockAccountRepo)
@@ -71,7 +77,10 @@ class TransactionViewModelFactoryTest {
         ServiceLocator.setSmsRepository(mockSmsRepo)
         ServiceLocator.setManageReimbursementUseCase(mockManageReimbursementUseCase)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactionsUseCase)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockMerchantCategoryMappingRepo)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMappingRepo)
+        ServiceLocator.setMerchantRenameRuleRepository(mockMerchantRenameRuleRepo)
+        ServiceLocator.setSplitTransactionRepository(mockSplitTransactionRepo)
 
         val viewModel = factory.create(TransactionViewModel::class.java)
 
@@ -104,11 +113,29 @@ class TransactionViewModelFactoryTest {
             }.get(viewModel)
         assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
 
+        val categoryMappingRepoField =
+            TransactionViewModel::class.java.getDeclaredField("merchantCategoryMappingRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantCategoryMappingRepo, categoryMappingRepoField)
+
         val mappingRepoField =
             TransactionViewModel::class.java.getDeclaredField("merchantMappingRepository").apply {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockMerchantMappingRepo, mappingRepoField)
+
+        val renameRuleRepoField =
+            TransactionViewModel::class.java.getDeclaredField("merchantRenameRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantRenameRuleRepo, renameRuleRepoField)
+
+        val splitRepoField =
+            TransactionViewModel::class.java.getDeclaredField("splitTransactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSplitTransactionRepo, splitRepoField)
     }
 
     @Test
