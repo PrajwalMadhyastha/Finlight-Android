@@ -9,15 +9,15 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 
 class RecurringTransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(RecurringTransactionViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
-            val repository = RecurringTransactionRepository(db.recurringTransactionDao())
+            val repository = ServiceLocator.provideRecurringTransactionRepository(application, db)
             val patternDao = db.recurringPatternDao()
             @Suppress("UNCHECKED_CAST")
             return RecurringTransactionViewModel(application, repository, patternDao) as T

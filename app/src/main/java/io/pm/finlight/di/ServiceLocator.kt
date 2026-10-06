@@ -20,6 +20,7 @@ import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.INotificationSettingsRepository
@@ -32,6 +33,7 @@ import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.MerchantCategoryMappingRepository
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRuleRepository
 import io.pm.finlight.NotificationSettingsRepository
@@ -132,6 +134,9 @@ object ServiceLocator {
 
     @Volatile
     private var merchantRenameRuleRepository: IMerchantRenameRuleRepository? = null
+
+    @Volatile
+    private var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -396,6 +401,11 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [IMerchantMappingRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -417,6 +427,11 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [IBudgetRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -438,6 +453,11 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [IRecurringTransactionRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -459,6 +479,11 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [ISplitTransactionRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -480,6 +505,11 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [IMerchantRenameRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -495,6 +525,32 @@ object ServiceLocator {
                     dao = db.merchantRenameRuleDao(),
                 ).also {
                     merchantRenameRuleRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IMerchantCategoryMappingRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMerchantCategoryMappingRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IMerchantCategoryMappingRepository {
+        return merchantCategoryMappingRepository ?: synchronized(this) {
+            merchantCategoryMappingRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MerchantCategoryMappingRepository(
+                    dao = db.merchantCategoryMappingDao(),
+                ).also {
+                    merchantCategoryMappingRepository = it
                 }
             }
         }
@@ -626,6 +682,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setMerchantCategoryMappingRepository(repository: IMerchantCategoryMappingRepository?) {
+        merchantCategoryMappingRepository = repository
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -652,5 +713,6 @@ object ServiceLocator {
         recurringTransactionRepository = null
         splitTransactionRepository = null
         merchantRenameRuleRepository = null
+        merchantCategoryMappingRepository = null
     }
 }

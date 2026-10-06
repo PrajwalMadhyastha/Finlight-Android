@@ -142,6 +142,15 @@ class ServiceLocatorRepositorySwapTest {
     }
 
     @Test
+    fun serviceLocator_swapsMerchantCategoryMappingRepositoryForTestingInAndroidTest() {
+        val mockCategoryMappingRepo: IMerchantCategoryMappingRepository = createFakeRepository()
+        ServiceLocator.setMerchantCategoryMappingRepository(mockCategoryMappingRepo)
+
+        val resolved = ServiceLocator.provideMerchantCategoryMappingRepository(context)
+        assertSame(mockCategoryMappingRepo, resolved)
+    }
+
+    @Test
     fun serviceLocator_reset_restoresDefaultRepositories() {
         val mockAccountRepo: IAccountRepository = createFakeRepository()
         val mockTxnRepo: ITransactionRepository = createFakeRepository()
@@ -149,6 +158,7 @@ class ServiceLocatorRepositorySwapTest {
         val mockRecurringRepo: IRecurringTransactionRepository = createFakeRepository()
         val mockSplitRepo: ISplitTransactionRepository = createFakeRepository()
         val mockRenameRepo: IMerchantRenameRuleRepository = createFakeRepository()
+        val mockCategoryMappingRepo: IMerchantCategoryMappingRepository = createFakeRepository()
 
         ServiceLocator.setAccountRepository(mockAccountRepo)
         ServiceLocator.setTransactionRepository(mockTxnRepo)
@@ -156,6 +166,7 @@ class ServiceLocatorRepositorySwapTest {
         ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
         ServiceLocator.setSplitTransactionRepository(mockSplitRepo)
         ServiceLocator.setMerchantRenameRuleRepository(mockRenameRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockCategoryMappingRepo)
 
         assertSame(mockAccountRepo, ServiceLocator.provideAccountRepository(context))
         assertSame(mockTxnRepo, ServiceLocator.provideTransactionRepository(context))
@@ -163,6 +174,7 @@ class ServiceLocatorRepositorySwapTest {
         assertSame(mockRecurringRepo, ServiceLocator.provideRecurringTransactionRepository(context))
         assertSame(mockSplitRepo, ServiceLocator.provideSplitTransactionRepository(context))
         assertSame(mockRenameRepo, ServiceLocator.provideMerchantRenameRuleRepository(context))
+        assertSame(mockCategoryMappingRepo, ServiceLocator.provideMerchantCategoryMappingRepository(context))
 
         ServiceLocator.reset()
 
@@ -172,6 +184,7 @@ class ServiceLocatorRepositorySwapTest {
         val restoredRecurringRepo = ServiceLocator.provideRecurringTransactionRepository(context)
         val restoredSplitRepo = ServiceLocator.provideSplitTransactionRepository(context)
         val restoredRenameRepo = ServiceLocator.provideMerchantRenameRuleRepository(context)
+        val restoredCategoryMappingRepo = ServiceLocator.provideMerchantCategoryMappingRepository(context)
 
         assertNotNull(restoredAccountRepo)
         assertNotNull(restoredTxnRepo)
@@ -179,12 +192,14 @@ class ServiceLocatorRepositorySwapTest {
         assertNotNull(restoredRecurringRepo)
         assertNotNull(restoredSplitRepo)
         assertNotNull(restoredRenameRepo)
+        assertNotNull(restoredCategoryMappingRepo)
         assertNotSame(mockAccountRepo, restoredAccountRepo)
         assertNotSame(mockTxnRepo, restoredTxnRepo)
         assertNotSame(mockBudgetRepo, restoredBudgetRepo)
         assertNotSame(mockRecurringRepo, restoredRecurringRepo)
         assertNotSame(mockSplitRepo, restoredSplitRepo)
         assertNotSame(mockRenameRepo, restoredRenameRepo)
+        assertNotSame(mockCategoryMappingRepo, restoredCategoryMappingRepo)
     }
 
     @Test
