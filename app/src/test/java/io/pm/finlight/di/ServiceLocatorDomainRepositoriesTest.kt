@@ -7,12 +7,16 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.IAccountRepository
+import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
+import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ISmsRepository
+import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
-import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
@@ -125,6 +129,42 @@ class ServiceLocatorDomainRepositoriesTest {
     fun provideMerchantMappingRepository_returnsSingletonInstance() {
         val repo1 = ServiceLocator.provideMerchantMappingRepository(application)
         val repo2 = ServiceLocator.provideMerchantMappingRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun provideBudgetRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideBudgetRepository(application)
+        val repo2 = ServiceLocator.provideBudgetRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun provideRecurringTransactionRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideRecurringTransactionRepository(application)
+        val repo2 = ServiceLocator.provideRecurringTransactionRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun provideSplitTransactionRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideSplitTransactionRepository(application)
+        val repo2 = ServiceLocator.provideSplitTransactionRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun provideMerchantRenameRuleRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideMerchantRenameRuleRepository(application)
+        val repo2 = ServiceLocator.provideMerchantRenameRuleRepository(application)
 
         assertNotNull(repo1)
         assertSame(repo1, repo2)
@@ -275,6 +315,70 @@ class ServiceLocatorDomainRepositoriesTest {
     }
 
     @Test
+    fun setBudgetRepository_overridesInstance() {
+        val mockRepo: IBudgetRepository = mockk(relaxed = true)
+        ServiceLocator.setBudgetRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideBudgetRepository(application))
+
+        val mockRepo2: IBudgetRepository = mockk(relaxed = true)
+        ServiceLocator.setBudgetRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideBudgetRepository(application))
+
+        ServiceLocator.setBudgetRepository(null)
+        val defaultRepo = ServiceLocator.provideBudgetRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
+    @Test
+    fun setRecurringTransactionRepository_overridesInstance() {
+        val mockRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        ServiceLocator.setRecurringTransactionRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideRecurringTransactionRepository(application))
+
+        val mockRepo2: IRecurringTransactionRepository = mockk(relaxed = true)
+        ServiceLocator.setRecurringTransactionRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideRecurringTransactionRepository(application))
+
+        ServiceLocator.setRecurringTransactionRepository(null)
+        val defaultRepo = ServiceLocator.provideRecurringTransactionRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
+    @Test
+    fun setSplitTransactionRepository_overridesInstance() {
+        val mockRepo: ISplitTransactionRepository = mockk(relaxed = true)
+        ServiceLocator.setSplitTransactionRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideSplitTransactionRepository(application))
+
+        val mockRepo2: ISplitTransactionRepository = mockk(relaxed = true)
+        ServiceLocator.setSplitTransactionRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideSplitTransactionRepository(application))
+
+        ServiceLocator.setSplitTransactionRepository(null)
+        val defaultRepo = ServiceLocator.provideSplitTransactionRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
+    @Test
+    fun setMerchantRenameRuleRepository_overridesInstance() {
+        val mockRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setMerchantRenameRuleRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideMerchantRenameRuleRepository(application))
+
+        val mockRepo2: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setMerchantRenameRuleRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideMerchantRenameRuleRepository(application))
+
+        ServiceLocator.setMerchantRenameRuleRepository(null)
+        val defaultRepo = ServiceLocator.provideMerchantRenameRuleRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
+    @Test
     fun reset_clearsAllDomainRepositories() {
         val mockTxn: ITransactionRepository = mockk(relaxed = true)
         val mockAccount: IAccountRepository = mockk(relaxed = true)
@@ -285,6 +389,10 @@ class ServiceLocatorDomainRepositoriesTest {
         val mockManageReimbursement: ManageReimbursementUseCase = mockk(relaxed = true)
         val mockMergeTransactions: MergeTransactionsUseCase = mockk(relaxed = true)
         val mockMerchantMapping: IMerchantMappingRepository = mockk(relaxed = true)
+        val mockBudget: IBudgetRepository = mockk(relaxed = true)
+        val mockRecurring: IRecurringTransactionRepository = mockk(relaxed = true)
+        val mockSplit: ISplitTransactionRepository = mockk(relaxed = true)
+        val mockRename: IMerchantRenameRuleRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxn)
         ServiceLocator.setAccountRepository(mockAccount)
@@ -295,6 +403,10 @@ class ServiceLocatorDomainRepositoriesTest {
         ServiceLocator.setManageReimbursementUseCase(mockManageReimbursement)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactions)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMapping)
+        ServiceLocator.setBudgetRepository(mockBudget)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurring)
+        ServiceLocator.setSplitTransactionRepository(mockSplit)
+        ServiceLocator.setMerchantRenameRuleRepository(mockRename)
 
         assertSame(mockTxn, ServiceLocator.provideTransactionRepository(application))
         assertSame(mockAccount, ServiceLocator.provideAccountRepository(application))
@@ -305,6 +417,10 @@ class ServiceLocatorDomainRepositoriesTest {
         assertSame(mockManageReimbursement, ServiceLocator.provideManageReimbursementUseCase(application))
         assertSame(mockMergeTransactions, ServiceLocator.provideMergeTransactionsUseCase(application))
         assertSame(mockMerchantMapping, ServiceLocator.provideMerchantMappingRepository(application))
+        assertSame(mockBudget, ServiceLocator.provideBudgetRepository(application))
+        assertSame(mockRecurring, ServiceLocator.provideRecurringTransactionRepository(application))
+        assertSame(mockSplit, ServiceLocator.provideSplitTransactionRepository(application))
+        assertSame(mockRename, ServiceLocator.provideMerchantRenameRuleRepository(application))
 
         ServiceLocator.reset()
 
@@ -317,6 +433,10 @@ class ServiceLocatorDomainRepositoriesTest {
         val newManageReimbursement = ServiceLocator.provideManageReimbursementUseCase(application)
         val newMergeTransactions = ServiceLocator.provideMergeTransactionsUseCase(application)
         val newMerchantMapping = ServiceLocator.provideMerchantMappingRepository(application)
+        val newBudget = ServiceLocator.provideBudgetRepository(application)
+        val newRecurring = ServiceLocator.provideRecurringTransactionRepository(application)
+        val newSplit = ServiceLocator.provideSplitTransactionRepository(application)
+        val newRename = ServiceLocator.provideMerchantRenameRuleRepository(application)
 
         assertNotNull(newTxn)
         assertNotSame(mockTxn, newTxn)
@@ -336,5 +456,13 @@ class ServiceLocatorDomainRepositoriesTest {
         assertNotSame(mockMergeTransactions, newMergeTransactions)
         assertNotNull(newMerchantMapping)
         assertNotSame(mockMerchantMapping, newMerchantMapping)
+        assertNotNull(newBudget)
+        assertNotSame(mockBudget, newBudget)
+        assertNotNull(newRecurring)
+        assertNotSame(mockRecurring, newRecurring)
+        assertNotNull(newSplit)
+        assertNotSame(mockSplit, newSplit)
+        assertNotNull(newRename)
+        assertNotSame(mockRename, newRename)
     }
 }

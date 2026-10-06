@@ -5,6 +5,7 @@ import androidx.annotation.VisibleForTesting
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BackupSettingsRepository
+import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.DashboardSettingsRepository
@@ -13,26 +14,33 @@ import io.pm.finlight.FirstLaunchSettingsRepository
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IAppConfigRepository
 import io.pm.finlight.IBackupSettingsRepository
+import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.IBudgetSettingsRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
 import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.INotificationSettingsRepository
+import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ISecuritySettingsRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ISmsRuleSettingsRepository
+import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.MerchantMappingRepository
+import io.pm.finlight.MerchantRenameRuleRepository
 import io.pm.finlight.NotificationSettingsRepository
+import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.SmsRuleSettingsRepository
+import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
@@ -112,6 +120,18 @@ object ServiceLocator {
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
+
+    @Volatile
+    private var budgetRepository: IBudgetRepository? = null
+
+    @Volatile
+    private var recurringTransactionRepository: IRecurringTransactionRepository? = null
+
+    @Volatile
+    private var splitTransactionRepository: ISplitTransactionRepository? = null
+
+    @Volatile
+    private var merchantRenameRuleRepository: IMerchantRenameRuleRepository? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -396,6 +416,90 @@ object ServiceLocator {
         }
     }
 
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideBudgetRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IBudgetRepository {
+        return budgetRepository ?: synchronized(this) {
+            budgetRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                BudgetRepository(
+                    budgetDao = db.budgetDao(),
+                ).also {
+                    budgetRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideRecurringTransactionRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IRecurringTransactionRepository {
+        return recurringTransactionRepository ?: synchronized(this) {
+            recurringTransactionRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                RecurringTransactionRepository(
+                    recurringTransactionDao = db.recurringTransactionDao(),
+                ).also {
+                    recurringTransactionRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideSplitTransactionRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ISplitTransactionRepository {
+        return splitTransactionRepository ?: synchronized(this) {
+            splitTransactionRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                SplitTransactionRepository(
+                    splitTransactionDao = db.splitTransactionDao(),
+                ).also {
+                    splitTransactionRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMerchantRenameRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IMerchantRenameRuleRepository {
+        return merchantRenameRuleRepository ?: synchronized(this) {
+            merchantRenameRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MerchantRenameRuleRepository(
+                    dao = db.merchantRenameRuleDao(),
+                ).also {
+                    merchantRenameRuleRepository = it
+                }
+            }
+        }
+    }
+
     @VisibleForTesting
     fun setSettingsRepository(repository: ISettingsRepository?) {
         settingsRepository = repository
@@ -502,6 +606,26 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setBudgetRepository(repository: IBudgetRepository?) {
+        budgetRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setRecurringTransactionRepository(repository: IRecurringTransactionRepository?) {
+        recurringTransactionRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setSplitTransactionRepository(repository: ISplitTransactionRepository?) {
+        splitTransactionRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setMerchantRenameRuleRepository(repository: IMerchantRenameRuleRepository?) {
+        merchantRenameRuleRepository = repository
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -524,5 +648,9 @@ object ServiceLocator {
         manageReimbursementUseCase = null
         mergeTransactionsUseCase = null
         merchantMappingRepository = null
+        budgetRepository = null
+        recurringTransactionRepository = null
+        splitTransactionRepository = null
+        merchantRenameRuleRepository = null
     }
 }
