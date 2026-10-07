@@ -49,8 +49,7 @@ class TimePeriodReportViewModel(
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
         GetMonthlyConsistencyDataUseCase(
             settingsRepository = settingsRepository,
-            transactionAnalyticsDao = transactionAnalyticsDao,
-            transactionQueryDao = transactionQueryDao,
+            transactionRepository = transactionRepository,
             dispatcherProvider = dispatcherProvider,
         ),
 ) : ViewModel() {
