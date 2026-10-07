@@ -36,6 +36,7 @@ import org.robolectric.annotation.Config
 import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -562,6 +563,35 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             assertEquals(listOf("Swiggy", "Zomato"), descs)
             assertEquals(listOf(1, 2, 3), ids)
+        }
+
+    @Test
+    fun `existsBySmsHash delegates to transactionDao existsBySmsHash`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            `when`(transactionDao.existsBySmsHash("test_hash_1")).thenReturn(true)
+            `when`(transactionDao.existsBySmsHash("test_hash_2")).thenReturn(false)
+
+            val exists1 = repository.existsBySmsHash("test_hash_1")
+            val exists2 = repository.existsBySmsHash("test_hash_2")
+
+            assertTrue(exists1)
+            assertFalse(exists2)
+            verify(transactionDao).existsBySmsHash("test_hash_1")
+            verify(transactionDao).existsBySmsHash("test_hash_2")
+        }
+
+    @Test
+    fun `updateSmsHashByLegacy delegates to transactionDao updateSmsHashByLegacy`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.updateSmsHashByLegacy("old_hash", "new_hash")
+
+            verify(transactionDao).updateSmsHashByLegacy("old_hash", "new_hash")
         }
 
     // ── Constructors and Dispatcher Injection Tests ────────────────────────────

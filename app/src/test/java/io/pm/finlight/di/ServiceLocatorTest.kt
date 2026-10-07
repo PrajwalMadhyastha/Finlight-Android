@@ -32,6 +32,7 @@ import io.pm.finlight.SplitTransactionDao
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
@@ -141,6 +142,15 @@ class ServiceLocatorTest {
     fun provideMergeTransactionsUseCase_returnsSingletonInstance() {
         val useCase1 = ServiceLocator.provideMergeTransactionsUseCase(application)
         val useCase2 = ServiceLocator.provideMergeTransactionsUseCase(application)
+
+        assertNotNull(useCase1)
+        assertSame(useCase1, useCase2)
+    }
+
+    @Test
+    fun provideAutoSaveSmsTransactionUseCase_returnsSingletonInstance() {
+        val useCase1 = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
+        val useCase2 = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
 
         assertNotNull(useCase1)
         assertSame(useCase1, useCase2)
@@ -422,6 +432,22 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun setAutoSaveSmsTransactionUseCase_overridesInstance() {
+        val mockUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockUseCase)
+        assertSame(mockUseCase, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
+
+        val mockUseCase2: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockUseCase2)
+        assertSame(mockUseCase2, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
+
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(null)
+        val defaultUseCase = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
+        assertNotNull(defaultUseCase)
+        assertNotSame(mockUseCase2, defaultUseCase)
+    }
+
+    @Test
     fun setMerchantMappingRepository_overridesInstance() {
         val mockRepo: IMerchantMappingRepository = mockk(relaxed = true)
         ServiceLocator.setMerchantMappingRepository(mockRepo)
@@ -529,6 +555,7 @@ class ServiceLocatorTest {
         val mockMergeAccounts: MergeAccountsUseCase = mockk(relaxed = true)
         val mockManageReimbursement: ManageReimbursementUseCase = mockk(relaxed = true)
         val mockMergeTransactions: MergeTransactionsUseCase = mockk(relaxed = true)
+        val mockAutoSave: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
         val mockMerchantMapping: IMerchantMappingRepository = mockk(relaxed = true)
         val mockBudget: IBudgetRepository = mockk(relaxed = true)
         val mockRecurring: IRecurringTransactionRepository = mockk(relaxed = true)
@@ -544,6 +571,7 @@ class ServiceLocatorTest {
         ServiceLocator.setMergeAccountsUseCase(mockMergeAccounts)
         ServiceLocator.setManageReimbursementUseCase(mockManageReimbursement)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactions)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSave)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMapping)
         ServiceLocator.setBudgetRepository(mockBudget)
         ServiceLocator.setRecurringTransactionRepository(mockRecurring)
@@ -559,6 +587,7 @@ class ServiceLocatorTest {
         assertSame(mockMergeAccounts, ServiceLocator.provideMergeAccountsUseCase(application))
         assertSame(mockManageReimbursement, ServiceLocator.provideManageReimbursementUseCase(application))
         assertSame(mockMergeTransactions, ServiceLocator.provideMergeTransactionsUseCase(application))
+        assertSame(mockAutoSave, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
         assertSame(mockMerchantMapping, ServiceLocator.provideMerchantMappingRepository(application))
         assertSame(mockBudget, ServiceLocator.provideBudgetRepository(application))
         assertSame(mockRecurring, ServiceLocator.provideRecurringTransactionRepository(application))
@@ -576,6 +605,7 @@ class ServiceLocatorTest {
         val newMergeAccounts = ServiceLocator.provideMergeAccountsUseCase(application)
         val newManageReimbursement = ServiceLocator.provideManageReimbursementUseCase(application)
         val newMergeTransactions = ServiceLocator.provideMergeTransactionsUseCase(application)
+        val newAutoSave = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
         val newMerchantMapping = ServiceLocator.provideMerchantMappingRepository(application)
         val newBudget = ServiceLocator.provideBudgetRepository(application)
         val newRecurring = ServiceLocator.provideRecurringTransactionRepository(application)
@@ -599,6 +629,8 @@ class ServiceLocatorTest {
         assertNotSame(mockManageReimbursement, newManageReimbursement)
         assertNotNull(newMergeTransactions)
         assertNotSame(mockMergeTransactions, newMergeTransactions)
+        assertNotNull(newAutoSave)
+        assertNotSame(mockAutoSave, newAutoSave)
         assertNotNull(newMerchantMapping)
         assertNotSame(mockMerchantMapping, newMerchantMapping)
         assertNotNull(newBudget)

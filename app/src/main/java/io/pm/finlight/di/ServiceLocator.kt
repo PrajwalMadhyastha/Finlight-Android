@@ -47,9 +47,11 @@ import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 
@@ -119,6 +121,9 @@ object ServiceLocator {
 
     @Volatile
     private var mergeTransactionsUseCase: MergeTransactionsUseCase? = null
+
+    @Volatile
+    private var autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
@@ -401,6 +406,40 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [AutoSaveSmsTransactionUseCase] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideAutoSaveSmsTransactionUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): AutoSaveSmsTransactionUseCase {
+        return autoSaveSmsTransactionUseCase ?: synchronized(this) {
+            autoSaveSmsTransactionUseCase ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                val tagRepository = provideTagRepository(context)
+                AutoSaveSmsTransactionUseCase(
+                    transactionRepository = provideTransactionRepository(context),
+                    accountRepository = provideAccountRepository(context),
+                    smsRepository = provideSmsRepository(context),
+                    merchantMappingRepository = provideMerchantMappingRepository(context, db),
+                    db = db,
+                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    autoSaveSmsTransactionUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
      * Resolves the singleton [IMerchantMappingRepository] instance.
      *
      * Note: Once initialized, the cached singleton instance is returned on subsequent calls
@@ -657,6 +696,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setAutoSaveSmsTransactionUseCase(useCase: AutoSaveSmsTransactionUseCase?) {
+        autoSaveSmsTransactionUseCase = useCase
+    }
+
+    @VisibleForTesting
     fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
         merchantMappingRepository = repository
     }
@@ -708,6 +752,7 @@ object ServiceLocator {
         mergeAccountsUseCase = null
         manageReimbursementUseCase = null
         mergeTransactionsUseCase = null
+        autoSaveSmsTransactionUseCase = null
         merchantMappingRepository = null
         budgetRepository = null
         recurringTransactionRepository = null

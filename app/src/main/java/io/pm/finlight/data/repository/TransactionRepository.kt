@@ -361,6 +361,17 @@ class TransactionRepository(
         transactionWriteDao.setSmsHash(transactionId, smsHash)
     }
 
+    override suspend fun existsBySmsHash(hash: String): Boolean {
+        return transactionQueryDao.existsBySmsHash(hash)
+    }
+
+    override suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    ) {
+        transactionWriteDao.updateSmsHashByLegacy(oldHash = oldHash, newHash = newHash)
+    }
+
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }

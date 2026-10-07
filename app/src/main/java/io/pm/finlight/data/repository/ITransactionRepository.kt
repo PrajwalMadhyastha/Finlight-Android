@@ -178,6 +178,13 @@ interface ITransactionRepository {
         smsHash: String,
     )
 
+    suspend fun existsBySmsHash(hash: String): Boolean
+
+    suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    )
+
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
     suspend fun findSimilarTransactions(
