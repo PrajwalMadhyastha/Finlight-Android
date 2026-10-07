@@ -53,13 +53,7 @@ class GetMonthlyConsistencyDataUseCase(
     ) : this(
         budgetProvider = { year, month -> budgetSettingsRepository.getOverallBudgetForMonth(year, month) },
         transactionRepository = transactionRepository,
-        dispatcherProvider =
-            object : DispatcherProvider {
-                override val main: CoroutineDispatcher get() = dispatcher
-                override val io: CoroutineDispatcher get() = dispatcher
-                override val default: CoroutineDispatcher get() = dispatcher
-                override val unconfined: CoroutineDispatcher get() = dispatcher
-            },
+        dispatcherProvider = dispatcher.asDispatcherProvider(),
     )
 
     constructor(
@@ -69,13 +63,7 @@ class GetMonthlyConsistencyDataUseCase(
     ) : this(
         budgetProvider = { year, month -> settingsRepository.getOverallBudgetForMonth(year, month) },
         transactionRepository = transactionRepository,
-        dispatcherProvider =
-            object : DispatcherProvider {
-                override val main: CoroutineDispatcher get() = dispatcher
-                override val io: CoroutineDispatcher get() = dispatcher
-                override val default: CoroutineDispatcher get() = dispatcher
-                override val unconfined: CoroutineDispatcher get() = dispatcher
-            },
+        dispatcherProvider = dispatcher.asDispatcherProvider(),
     )
 
     /**
@@ -178,3 +166,11 @@ class GetMonthlyConsistencyDataUseCase(
             )
     }
 }
+
+private fun CoroutineDispatcher.asDispatcherProvider(): DispatcherProvider =
+    object : DispatcherProvider {
+        override val main: CoroutineDispatcher get() = this@asDispatcherProvider
+        override val io: CoroutineDispatcher get() = this@asDispatcherProvider
+        override val default: CoroutineDispatcher get() = this@asDispatcherProvider
+        override val unconfined: CoroutineDispatcher get() = this@asDispatcherProvider
+    }

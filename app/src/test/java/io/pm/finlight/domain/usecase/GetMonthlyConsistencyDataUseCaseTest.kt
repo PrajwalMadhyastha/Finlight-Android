@@ -2,8 +2,9 @@ package io.pm.finlight.domain.usecase
 
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import io.pm.finlight.BaseViewModelTest
-import io.pm.finlight.BudgetSettingsRepository
+import io.pm.finlight.IBudgetSettingsRepository
 import io.pm.finlight.CalendarDayStatus
 import io.pm.finlight.DailyTotal
 import io.pm.finlight.ISettingsRepository
@@ -24,7 +25,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
-    private val budgetSettingsRepository: BudgetSettingsRepository = mockk()
+    private val budgetSettingsRepository: IBudgetSettingsRepository = mockk()
     private val transactionRepository: ITransactionRepository = mockk()
 
     private fun getDayOfMonth(dayStatus: CalendarDayStatus): Int {
@@ -125,12 +126,18 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
 
             // Spent 0 on 0 budget -> WITHIN_LIMIT
             assertEquals(SpendingStatus.WITHIN_LIMIT, day1?.status)
+            assertEquals(0L, day1?.amountSpent)
+            assertEquals(0L, day1?.safeToSpend)
 
             // Spent 100 on 0 budget -> OVER_LIMIT
             assertEquals(SpendingStatus.OVER_LIMIT, day2?.status)
+            assertEquals(100L, day2?.amountSpent)
+            assertEquals(0L, day2?.safeToSpend)
 
             // Spent 0 on 0 budget -> WITHIN_LIMIT
             assertEquals(SpendingStatus.WITHIN_LIMIT, day3?.status)
+            assertEquals(0L, day3?.amountSpent)
+            assertEquals(0L, day3?.safeToSpend)
         }
 
     @Test
@@ -165,12 +172,20 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
             val day3 = results.find { getDayOfMonth(it) == 3 }
 
             assertEquals(SpendingStatus.NO_SPEND, day1?.status)
+            assertEquals(0L, day1?.amountSpent)
+            assertEquals(100L, day1?.safeToSpend)
+
             assertEquals(SpendingStatus.WITHIN_LIMIT, day2?.status)
+            assertEquals(50L, day2?.amountSpent)
+            assertEquals(103L, day2?.safeToSpend)
+
             assertEquals(SpendingStatus.OVER_LIMIT, day3?.status)
+            assertEquals(200L, day3?.amountSpent)
+            assertEquals(105L, day3?.safeToSpend)
         }
 
     @Test
-    fun `returns NO_DATA before first transaction and for future days`() =
+    fun `returns NO_DATA before first transaction`() =
         runTest(testDispatcher) {
             val useCase =
                 GetMonthlyConsistencyDataUseCase(
@@ -199,6 +214,67 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
 
             // Day 15 is on/after firstTxDate
             assertEquals(SpendingStatus.NO_SPEND, day15?.status)
+        }
+
+    @Test
+    fun `returns NO_DATA for future days in future month`() =
+        runTest(testDispatcher) {
+            val useCase =
+                GetMonthlyConsistencyDataUseCase(
+                    budgetSettingsRepository = budgetSettingsRepository,
+                    transactionRepository = transactionRepository,
+                    dispatcher = testDispatcher,
+                )
+
+            val futureYear = Calendar.getInstance().get(Calendar.YEAR) + 1
+            val month = 1
+            val firstTxDate = getTimestamp(Calendar.JANUARY, 1, year = 2020)
+
+            every { budgetSettingsRepository.getOverallBudgetForMonth(futureYear, month) } returns flowOf(1000f)
+            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(emptyList())
+
+            val results = useCase(futureYear, month).first()
+
+            assertTrue(results.isNotEmpty())
+            for (day in results) {
+                assertEquals(SpendingStatus.NO_DATA, day.status)
+                assertEquals(0L, day.safeToSpend)
+                assertEquals(0L, day.amountSpent)
+            }
+        }
+
+    @Test
+    fun `handles null firstTransactionDate gracefully`() =
+        runTest(testDispatcher) {
+            val useCase =
+                GetMonthlyConsistencyDataUseCase(
+                    budgetSettingsRepository = budgetSettingsRepository,
+                    transactionRepository = transactionRepository,
+                    dispatcher = testDispatcher,
+                )
+
+            val year = 2025
+            val month = 9
+            val totalBudget = 3000f
+
+            every { budgetSettingsRepository.getOverallBudgetForMonth(year, month) } returns flowOf(totalBudget)
+            every { transactionRepository.getFirstTransactionDate() } returns flowOf(null)
+            val dailyTotals = listOf(DailyTotal(getDateKey(year, month, 1), 50.0))
+            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
+
+            val results = useCase(year, month).first()
+
+            val day1 = results.find { getDayOfMonth(it) == 1 }
+            val day2 = results.find { getDayOfMonth(it) == 2 }
+
+            assertNotNull(day1)
+            assertEquals(SpendingStatus.WITHIN_LIMIT, day1?.status)
+            assertEquals(50L, day1?.amountSpent)
+
+            assertNotNull(day2)
+            assertEquals(SpendingStatus.NO_SPEND, day2?.status)
+            assertEquals(0L, day2?.amountSpent)
         }
 
     @Test
@@ -283,5 +359,27 @@ class GetMonthlyConsistencyDataUseCaseTest : BaseViewModelTest() {
                     transactionRepository = transactionRepository,
                 )
             assertTrue(defaultUseCase.dispatcherProvider is DefaultDispatcherProvider)
+
+            // Verify execution and flow collection via ISettingsRepository constructor
+            val year = 2025
+            val month = 9
+            val firstTxDate = getTimestamp(Calendar.SEPTEMBER, 1)
+
+            every { mockSettingsRepo.getOverallBudgetForMonth(year, month) } returns flowOf(3000f)
+            every { transactionRepository.getFirstTransactionDate() } returns flowOf(firstTxDate)
+            val dailyTotals = listOf(DailyTotal(getDateKey(year, month, 1), 50.0))
+            every { transactionRepository.getDailySpendingForDateRange(any(), any()) } returns flowOf(dailyTotals)
+
+            val results = useCase1(year, month).first()
+            assertNotNull(results)
+            val day1 = results.find { getDayOfMonth(it) == 1 }
+            assertEquals(SpendingStatus.WITHIN_LIMIT, day1?.status)
+            assertEquals(50L, day1?.amountSpent)
+            verify(exactly = 1) { mockSettingsRepo.getOverallBudgetForMonth(year, month) }
+
+            val results2 = useCase2(year, month).first()
+            assertNotNull(results2)
+            val day1UseCase2 = results2.find { getDayOfMonth(it) == 1 }
+            assertEquals(SpendingStatus.WITHIN_LIMIT, day1UseCase2?.status)
         }
 }

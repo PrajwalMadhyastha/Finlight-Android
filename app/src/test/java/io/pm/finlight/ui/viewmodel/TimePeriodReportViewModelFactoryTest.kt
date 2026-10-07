@@ -14,6 +14,7 @@ import io.pm.finlight.TimePeriodReportViewModelFactory
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -67,6 +68,18 @@ class TimePeriodReportViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockTxnRepo, txnField)
+
+        val useCase =
+            TimePeriodReportViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
+                isAccessible = true
+            }.get(viewModel) as GetMonthlyConsistencyDataUseCase
+        assertNotNull(useCase)
+
+        val useCaseTxnRepo =
+            GetMonthlyConsistencyDataUseCase::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(useCase)
+        assertSame(mockTxnRepo, useCaseTxnRepo)
     }
 
     @Test
