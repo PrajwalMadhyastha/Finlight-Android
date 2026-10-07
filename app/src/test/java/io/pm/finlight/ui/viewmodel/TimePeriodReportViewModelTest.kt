@@ -57,6 +57,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         `when`(transactionAnalyticsDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
         `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(0L))
+        `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
 
         // --- NEW: Mock the new repository/usecase dependency ---
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
@@ -64,6 +66,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
         `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(emptySet()))
         `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(emptySet()))
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null))
     }
 
     @Test

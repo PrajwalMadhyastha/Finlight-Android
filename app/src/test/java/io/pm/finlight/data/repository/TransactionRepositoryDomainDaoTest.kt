@@ -117,6 +117,17 @@ class TransactionRepositoryDomainDaoTest {
         }
 
     @Test
+    fun testDelegationToGetDailySpendingForDateRange() =
+        runTest {
+            val dailyTotals = listOf(DailyTotal("2025-09-01", 100.0))
+            every { analyticsDao.getDailySpendingForDateRange(100L, 200L) } returns flowOf(dailyTotals)
+
+            val result = repository.getDailySpendingForDateRange(100L, 200L).first()
+            assertEquals(dailyTotals, result)
+            verify(exactly = 1) { analyticsDao.getDailySpendingForDateRange(100L, 200L) }
+        }
+
+    @Test
     fun testDelegationToReimbursementDao() =
         runTest {
             val incomeTxn = Transaction(id = 1, description = "Income", amount = 50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = null)
