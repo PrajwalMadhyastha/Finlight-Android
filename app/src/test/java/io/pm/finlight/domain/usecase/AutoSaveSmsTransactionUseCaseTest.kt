@@ -1,5 +1,6 @@
 package io.pm.finlight.domain.usecase
 
+import android.content.Context
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -15,6 +16,7 @@ import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.MerchantMapping
 import io.pm.finlight.PotentialAccount
 import io.pm.finlight.PotentialTransaction
@@ -23,12 +25,13 @@ import io.pm.finlight.Tag
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionType
+import io.pm.finlight.TravelModeSettings
+import io.pm.finlight.TripType
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.DeletedSmsHashDao
-import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -49,8 +52,7 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
     private val accountRepository: IAccountRepository = mockk(relaxed = true)
     private val smsRepository: ISmsRepository = mockk(relaxed = true)
     private val merchantMappingRepository: IMerchantMappingRepository = mockk(relaxed = true)
-    private val deletedSmsHashDao: DeletedSmsHashDao = mockk(relaxed = true)
-    private val db: AppDatabase = mockk(relaxed = true)
+    private val travelSettingsRepository: ITravelSettingsRepository = mockk(relaxed = true)
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase = mockk(relaxed = true)
     private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var useCase: AutoSaveSmsTransactionUseCase
@@ -59,22 +61,21 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         testDispatcherProvider = TestDispatcherProvider(testDispatcher)
-        every { db.deletedSmsHashDao() } returns deletedSmsHashDao
         every { merchantMappingRepository.allMappings } returns flowOf(emptyList())
         coEvery { transactionRepository.existsBySmsHash(any()) } returns false
-        coEvery { deletedSmsHashDao.existsByHash(any()) } returns false
+        coEvery { transactionRepository.existsDeletedSmsHash(any()) } returns false
         coEvery { accountRepository.findOrCreateByName(any(), any<String>()) } returns Account(1, "Test Account", "General")
         coEvery { transactionRepository.insertTransactionWithTags(any(), any()) } returns 1L
         coEvery { resolveTravelModeTagUseCase.getFinalTags(any(), any(), any()) } returns emptySet()
+        coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns null
 
         useCase =
             AutoSaveSmsTransactionUseCase(
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
-                smsRepository = smsRepository,
                 merchantMappingRepository = merchantMappingRepository,
-                db = db,
-                deletedSmsHashDao = deletedSmsHashDao,
+                smsRepository = smsRepository,
+                travelSettingsRepository = travelSettingsRepository,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 dispatcherProvider = testDispatcherProvider,
             )
@@ -95,25 +96,34 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         accountType: String? = "Bank Account",
         sender: String = "AM-HDFCBK",
         body: String = "Spent Rs.100 at Swiggy",
+        transactionType: String = "expense",
+        smsSignature: String? = "sig_swiggy_123",
+        needsReview: Boolean = false,
     ): PotentialTransaction {
         return PotentialTransaction(
             sourceSmsId = 1L,
             smsSender = sender,
             amount = amount,
-            transactionType = "expense",
+            transactionType = transactionType,
             merchantName = merchantName,
             originalMessage = body,
             potentialAccount = accountName?.let { PotentialAccount(formattedName = it, accountType = accountType ?: "General") },
             sourceSmsHash = sourceSmsHash,
             categoryId = 5,
             originalMerchantName = originalMerchantName,
+            smsSignature = smsSignature,
+            needsReview = needsReview,
         )
     }
 
     @Test
-    fun `invoke saves valid transaction and returns true`() =
+    fun `invoke saves valid transaction and propagates all metadata`() =
         runTest(testDispatcher) {
-            val potentialTxn = createBaseTransaction()
+            val potentialTxn =
+                createBaseTransaction(
+                    smsSignature = "swiggy_sig_999",
+                    needsReview = true,
+                )
             val txnSlot = slot<Transaction>()
             coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 42L
 
@@ -127,6 +137,8 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
             assertEquals(5, txnSlot.captured.categoryId)
             assertEquals("Auto-Captured", txnSlot.captured.source)
             assertEquals(TransactionType.EXPENSE, txnSlot.captured.transactionType)
+            assertEquals("swiggy_sig_999", txnSlot.captured.smsSignature)
+            assertTrue(txnSlot.captured.needsReview)
         }
 
     @Test
@@ -139,6 +151,20 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
             assertFalse(useCase(createBaseTransaction(amount = Double.NEGATIVE_INFINITY)))
 
             coVerify(exactly = 0) { transactionRepository.insertTransactionWithTags(any(), any()) }
+        }
+
+    @Test
+    fun `invoke proceeds when sourceSmsHash is null`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction(sourceSmsHash = null)
+            coEvery { transactionRepository.insertTransactionWithTags(any(), any()) } returns 10L
+
+            val result = useCase(potentialTxn)
+
+            assertTrue(result)
+            coVerify(exactly = 0) { transactionRepository.existsBySmsHash(any()) }
+            coVerify(exactly = 0) { transactionRepository.existsDeletedSmsHash(any()) }
+            coVerify(exactly = 1) { transactionRepository.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
@@ -169,10 +195,10 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `invoke suppresses duplicate when current hash exists in deletedSmsHashDao`() =
+    fun `invoke suppresses duplicate when current hash exists in deleted sms hash deny-list`() =
         runTest(testDispatcher) {
             val potentialTxn = createBaseTransaction(sourceSmsHash = "deleted_hash")
-            coEvery { deletedSmsHashDao.existsByHash("deleted_hash") } returns true
+            coEvery { transactionRepository.existsDeletedSmsHash("deleted_hash") } returns true
 
             val result = useCase(potentialTxn)
 
@@ -181,19 +207,17 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `invoke suppresses duplicate and upgrades hash when legacy hash exists in deletedSmsHashDao`() =
+    fun `invoke suppresses duplicate and upgrades hash when legacy hash exists in deleted sms hash deny-list`() =
         runTest(testDispatcher) {
             val potentialTxn = createBaseTransaction(sender = "AM-HDFCBK", body = "Spent Rs.100 at Swiggy", sourceSmsHash = "new_hash")
             val legacyHash = SmsParser.computeLegacySmsHash("AM-HDFCBK", "Spent Rs.100 at Swiggy")
-            coEvery { deletedSmsHashDao.existsByHash("new_hash") } returns false
-            coEvery { deletedSmsHashDao.existsByHash(legacyHash) } returns true
+            coEvery { transactionRepository.existsDeletedSmsHash("new_hash") } returns false
+            coEvery { transactionRepository.existsDeletedSmsHash(legacyHash) } returns true
 
             val result = useCase(potentialTxn)
 
             assertFalse(result)
-            val insertedSlot = slot<DeletedSmsHash>()
-            coVerify(exactly = 1) { deletedSmsHashDao.insert(capture(insertedSlot)) }
-            assertEquals("new_hash", insertedSlot.captured.smsHash)
+            coVerify(exactly = 1) { transactionRepository.insertDeletedSmsHash("new_hash") }
             coVerify(exactly = 0) { transactionRepository.insertTransactionWithTags(any(), any()) }
         }
 
@@ -212,6 +236,23 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
             assertTrue(result)
             assertEquals(88, txnSlot.captured.accountId)
             coVerify(exactly = 1) { accountRepository.findOrCreateByName("ICICI Bank - 4321", "Savings") }
+        }
+
+    @Test
+    fun `invoke handles null potentialAccount and falls back to Unknown Account`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction(accountName = null)
+            val defaultAccount = Account(id = 77, name = "Unknown Account", type = "General")
+            coEvery { accountRepository.findOrCreateByName("Unknown Account", "General") } returns defaultAccount
+
+            val txnSlot = slot<Transaction>()
+            coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 11L
+
+            val result = useCase(potentialTxn)
+
+            assertTrue(result)
+            assertEquals(77, txnSlot.captured.accountId)
+            coVerify(exactly = 1) { accountRepository.findOrCreateByName("Unknown Account", "General") }
         }
 
     @Test
@@ -265,9 +306,8 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `invoke resolves merchant name from merchantMappingRepository when merchantName is blank or Unknown Merchant`() =
+    fun `invoke resolves merchant name from merchantMappingRepository when merchantName is Unknown Merchant and harmonizes originalDescription`() =
         runTest(testDispatcher) {
-            val potentialTxnBlank = createBaseTransaction(merchantName = "   ", originalMerchantName = null, sender = "AM-ZOMATO")
             val potentialTxnUnknown = createBaseTransaction(merchantName = "Unknown Merchant", originalMerchantName = null, sender = "AM-ZOMATO")
             val mappings = listOf(MerchantMapping(smsSender = "AM-ZOMATO", merchantName = "Zomato"))
             every { merchantMappingRepository.allMappings } returns flowOf(mappings)
@@ -275,13 +315,26 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
             val txnSlot = slot<Transaction>()
             coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 16L
 
-            val resultBlank = useCase(potentialTxnBlank)
-            assertTrue(resultBlank)
-            assertEquals("Zomato", txnSlot.captured.description)
-
             val resultUnknown = useCase(potentialTxnUnknown)
             assertTrue(resultUnknown)
             assertEquals("Zomato", txnSlot.captured.description)
+            assertEquals("Zomato", txnSlot.captured.originalDescription)
+        }
+
+    @Test
+    fun `invoke handles exception from merchantMappingRepository and falls back gracefully`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction(merchantName = null, originalMerchantName = null, sender = "AM-FAIL")
+            every { merchantMappingRepository.allMappings } returns flow { throw RuntimeException("Flow error") }
+
+            val txnSlot = slot<Transaction>()
+            coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 17L
+
+            val result = useCase(potentialTxn)
+
+            assertTrue(result)
+            assertEquals("Unknown Merchant", txnSlot.captured.description)
+            assertEquals("Unknown Merchant", txnSlot.captured.originalDescription)
         }
 
     @Test
@@ -301,19 +354,110 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `invoke attaches tags from resolveTravelModeTagUseCase`() =
+    fun `invoke falls back to merchantName when originalMerchantName is blank or Unknown Merchant`() =
         runTest(testDispatcher) {
-            val potentialTxn = createBaseTransaction()
-            val expectedTags = setOf(Tag(id = 1, name = "Vacation"))
-            coEvery { resolveTravelModeTagUseCase.getFinalTags(any(), any(), any()) } returns expectedTags
+            val txnBlank = createBaseTransaction(merchantName = "Starbucks", originalMerchantName = "   ")
+            val txnUnknown = createBaseTransaction(merchantName = "Starbucks", originalMerchantName = "Unknown Merchant")
 
-            val tagsSlot = slot<Set<Tag>>()
-            coEvery { transactionRepository.insertTransactionWithTags(any(), capture(tagsSlot)) } returns 18L
+            val txnSlot = slot<Transaction>()
+            coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 18L
+
+            assertTrue(useCase(txnBlank))
+            assertEquals("Starbucks", txnSlot.captured.originalDescription)
+
+            assertTrue(useCase(txnUnknown))
+            assertEquals("Starbucks", txnSlot.captured.originalDescription)
+        }
+
+    @Test
+    fun `invoke falls back safely to EXPENSE on unrecognized transactionType without throwing`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction(transactionType = "UNKNOWN_CUSTOM_TYPE")
+            val txnSlot = slot<Transaction>()
+            coEvery { transactionRepository.insertTransactionWithTags(capture(txnSlot), any()) } returns 19L
 
             val result = useCase(potentialTxn)
 
             assertTrue(result)
+            assertEquals(TransactionType.EXPENSE, txnSlot.captured.transactionType)
+        }
+
+    @Test
+    fun `invoke attaches tags from resolveTravelModeTagUseCase using travelSettings parameter`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction()
+            val expectedTags = setOf(Tag(id = 1, name = "Vacation"))
+            val explicitSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Goa",
+                    tripType = TripType.DOMESTIC,
+                    startDate = 0L,
+                    endDate = 2000L,
+                    currencyCode = null,
+                    conversionRate = null,
+                )
+            coEvery { resolveTravelModeTagUseCase.getFinalTags(any(), any(), eq(explicitSettings)) } returns expectedTags
+
+            val tagsSlot = slot<Set<Tag>>()
+            coEvery { transactionRepository.insertTransactionWithTags(any(), capture(tagsSlot)) } returns 20L
+
+            val result = useCase(potentialTxn, travelSettings = explicitSettings)
+
+            assertTrue(result)
             assertEquals(expectedTags, tagsSlot.captured)
+            coVerify(exactly = 0) { travelSettingsRepository.getCurrentTravelModeSettings() }
+        }
+
+    @Test
+    fun `invoke attaches tags by querying travelSettingsRepository when travelSettings parameter is null`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction()
+            val expectedTags = setOf(Tag(id = 2, name = "Business"))
+            val storedSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "London",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = 0L,
+                    endDate = 3000L,
+                    currencyCode = "GBP",
+                    conversionRate = 100.0f,
+                )
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns storedSettings
+            coEvery { resolveTravelModeTagUseCase.getFinalTags(any(), any(), eq(storedSettings)) } returns expectedTags
+
+            val tagsSlot = slot<Set<Tag>>()
+            coEvery { transactionRepository.insertTransactionWithTags(any(), capture(tagsSlot)) } returns 21L
+
+            val result = useCase(potentialTxn, travelSettings = null)
+
+            assertTrue(result)
+            assertEquals(expectedTags, tagsSlot.captured)
+            coVerify(exactly = 1) { travelSettingsRepository.getCurrentTravelModeSettings() }
+        }
+
+    @Test
+    fun `invoke works when resolveTravelModeTagUseCase is null`() =
+        runTest(testDispatcher) {
+            val useCaseWithoutTagResolver =
+                AutoSaveSmsTransactionUseCase(
+                    transactionRepository = transactionRepository,
+                    accountRepository = accountRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                    smsRepository = smsRepository,
+                    travelSettingsRepository = travelSettingsRepository,
+                    resolveTravelModeTagUseCase = null,
+                    dispatcherProvider = testDispatcherProvider,
+                )
+
+            val tagsSlot = slot<Set<Tag>>()
+            coEvery { transactionRepository.insertTransactionWithTags(any(), capture(tagsSlot)) } returns 22L
+
+            val result = useCaseWithoutTagResolver(createBaseTransaction())
+
+            assertTrue(result)
+            assertTrue(tagsSlot.captured.isEmpty())
         }
 
     @Test
@@ -328,33 +472,69 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `secondary constructor instantiates successfully with context`() {
+    fun `invoke catches unexpected exception and returns false`() =
+        runTest(testDispatcher) {
+            val potentialTxn = createBaseTransaction()
+            coEvery { transactionRepository.insertTransactionWithTags(any(), any()) } throws RuntimeException("Disk full")
+
+            val result = useCase(potentialTxn)
+
+            assertFalse(result)
+        }
+
+    @Test
+    fun `secondary constructor with four repositories executes invoke with deleted hash filtering`() =
+        runTest(testDispatcher) {
+            val fourRepoUseCase =
+                AutoSaveSmsTransactionUseCase(
+                    transactionRepository = transactionRepository,
+                    accountRepository = accountRepository,
+                    smsRepository = smsRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                )
+
+            // 1. Verify deleted transaction suppression works via transactionRepository
+            coEvery { transactionRepository.existsDeletedSmsHash("hash_deleted_test") } returns true
+            val deletedTxn = createBaseTransaction(sourceSmsHash = "hash_deleted_test")
+            val deletedResult = fourRepoUseCase(deletedTxn)
+            assertFalse(deletedResult)
+            coVerify(exactly = 1) { transactionRepository.existsDeletedSmsHash("hash_deleted_test") }
+
+            // 2. Verify normal save works
+            coEvery { transactionRepository.existsDeletedSmsHash("hash_clean_test") } returns false
+            coEvery { transactionRepository.insertTransactionWithTags(any(), any()) } returns 50L
+            val validTxn = createBaseTransaction(sourceSmsHash = "hash_clean_test")
+            val validResult = fourRepoUseCase(validTxn)
+            assertTrue(validResult)
+        }
+
+    @Test
+    fun `secondary constructor instantiates successfully with context and resolvedDb`() {
         val mockDb: AppDatabase = mockk(relaxed = true)
         val mockTagRepository: ITagRepository = mockk(relaxed = true)
+        val mockTravelSettingsRepo: ITravelSettingsRepository = mockk(relaxed = true)
+        val context: Context = ApplicationProvider.getApplicationContext()
+
         ServiceLocator.setTransactionRepository(transactionRepository)
         ServiceLocator.setAccountRepository(accountRepository)
         ServiceLocator.setSmsRepository(smsRepository)
         ServiceLocator.setMerchantMappingRepository(merchantMappingRepository)
+        ServiceLocator.setTravelSettingsRepository(mockTravelSettingsRepo)
         ServiceLocator.setTagRepository(mockTagRepository)
         ServiceLocator.setDispatcherProvider(testDispatcherProvider)
 
-        val constructedUseCase =
+        val constructedUseCaseWithDb =
             AutoSaveSmsTransactionUseCase(
-                context = ApplicationProvider.getApplicationContext(),
+                context = context,
                 resolvedDb = mockDb,
             )
-        assertNotNull(constructedUseCase)
-    }
+        assertNotNull(constructedUseCaseWithDb)
 
-    @Test
-    fun `secondary constructor instantiates successfully with four repositories`() {
-        val constructedUseCase =
+        val constructedUseCaseWithoutDb =
             AutoSaveSmsTransactionUseCase(
-                transactionRepository = transactionRepository,
-                accountRepository = accountRepository,
-                smsRepository = smsRepository,
-                merchantMappingRepository = merchantMappingRepository,
+                context = context,
+                resolvedDb = null,
             )
-        assertNotNull(constructedUseCase)
+        assertNotNull(constructedUseCaseWithoutDb)
     }
 }

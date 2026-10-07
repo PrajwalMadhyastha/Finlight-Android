@@ -53,6 +53,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var manageReimbursementUseCase: ManageReimbursementUseCase
 
+    @Mock
+    private lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
+
     private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var repository: TransactionRepository
 
@@ -61,6 +64,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         super.setup()
 
         testDispatcherProvider = TestDispatcherProvider(testDispatcher)
+        whenever(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         // Mock withTransaction
         mockkStatic("androidx.room.RoomDatabaseKt")
@@ -592,6 +596,32 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.updateSmsHashByLegacy("old_hash", "new_hash")
 
             verify(transactionDao).updateSmsHashByLegacy("old_hash", "new_hash")
+        }
+
+    @Test
+    fun `existsDeletedSmsHash delegates to deletedSmsHashDao existsByHash`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            `when`(deletedSmsHashDao.existsByHash("del_hash_1")).thenReturn(true)
+            `when`(deletedSmsHashDao.existsByHash("del_hash_2")).thenReturn(false)
+
+            assertTrue(repository.existsDeletedSmsHash("del_hash_1"))
+            assertFalse(repository.existsDeletedSmsHash("del_hash_2"))
+            verify(deletedSmsHashDao).existsByHash("del_hash_1")
+            verify(deletedSmsHashDao).existsByHash("del_hash_2")
+        }
+
+    @Test
+    fun `insertDeletedSmsHash delegates to deletedSmsHashDao insert`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.insertDeletedSmsHash("del_hash_new")
+
+            verify(deletedSmsHashDao).insert(io.pm.finlight.data.db.entity.DeletedSmsHash("del_hash_new"))
         }
 
     // ── Constructors and Dispatcher Injection Tests ────────────────────────────

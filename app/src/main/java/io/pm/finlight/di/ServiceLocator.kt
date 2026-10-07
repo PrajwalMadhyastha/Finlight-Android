@@ -421,15 +421,13 @@ object ServiceLocator {
     ): AutoSaveSmsTransactionUseCase {
         return autoSaveSmsTransactionUseCase ?: synchronized(this) {
             autoSaveSmsTransactionUseCase ?: run {
-                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 val tagRepository = provideTagRepository(context)
                 AutoSaveSmsTransactionUseCase(
                     transactionRepository = provideTransactionRepository(context),
                     accountRepository = provideAccountRepository(context),
+                    merchantMappingRepository = provideMerchantMappingRepository(context, resolvedDb),
                     smsRepository = provideSmsRepository(context),
-                    merchantMappingRepository = provideMerchantMappingRepository(context, db),
-                    db = db,
-                    deletedSmsHashDao = db.deletedSmsHashDao(),
+                    travelSettingsRepository = provideTravelSettingsRepository(context),
                     resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository),
                     dispatcherProvider = provideDispatcherProvider(context),
                 ).also {

@@ -6,13 +6,13 @@ import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.SmsParser
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionType
+import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.DeletedSmsHashDao
-import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * Domain UseCase that encapsulates SMS transaction deduplication, account resolution,
- * merchant fallback mapping, and transaction auto-persistence.
+ * merchant fallback mapping, travel mode tag resolution, and transaction auto-persistence.
  *
  * Extracted from TransactionViewModel to allow ingestion services, background workers,
  * and ViewModels to auto-save transactions cleanly without depending on presentation state.
@@ -29,10 +29,9 @@ import kotlinx.coroutines.withContext
 class AutoSaveSmsTransactionUseCase(
     private val transactionRepository: ITransactionRepository,
     private val accountRepository: IAccountRepository,
-    private val smsRepository: ISmsRepository,
     private val merchantMappingRepository: IMerchantMappingRepository,
-    private val db: AppDatabase? = null,
-    private val deletedSmsHashDao: DeletedSmsHashDao? = db?.deletedSmsHashDao(),
+    private val smsRepository: ISmsRepository? = null,
+    private val travelSettingsRepository: ITravelSettingsRepository? = null,
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase? = null,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) {
@@ -46,10 +45,9 @@ class AutoSaveSmsTransactionUseCase(
     ) : this(
         transactionRepository = ServiceLocator.provideTransactionRepository(context),
         accountRepository = ServiceLocator.provideAccountRepository(context),
-        smsRepository = ServiceLocator.provideSmsRepository(context),
         merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(context, resolvedDb),
-        db = resolvedDb ?: AppDatabase.getInstance(context),
-        deletedSmsHashDao = (resolvedDb ?: AppDatabase.getInstance(context)).deletedSmsHashDao(),
+        smsRepository = ServiceLocator.provideSmsRepository(context),
+        travelSettingsRepository = ServiceLocator.provideTravelSettingsRepository(context),
         resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(ServiceLocator.provideTagRepository(context)),
         dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
     )
@@ -62,10 +60,9 @@ class AutoSaveSmsTransactionUseCase(
     ) : this(
         transactionRepository = transactionRepository,
         accountRepository = accountRepository,
-        smsRepository = smsRepository,
         merchantMappingRepository = merchantMappingRepository,
-        db = null,
-        deletedSmsHashDao = null,
+        smsRepository = smsRepository,
+        travelSettingsRepository = null,
         resolveTravelModeTagUseCase = null,
         dispatcherProvider = DefaultDispatcherProvider(),
     )
@@ -75,11 +72,13 @@ class AutoSaveSmsTransactionUseCase(
      *
      * @param potentialTxn The candidate transaction parsed from an SMS.
      * @param source The origin label to stamp on the transaction (e.g., "Auto-Captured", "Imported").
+     * @param travelSettings Optional active travel settings. If null, resolved via [travelSettingsRepository].
      * @return True if the transaction was successfully saved, false if dropped or deduplicated.
      */
     suspend operator fun invoke(
         potentialTxn: PotentialTransaction,
         source: String = "Auto-Captured",
+        travelSettings: TravelModeSettings? = null,
     ): Boolean {
         return withContext(dispatcherProvider.io) {
             try {
@@ -124,8 +123,8 @@ class AutoSaveSmsTransactionUseCase(
                     }
 
                 val originalDescription =
-                    potentialTxn.originalMerchantName?.takeIf { it.isNotBlank() }
-                        ?: potentialTxn.merchantName?.takeIf { it.isNotBlank() }
+                    potentialTxn.originalMerchantName?.takeIf { it.isNotBlank() && !it.equals("Unknown Merchant", ignoreCase = true) }
+                        ?: potentialTxn.merchantName?.takeIf { it.isNotBlank() && !it.equals("Unknown Merchant", ignoreCase = true) }
                         ?: merchantName
 
                 val transactionToSave =
@@ -139,13 +138,23 @@ class AutoSaveSmsTransactionUseCase(
                         notes = null,
                         transactionType =
                             TransactionType.fromStringOrNull(potentialTxn.transactionType)
-                                ?: TransactionType.fromString(potentialTxn.transactionType),
+                                ?: TransactionType.EXPENSE,
                         sourceSmsId = potentialTxn.sourceSmsId,
                         sourceSmsHash = potentialTxn.sourceSmsHash,
                         source = source,
+                        smsSignature = potentialTxn.smsSignature,
+                        needsReview = potentialTxn.needsReview,
                     )
 
-                val finalTags = resolveTravelModeTagUseCase?.getFinalTags(transactionToSave.date, emptySet(), null) ?: emptySet()
+                val activeTravelSettings =
+                    travelSettings ?: travelSettingsRepository?.getCurrentTravelModeSettings()
+                val finalTags =
+                    resolveTravelModeTagUseCase?.getFinalTags(
+                        transactionDate = transactionToSave.date,
+                        initialTags = emptySet(),
+                        travelSettings = activeTravelSettings,
+                    ) ?: emptySet()
+
                 val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
                 if (newId <= 0L) {
                     Log.d(TAG, "Auto-save ignored or failed due to conflict (newId: $newId).")
@@ -177,17 +186,14 @@ class AutoSaveSmsTransactionUseCase(
         }
 
         // 3. Check deny-list (deleted transactions)
-        val activeDeletedDao = deletedSmsHashDao ?: db?.deletedSmsHashDao()
-        if (activeDeletedDao != null) {
-            val isCurrentDeleted = activeDeletedDao.existsByHash(hash)
-            val isLegacyDeleted = legacyHash.isNotBlank() && activeDeletedDao.existsByHash(legacyHash)
-            if (isCurrentDeleted || isLegacyDeleted) {
-                Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping auto-save.")
-                if (isLegacyDeleted) {
-                    activeDeletedDao.insert(DeletedSmsHash(hash))
-                }
-                return true
+        val isCurrentDeleted = transactionRepository.existsDeletedSmsHash(hash)
+        val isLegacyDeleted = legacyHash.isNotBlank() && transactionRepository.existsDeletedSmsHash(legacyHash)
+        if (isCurrentDeleted || isLegacyDeleted) {
+            Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping auto-save.")
+            if (isLegacyDeleted) {
+                transactionRepository.insertDeletedSmsHash(hash)
             }
+            return true
         }
 
         return false

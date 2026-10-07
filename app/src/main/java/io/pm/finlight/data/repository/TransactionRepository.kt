@@ -10,10 +10,12 @@ package io.pm.finlight
 import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -38,6 +40,7 @@ class TransactionRepository(
             db = db,
             dispatcherProvider = dispatcherProvider,
         ),
+    private val deletedSmsHashDao: DeletedSmsHashDao = db.deletedSmsHashDao(),
 ) : ITransactionRepository {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
@@ -60,6 +63,7 @@ class TransactionRepository(
         db = db,
         dispatcherProvider = dispatcherProvider,
         manageReimbursementUseCase = manageReimbursementUseCase,
+        deletedSmsHashDao = db.deletedSmsHashDao(),
     )
 
     // --- NEW: Function for Spending Velocity feature ---
@@ -370,6 +374,14 @@ class TransactionRepository(
         newHash: String,
     ) {
         transactionWriteDao.updateSmsHashByLegacy(oldHash = oldHash, newHash = newHash)
+    }
+
+    override suspend fun existsDeletedSmsHash(hash: String): Boolean {
+        return deletedSmsHashDao.existsByHash(hash)
+    }
+
+    override suspend fun insertDeletedSmsHash(hash: String) {
+        deletedSmsHashDao.insert(DeletedSmsHash(hash))
     }
 
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
