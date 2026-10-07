@@ -8,6 +8,7 @@ import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.pm.finlight.*
@@ -34,6 +35,7 @@ import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -122,8 +124,113 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.linkTransfer(1, 2)
 
+            coVerify { db.withTransaction<Any?>(any()) }
             verify(transactionDao).updateTransferLinkStatus(1, 2, true)
             verify(transactionDao).updateTransferLinkStatus(2, 1, true)
+        }
+
+    // ── Pending Transactions, Confirmation & Skip Tests ─────────────────────────
+
+    @Test
+    fun `getPendingTransactionsFlow delegates to transactionQueryDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val pendingList =
+                listOf(
+                    Transaction(
+                        id = 1,
+                        description = "Pending Bill",
+                        amount = 100.0,
+                        date = 1000L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                        status = TransactionStatus.PENDING,
+                    ),
+                )
+            whenever(transactionDao.getPendingTransactions()).thenReturn(flowOf(pendingList))
+
+            repository.getPendingTransactionsFlow().test {
+                val item = awaitItem()
+                assertEquals(pendingList, item)
+                awaitComplete()
+            }
+
+            verify(transactionDao).getPendingTransactions()
+        }
+
+    @Test
+    fun `confirmTransaction without confirmedAmount only calls confirmTransaction atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42)
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount updates amount and confirms atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            val inOrder = inOrder(transactionDao)
+            inOrder.verify(transactionDao).updateAmount(42, 150.0)
+            inOrder.verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount propagates exception when updateAmount fails`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            whenever(transactionDao.updateAmount(eq(42), eq(150.0))).thenThrow(RuntimeException("DB failure"))
+
+            assertFailsWith<RuntimeException> {
+                repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+            }
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            verify(transactionDao).updateAmount(42, 150.0)
+            verify(transactionDao, never()).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with invalid confirmedAmount throws IllegalArgumentException without DB interaction`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val invalidAmounts = listOf(0.0, -10.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            for (invalidAmount in invalidAmounts) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = 42, confirmedAmount = invalidAmount)
+                }
+            }
+
+            coVerify(exactly = 0) { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao, never()).confirmTransaction(any())
+        }
+
+    @Test
+    fun `skipTransaction delegates to transactionWriteDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.skipTransaction(transactionId = 42)
+
+            verify(transactionDao).skipTransaction(42)
         }
 
     // ── Reimbursement / Offset Feature Tests ──────────────────────────────────

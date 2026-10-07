@@ -3,7 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.*
+import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
@@ -33,10 +33,10 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 tagRepository = tagRepository,
                 settingsRepository = settingsRepository,
                 smsRepository = smsRepository,
-                merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao()),
-                merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao()),
+                merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db),
+                merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db),
                 merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(application, db),
-                splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao()),
+                splitTransactionRepository = ServiceLocator.provideSplitTransactionRepository(application, db),
                 smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,

@@ -14,14 +14,13 @@ class ReportsViewModelFactory(private val application: Application) : ViewModelP
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionRepository = transactionRepository,
                     dispatcherProvider = dispatcherProvider,
                 )
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(

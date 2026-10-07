@@ -7,16 +7,12 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
-import io.mockk.verify
-import io.pm.finlight.DashboardViewModel
-import io.pm.finlight.DashboardViewModelFactory
-import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ReportsViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
-import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -28,9 +24,9 @@ import org.robolectric.annotation.Config
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class DashboardViewModelFactoryTest {
+class ReportsViewModelFactoryTest {
     private lateinit var application: Application
-    private lateinit var factory: DashboardViewModelFactory
+    private lateinit var factory: ReportsViewModelFactory
     private lateinit var db: AppDatabase
 
     @Before
@@ -41,7 +37,7 @@ class DashboardViewModelFactoryTest {
                 .allowMainThreadQueries()
                 .build()
         AppDatabase.setTestInstance(db)
-        factory = DashboardViewModelFactory(application)
+        factory = ReportsViewModelFactory(application)
         ServiceLocator.reset()
     }
 
@@ -52,38 +48,21 @@ class DashboardViewModelFactoryTest {
     }
 
     @Test
-    fun create_withDashboardViewModelClass_resolvesRepositoriesFromServiceLocator() {
+    fun create_withReportsViewModelClass_resolvesRepositoriesFromServiceLocator() {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
-        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
-        val mockMergeTransactionsUseCase: MergeTransactionsUseCase = mockk(relaxed = true)
-
         ServiceLocator.setTransactionRepository(mockTxnRepo)
-        ServiceLocator.setAccountRepository(mockAccountRepo)
-        ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactionsUseCase)
 
-        val viewModel = factory.create(DashboardViewModel::class.java)
+        val viewModel = factory.create(ReportsViewModel::class.java)
 
         assertNotNull(viewModel)
         val txnField =
-            DashboardViewModel::class.java.getDeclaredField("transactionRepository").apply {
+            ReportsViewModel::class.java.getDeclaredField("transactionRepository").apply {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockTxnRepo, txnField)
 
-        val accField =
-            DashboardViewModel::class.java.getDeclaredField("accountRepository").apply {
-                isAccessible = true
-            }.get(viewModel)
-        assertSame(mockAccountRepo, accField)
-
-        val mergeUseCaseField =
-            DashboardViewModel::class.java.getDeclaredField("mergeTransactionsUseCase").apply {
-                isAccessible = true
-            }.get(viewModel)
-        assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
-
         val useCase =
-            DashboardViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
+            ReportsViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
                 isAccessible = true
             }.get(viewModel) as GetMonthlyConsistencyDataUseCase
         assertNotNull(useCase)
@@ -93,9 +72,6 @@ class DashboardViewModelFactoryTest {
                 isAccessible = true
             }.get(useCase)
         assertSame(mockTxnRepo, useCaseTxnRepo)
-
-        verify { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) }
-        verify { mockAccountRepo.accountsWithBalance }
     }
 
     @Test

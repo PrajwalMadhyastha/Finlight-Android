@@ -535,4 +535,33 @@ class TransactionRepository(
             transactionWriteDao.updateTransferLinkStatus(secondaryTxnId, primaryTxnId, true)
         }
     }
+
+    // ─── Pending Transactions, Confirmation & Skip ─────────────────────────
+
+    override fun getPendingTransactionsFlow(): Flow<List<Transaction>> =
+        transactionQueryDao.getPendingTransactions()
+
+    override suspend fun confirmTransaction(
+        transactionId: Int,
+        confirmedAmount: Double?,
+    ) {
+        if (confirmedAmount != null) {
+            require(confirmedAmount > 0.0 && !confirmedAmount.isNaN() && !confirmedAmount.isInfinite()) {
+                "Confirmed amount must be positive and finite, but was: $confirmedAmount"
+            }
+        }
+        withContext(dispatcherProvider.io) {
+            db.withTransaction {
+                if (confirmedAmount != null) {
+                    transactionWriteDao.updateAmount(transactionId, confirmedAmount)
+                }
+                transactionWriteDao.confirmTransaction(transactionId)
+            }
+        }
+    }
+
+    override suspend fun skipTransaction(transactionId: Int) =
+        withContext(dispatcherProvider.io) {
+            transactionWriteDao.skipTransaction(transactionId)
+        }
 }
