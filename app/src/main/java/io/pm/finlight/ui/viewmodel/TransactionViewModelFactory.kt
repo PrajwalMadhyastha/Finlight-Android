@@ -18,6 +18,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val manageReimbursementUseCase = ServiceLocator.provideManageReimbursementUseCase(application)
+            val autoSaveSmsTransactionUseCase = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
@@ -42,6 +43,7 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 dispatcherProvider = dispatcherProvider,
                 manageReimbursementUseCase = manageReimbursementUseCase,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

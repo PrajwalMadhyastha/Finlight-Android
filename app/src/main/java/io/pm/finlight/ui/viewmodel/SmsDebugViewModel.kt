@@ -14,6 +14,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -48,7 +49,7 @@ class SmsDebugViewModel(
     private val smsClassifier: SmsClassifier,
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
-    private val transactionViewModel: TransactionViewModel,
+    private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
 ) : AndroidViewModel(application) {
     // Secondary constructor for backward compatibility
     constructor(
@@ -57,14 +58,14 @@ class SmsDebugViewModel(
         db: AppDatabase,
         smsClassifier: SmsClassifier,
         nerExtractor: SmsEntityExtractor,
-        transactionViewModel: TransactionViewModel,
+        autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
     ) : this(
         application = application,
         smsRepository = smsRepository,
         db = db,
         smsClassifier = smsClassifier,
         nerExtractorProvider = { nerExtractor },
-        transactionViewModel = transactionViewModel,
+        autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
     )
 
     private val _uiState = MutableStateFlow(SmsDebugUiState())
@@ -266,7 +267,7 @@ class SmsDebugViewModel(
             var importedCount = 0
             if (transactionsToImport.isNotEmpty()) {
                 for (txn in transactionsToImport) {
-                    val success = transactionViewModel.autoSaveSmsTransaction(txn, source = "Imported")
+                    val success = autoSaveSmsTransactionUseCase(txn, source = "Imported")
                     if (success) {
                         importedCount++
                     }
