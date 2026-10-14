@@ -32,6 +32,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModelFactory
 import io.pm.finlight.ui.viewmodel.RecurringTransactionViewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -278,8 +280,13 @@ fun ConfirmPendingBottomSheet(
 }
 
 @Composable
-fun UpcomingPaymentsCard(navController: NavController) {
-    val pendingViewModel: PendingTransactionsViewModel = viewModel()
+fun UpcomingPaymentsCard(
+    navController: NavController,
+    pendingViewModel: PendingTransactionsViewModel =
+        viewModel(
+            factory = PendingTransactionsViewModelFactory(LocalContext.current.applicationContext as Application),
+        ),
+) {
     val pending by pendingViewModel.pendingTransactions.collectAsState()
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 

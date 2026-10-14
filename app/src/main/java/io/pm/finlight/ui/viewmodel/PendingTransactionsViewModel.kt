@@ -1,18 +1,16 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/PendingTransactionsViewModel.kt
-// REASON: NEW FILE (Issue #105) - Manages the state and actions for the
-// ConfirmPendingBottomSheet and the UPCOMING_PAYMENTS dashboard card.
-// Exposes:
-//  - pendingTransactions: Flow<List<Transaction>> — the user's action queue.
-//  - confirmPending(draftId, ruleId, confirmedAmount) — confirm with optional amount edit.
-//  - skipPending(draftId, ruleId) — skip this cycle, increment rule skipCount.
+// REASON: REFACTOR (Issue #338) - Decouples PendingTransactionsViewModel from
+// AndroidViewModel and direct Room database/DAO access, injecting repository interfaces
+// (ITransactionRepository, IRecurringTransactionRepository) and DispatcherProvider.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.Transaction
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
@@ -21,17 +19,13 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class PendingTransactionsViewModel(
-    application: Application,
+    private val transactionRepository: ITransactionRepository,
+    private val recurringTransactionRepository: IRecurringTransactionRepository,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
-) : AndroidViewModel(application) {
-    private val db = AppDatabase.getInstance(application)
-    private val transactionQueryDao = db.transactionQueryDao()
-    private val transactionWriteDao = db.transactionWriteDao()
-    private val recurringDao = db.recurringTransactionDao()
-
+) : ViewModel() {
     /** All PENDING draft transactions, ordered oldest-first (most overdue first). */
     val pendingTransactions: StateFlow<List<Transaction>> =
-        transactionQueryDao.getPendingTransactions()
+        transactionRepository.getPendingTransactionsFlow()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -42,25 +36,26 @@ class PendingTransactionsViewModel(
      * Confirms a pending draft transaction.
      *
      * @param draftId The ID of the PENDING Transaction to confirm.
-     * @param ruleId  The ID of the recurring rule that generated this draft.
+     * @param ruleId The ID of the recurring rule that generated this draft, or null.
      * @param confirmedAmount If non-null, overrides the draft amount before confirming.
      *                       Used when the user edits the amount on a variable bill.
      */
     fun confirmPending(
         draftId: Int,
-        ruleId: Int,
-        confirmedAmount: Double? = null
+        ruleId: Int? = null,
+        confirmedAmount: Double? = null,
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
-            if (confirmedAmount != null) {
-                // Update amount before confirming
-                transactionWriteDao.updateAmount(draftId, confirmedAmount)
+            transactionRepository.confirmTransaction(draftId, confirmedAmount)
+            if (ruleId != null) {
+                // Update the rule's lastRunDate so it doesn't fire again this cycle
+                // and reset skip counter on successful confirmation
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = ruleId,
+                    lastRunDate = System.currentTimeMillis(),
+                    skipCount = 0,
+                )
             }
-            transactionWriteDao.confirmTransaction(draftId)
-            // Update the rule's lastRunDate so it doesn't fire again this cycle
-            recurringDao.updateLastRunDate(ruleId, System.currentTimeMillis())
-            // Reset skip counter on successful confirmation
-            recurringDao.updateSkipCount(ruleId, 0)
         }
     }
 
@@ -68,20 +63,33 @@ class PendingTransactionsViewModel(
      * Skips the current cycle for a pending draft.
      *
      * @param draftId The ID of the PENDING Transaction to skip.
-     * @param ruleId  The ID of the recurring rule that generated this draft.
+     * @param ruleId The ID of the recurring rule that generated this draft.
+     * @param lastRunDate The timestamp of last execution (defaults to current system time).
+     * @param skipCount Optional target skip count. If null, the existing skip count is incremented by 1.
      */
     fun skipPending(
         draftId: Int,
-        ruleId: Int
+        ruleId: Int,
+        lastRunDate: Long = System.currentTimeMillis(),
+        skipCount: Int? = null,
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
-            transactionWriteDao.skipTransaction(draftId)
-            // Update lastRunDate so the worker doesn't recreate a draft for this cycle
-            recurringDao.updateLastRunDate(ruleId, System.currentTimeMillis())
-            // Increment the skip counter (groundwork for future cancellation detection)
-            val rule = recurringDao.getAllRulesList().find { it.id == ruleId }
-            if (rule != null) {
-                recurringDao.updateSkipCount(ruleId, rule.skipCount + 1)
+            transactionRepository.skipTransaction(draftId)
+            val finalSkipCount =
+                if (skipCount != null) {
+                    skipCount
+                } else {
+                    val rule = recurringTransactionRepository.getRuleById(ruleId)
+                    rule?.let { it.skipCount + 1 }
+                }
+            if (finalSkipCount != null) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = ruleId,
+                    lastRunDate = lastRunDate,
+                    skipCount = finalSkipCount,
+                )
+            } else {
+                recurringTransactionRepository.updateLastRunDate(ruleId, lastRunDate)
             }
         }
     }
