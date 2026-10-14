@@ -43,6 +43,27 @@ class AccountTypeTest {
     }
 
     @Test
+    fun `fromString resolves canonical variations and common aliases`() {
+        assertEquals(AccountType.BANK, AccountType.fromString("Savings Account"))
+        assertEquals(AccountType.BANK, AccountType.fromString("savings account"))
+        assertEquals(AccountType.BANK, AccountType.fromString("Savings"))
+        assertEquals(AccountType.BANK, AccountType.fromString("savings"))
+        assertEquals(AccountType.BANK, AccountType.fromString("Current Account"))
+        assertEquals(AccountType.BANK, AccountType.fromString("current account"))
+        assertEquals(AccountType.BANK, AccountType.fromString("Current"))
+        assertEquals(AccountType.BANK, AccountType.fromString("current"))
+        assertEquals(AccountType.BANK, AccountType.fromString("Checking"))
+        assertEquals(AccountType.BANK, AccountType.fromString("checking"))
+        assertEquals(AccountType.BANK, AccountType.fromString("bank"))
+        assertEquals(AccountType.CREDIT_CARD, AccountType.fromString("credit"))
+        assertEquals(AccountType.PREPAID_CARD, AccountType.fromString("prepaid"))
+        assertEquals(AccountType.MEAL_CARD, AccountType.fromString("Meal Card wallet"))
+        assertEquals(AccountType.MEAL_CARD, AccountType.fromString("meal card wallet"))
+        assertEquals(AccountType.MEAL_CARD, AccountType.fromString("meal card / wallet"))
+        assertEquals(AccountType.MEAL_CARD, AccountType.fromString("meal wallet"))
+    }
+
+    @Test
     fun `fromString returns OTHER for null blank or unknown values`() {
         assertEquals(AccountType.OTHER, AccountType.fromString(null))
         assertEquals(AccountType.OTHER, AccountType.fromString(""))

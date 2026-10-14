@@ -13,19 +13,42 @@ import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
 
 class SmsDebugViewModelFactory(
     private val application: Application,
-    private val transactionViewModel: TransactionViewModel,
+    private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null,
     private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
 ) : ViewModelProvider.Factory {
+    constructor(
+        application: Application,
+        nerExtractorProvider: (() -> SmsEntityExtractor)?,
+    ) : this(
+        application = application,
+        autoSaveSmsTransactionUseCase = null,
+        nerExtractorProvider = nerExtractorProvider,
+    )
+
+    constructor(
+        application: Application,
+        transactionViewModel: TransactionViewModel,
+        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    ) : this(
+        application = application,
+        autoSaveSmsTransactionUseCase = null,
+        nerExtractorProvider = nerExtractorProvider,
+    )
+
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
             val smsRepository = ServiceLocator.provideSmsRepository(application)
             val db = AppDatabase.getInstance(application)
             val smsClassifier = MlModelFactory.getClassifier(application)
+            val autoSaveUseCase =
+                autoSaveSmsTransactionUseCase
+                    ?: ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
@@ -36,7 +59,7 @@ class SmsDebugViewModelFactory(
                         db = db,
                         smsClassifier = smsClassifier,
                         nerExtractorProvider = nerExtractorProvider,
-                        transactionViewModel = transactionViewModel,
+                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
                     )
                 } else {
                     SmsDebugViewModel(
@@ -44,7 +67,7 @@ class SmsDebugViewModelFactory(
                         smsRepository = smsRepository,
                         db = db,
                         smsClassifier = smsClassifier,
-                        transactionViewModel = transactionViewModel,
+                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
                     )
                 }
             return viewModel as T

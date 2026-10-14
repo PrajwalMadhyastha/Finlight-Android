@@ -15,9 +15,9 @@ import io.mockk.verify
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.TestApplication
-import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
@@ -61,7 +61,9 @@ class SmsDebugViewModelFactoryTest {
             mockk(relaxed = true) {
                 coEvery { fetchAllSms(any()) } returns emptyList()
             }
+        val mockAutoSaveUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
         ServiceLocator.setSmsRepository(mockSmsRepo)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSaveUseCase)
 
         mockkObject(MlModelFactory)
         val mockClassifier: SmsClassifier = mockk(relaxed = true)
@@ -69,12 +71,17 @@ class SmsDebugViewModelFactoryTest {
         every { MlModelFactory.getClassifier(any()) } returns mockClassifier
         every { MlModelFactory.getNerExtractor(any()) } returns mockNerExtractor
 
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
-        val factory = SmsDebugViewModelFactory(application, mockTransactionViewModel)
+        val factory = SmsDebugViewModelFactory(application)
 
         val viewModel = factory.create(SmsDebugViewModel::class.java)
 
         assertNotNull(viewModel)
+
+        val autoSaveUseCaseField =
+            SmsDebugViewModel::class.java.getDeclaredField("autoSaveSmsTransactionUseCase").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockAutoSaveUseCase, autoSaveUseCaseField)
 
         // NerExtractor is NOT eagerly instantiated on creation
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
@@ -100,11 +107,9 @@ class SmsDebugViewModelFactoryTest {
         val customExtractor: SmsEntityExtractor = mockk(relaxed = true)
         val customProvider: () -> SmsEntityExtractor = { customExtractor }
 
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
         val factory =
             SmsDebugViewModelFactory(
                 application,
-                mockTransactionViewModel,
                 nerExtractorProvider = customProvider,
             )
         val viewModel = factory.create(SmsDebugViewModel::class.java)
@@ -115,8 +120,7 @@ class SmsDebugViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
-        val factory = SmsDebugViewModelFactory(application, mockTransactionViewModel)
+        val factory = SmsDebugViewModelFactory(application)
 
         class UnknownViewModel : ViewModel()
 

@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.Log
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IMerchantMappingRepository
-import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
 import io.pm.finlight.PotentialTransaction
@@ -30,7 +29,6 @@ class AutoSaveSmsTransactionUseCase(
     private val transactionRepository: ITransactionRepository,
     private val accountRepository: IAccountRepository,
     private val merchantMappingRepository: IMerchantMappingRepository,
-    private val smsRepository: ISmsRepository? = null,
     private val travelSettingsRepository: ITravelSettingsRepository? = null,
     private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase? = null,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
@@ -46,7 +44,6 @@ class AutoSaveSmsTransactionUseCase(
         transactionRepository = ServiceLocator.provideTransactionRepository(context),
         accountRepository = ServiceLocator.provideAccountRepository(context),
         merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(context, resolvedDb),
-        smsRepository = ServiceLocator.provideSmsRepository(context),
         travelSettingsRepository = ServiceLocator.provideTravelSettingsRepository(context),
         resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(ServiceLocator.provideTagRepository(context)),
         dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
@@ -55,16 +52,15 @@ class AutoSaveSmsTransactionUseCase(
     constructor(
         transactionRepository: ITransactionRepository,
         accountRepository: IAccountRepository,
-        smsRepository: ISmsRepository,
         merchantMappingRepository: IMerchantMappingRepository,
+        dispatcherProvider: DispatcherProvider,
     ) : this(
         transactionRepository = transactionRepository,
         accountRepository = accountRepository,
         merchantMappingRepository = merchantMappingRepository,
-        smsRepository = smsRepository,
         travelSettingsRepository = null,
         resolveTravelModeTagUseCase = null,
-        dispatcherProvider = DefaultDispatcherProvider(),
+        dispatcherProvider = dispatcherProvider,
     )
 
     /**

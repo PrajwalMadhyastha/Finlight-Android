@@ -90,6 +90,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
 
+    @Mock protected lateinit var merchantMappingDao: MerchantMappingDao
+
     protected lateinit var viewModel: TransactionViewModel
 
     @Before
@@ -112,6 +114,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
         whenever(db.splitTransactionDao()).thenReturn(splitTransactionDao)
         whenever(db.accountAliasDao()).thenReturn(accountAliasDao)
         whenever(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
+        whenever(db.merchantMappingDao()).thenReturn(merchantMappingDao)
 
         // Setup default mock behaviors for ViewModel initialization
         setupDefaultMocks()
@@ -184,11 +187,38 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                     }
                 }
             }
+            whenever(accountRepository.findOrCreateByName(anyString(), any<AccountType>())).thenAnswer { invocation ->
+                val name = invocation.getArgument<String>(0)
+                val type = invocation.getArgument<AccountType>(1)
+                kotlinx.coroutines.runBlocking {
+                    accountRepository.findOrCreateByName(name, type.typeName)
+                }
+            }
         }
     }
 
     protected fun initializeViewModel() {
         val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
+        val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
+        val autoSaveUseCase =
+            io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase(
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                travelSettingsRepository =
+                    object : io.pm.finlight.ITravelSettingsRepository {
+                        override suspend fun getCurrentTravelModeSettings(): io.pm.finlight.TravelModeSettings? =
+                            settingsRepository.getCurrentTravelModeSettings()
+
+                        override fun getTravelModeSettings(): kotlinx.coroutines.flow.Flow<io.pm.finlight.TravelModeSettings?> =
+                            settingsRepository.getTravelModeSettings()
+
+                        override suspend fun saveTravelModeSettings(settings: io.pm.finlight.TravelModeSettings?) =
+                            settingsRepository.saveTravelModeSettings(settings)
+                    },
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                dispatcherProvider = testDispatcherProvider,
+            )
         viewModel =
             TransactionViewModel(
                 application = applicationContext,
@@ -207,7 +237,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 manageReimbursementUseCase = manageReimbursementUseCase,
-                dispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher),
+                dispatcherProvider = testDispatcherProvider,
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
             )
     }
 }

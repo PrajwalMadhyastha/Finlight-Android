@@ -18,9 +18,18 @@ enum class AccountType(val typeName: String) {
     companion object {
         fun fromString(value: String?): AccountType {
             if (value.isNullOrBlank()) return OTHER
+            val trimmed = value.trim()
             return entries.firstOrNull {
-                it.name.equals(value, ignoreCase = true) || it.typeName.equals(value, ignoreCase = true)
-            } ?: OTHER
+                it.name.equals(trimmed, ignoreCase = true) || it.typeName.equals(trimmed, ignoreCase = true)
+            } ?: when (trimmed.lowercase()) {
+                "bank", "savings account", "savings", "current account", "current", "checking" -> BANK
+                "credit card", "credit" -> CREDIT_CARD
+                "card" -> CARD
+                "prepaid card", "prepaid" -> PREPAID_CARD
+                "meal card", "meal card wallet", "meal card / wallet", "meal wallet" -> MEAL_CARD
+                "general" -> GENERAL
+                else -> OTHER
+            }
         }
     }
 }

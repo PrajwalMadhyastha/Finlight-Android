@@ -22,6 +22,7 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,7 +47,7 @@ import org.robolectric.annotation.Config
 class SmsDebugViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var application: Application
 
-    @Mock private lateinit var transactionViewModel: TransactionViewModel
+    @Mock private lateinit var autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase
 
     @Mock private lateinit var smsRepository: SmsRepository
 
@@ -123,7 +124,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 db,
                 smsClassifier,
                 nerExtractor,
-                transactionViewModel,
+                autoSaveSmsTransactionUseCase,
             )
     }
 
@@ -263,7 +264,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer { invocation ->
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)
                 capturedSource = invocation.getArgument(1)
                 true
@@ -330,7 +331,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
             // Mocks for failure
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 false
             }
@@ -358,7 +359,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
             val finalState = viewModel.uiState.value
             assertFalse("Should not be loading after empty runAutoImportAndRefresh", finalState.isLoading)
             assertTrue("Debug results should be empty", finalState.debugResults.isEmpty())
@@ -411,7 +412,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     db = db,
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = countingProvider,
-                    transactionViewModel = transactionViewModel,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
                 )
 
             advanceUntilIdle()
@@ -439,7 +440,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     db = db,
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = countingProvider,
-                    transactionViewModel = transactionViewModel,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
                 )
 
             advanceUntilIdle()
@@ -504,7 +505,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -540,7 +541,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -576,7 +577,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -612,7 +613,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -644,7 +645,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     db = db,
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = countingProvider,
-                    transactionViewModel = transactionViewModel,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
                 )
             advanceUntilIdle()
 
@@ -682,7 +683,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     db = db,
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = { nerExtractor },
-                    transactionViewModel = transactionViewModel,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
                 )
             advanceUntilIdle()
 

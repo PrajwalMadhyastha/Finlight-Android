@@ -69,6 +69,7 @@ class TransactionViewModelFactoryTest {
         val mockMerchantMappingRepo: IMerchantMappingRepository = mockk(relaxed = true)
         val mockMerchantRenameRuleRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
         val mockSplitTransactionRepo: ISplitTransactionRepository = mockk(relaxed = true)
+        val mockAutoSaveUseCase: io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxnRepo)
         ServiceLocator.setAccountRepository(mockAccountRepo)
@@ -81,6 +82,7 @@ class TransactionViewModelFactoryTest {
         ServiceLocator.setMerchantMappingRepository(mockMerchantMappingRepo)
         ServiceLocator.setMerchantRenameRuleRepository(mockMerchantRenameRuleRepo)
         ServiceLocator.setSplitTransactionRepository(mockSplitTransactionRepo)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSaveUseCase)
 
         val viewModel = factory.create(TransactionViewModel::class.java)
 
@@ -112,6 +114,12 @@ class TransactionViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
+
+        val autoSaveUseCaseField =
+            TransactionViewModel::class.java.getDeclaredField("autoSaveSmsTransactionUseCase").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockAutoSaveUseCase, autoSaveUseCaseField)
 
         val categoryMappingRepoField =
             TransactionViewModel::class.java.getDeclaredField("merchantCategoryMappingRepository").apply {

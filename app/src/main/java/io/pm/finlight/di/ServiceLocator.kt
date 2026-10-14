@@ -426,7 +426,6 @@ object ServiceLocator {
                     transactionRepository = provideTransactionRepository(context),
                     accountRepository = provideAccountRepository(context),
                     merchantMappingRepository = provideMerchantMappingRepository(context, resolvedDb),
-                    smsRepository = provideSmsRepository(context),
                     travelSettingsRepository = provideTravelSettingsRepository(context),
                     resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository),
                     dispatcherProvider = provideDispatcherProvider(context),

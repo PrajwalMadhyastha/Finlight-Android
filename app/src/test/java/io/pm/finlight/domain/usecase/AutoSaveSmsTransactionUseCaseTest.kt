@@ -74,7 +74,6 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
                 merchantMappingRepository = merchantMappingRepository,
-                smsRepository = smsRepository,
                 travelSettingsRepository = travelSettingsRepository,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 dispatcherProvider = testDispatcherProvider,
@@ -445,7 +444,6 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
                     transactionRepository = transactionRepository,
                     accountRepository = accountRepository,
                     merchantMappingRepository = merchantMappingRepository,
-                    smsRepository = smsRepository,
                     travelSettingsRepository = travelSettingsRepository,
                     resolveTravelModeTagUseCase = null,
                     dispatcherProvider = testDispatcherProvider,
@@ -483,20 +481,20 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `secondary constructor with four repositories executes invoke with deleted hash filtering`() =
+    fun `secondary constructor with dispatcher provider executes invoke with deleted hash filtering`() =
         runTest(testDispatcher) {
-            val fourRepoUseCase =
+            val customDispatcherUseCase =
                 AutoSaveSmsTransactionUseCase(
                     transactionRepository = transactionRepository,
                     accountRepository = accountRepository,
-                    smsRepository = smsRepository,
                     merchantMappingRepository = merchantMappingRepository,
+                    dispatcherProvider = testDispatcherProvider,
                 )
 
             // 1. Verify deleted transaction suppression works via transactionRepository
             coEvery { transactionRepository.existsDeletedSmsHash("hash_deleted_test") } returns true
             val deletedTxn = createBaseTransaction(sourceSmsHash = "hash_deleted_test")
-            val deletedResult = fourRepoUseCase(deletedTxn)
+            val deletedResult = customDispatcherUseCase(deletedTxn)
             assertFalse(deletedResult)
             coVerify(exactly = 1) { transactionRepository.existsDeletedSmsHash("hash_deleted_test") }
 
@@ -504,7 +502,7 @@ class AutoSaveSmsTransactionUseCaseTest : BaseViewModelTest() {
             coEvery { transactionRepository.existsDeletedSmsHash("hash_clean_test") } returns false
             coEvery { transactionRepository.insertTransactionWithTags(any(), any()) } returns 50L
             val validTxn = createBaseTransaction(sourceSmsHash = "hash_clean_test")
-            val validResult = fourRepoUseCase(validTxn)
+            val validResult = customDispatcherUseCase(validTxn)
             assertTrue(validResult)
         }
 
