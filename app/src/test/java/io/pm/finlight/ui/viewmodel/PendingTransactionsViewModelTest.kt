@@ -1,6 +1,7 @@
 package io.pm.finlight.ui.viewmodel
 
 import app.cash.turbine.test
+import androidx.lifecycle.viewModelScope
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -8,13 +9,14 @@ import io.mockk.mockk
 import io.mockk.unmockkAll
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionStatus
 import io.pm.finlight.TransactionType
-import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -259,6 +261,178 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
                     lastRunDate = customLastRun,
                     skipCount = 5,
                 )
+            }
+        }
+
+    @Test
+    fun `confirmPending with negative amount aborts without invoking repository`() =
+        runTest {
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = -10.0)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.confirmTransaction(any(), any()) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `confirmPending with zero amount aborts without invoking repository`() =
+        runTest {
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = 0.0)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.confirmTransaction(any(), any()) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `confirmPending with NaN amount aborts without invoking repository`() =
+        runTest {
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = Double.NaN)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.confirmTransaction(any(), any()) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `confirmPending with infinite amount aborts without invoking repository`() =
+        runTest {
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = Double.POSITIVE_INFINITY)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.confirmTransaction(any(), any()) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `confirmPending handles repository exception gracefully without crashing coroutine`() =
+        runTest {
+            // Arrange
+            coEvery { transactionRepository.confirmTransaction(1, null) } throws RuntimeException("Database error")
+
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, null) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `skipPending handles repository exception gracefully without crashing coroutine`() =
+        runTest {
+            // Arrange
+            coEvery { transactionRepository.skipTransaction(1) } throws RuntimeException("Database error")
+
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.skipTransaction(1) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any()) }
+        }
+
+    @Test
+    fun `confirmPending executes recurring update even if job is cancelled during confirmTransaction`() =
+        runTest {
+            // Arrange
+            val testTimestamp = 1_700_000_000_000L
+            coEvery { transactionRepository.confirmTransaction(1, null) } coAnswers {
+                viewModel.viewModelScope.cancel()
+            }
+
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, lastRunDate = testTimestamp)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, null) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = testTimestamp,
+                    skipCount = 0,
+                )
+            }
+        }
+
+    @Test
+    fun `skipPending executes recurring update even if job is cancelled during skipTransaction`() =
+        runTest {
+            // Arrange
+            val testTimestamp = 1_700_000_000_000L
+            coEvery { recurringTransactionRepository.getRuleById(2) } returns
+                RecurringTransaction(
+                    id = 2,
+                    description = "Test Rule",
+                    amount = 100.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    skipCount = 0,
+                )
+            coEvery { transactionRepository.skipTransaction(1) } coAnswers {
+                viewModel.viewModelScope.cancel()
+            }
+
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = 2, lastRunDate = testTimestamp)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.skipTransaction(1) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = testTimestamp,
+                    skipCount = 1,
+                )
+            }
+        }
+
+    @Test
+    fun `confirmPending emits error to uiEvent on invalid amount`() =
+        runTest {
+            viewModel.uiEvent.test {
+                viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = -5.0)
+                assertEquals("Invalid amount: must be greater than 0", awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `confirmPending emits error to uiEvent on repository exception`() =
+        runTest {
+            coEvery { transactionRepository.confirmTransaction(1, null) } throws RuntimeException("Disk failure")
+
+            viewModel.uiEvent.test {
+                viewModel.confirmPending(draftId = 1, ruleId = 2)
+                assertEquals("Failed to confirm transaction: Disk failure", awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `skipPending emits error to uiEvent on repository exception`() =
+        runTest {
+            coEvery { transactionRepository.skipTransaction(1) } throws RuntimeException("DB locked")
+
+            viewModel.uiEvent.test {
+                viewModel.skipPending(draftId = 1, ruleId = 2)
+                assertEquals("Failed to skip transaction: DB locked", awaitItem())
+                cancelAndIgnoreRemainingEvents()
             }
         }
 }
