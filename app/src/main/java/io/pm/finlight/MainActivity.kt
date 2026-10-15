@@ -1304,7 +1304,11 @@ fun AppNavHost(
                     navArgument("transactionId") { type = NavType.IntType },
                     navArgument("ruleId") { type = NavType.IntType }
                 ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending/{transactionId}/{ruleId}" })
+            deepLinks =
+                listOf(
+                    navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending_transaction/{transactionId}/{ruleId}" },
+                    navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending/{transactionId}/{ruleId}" },
+                ),
         ) { backStackEntry ->
             LaunchedEffect(Unit) {
                 navController.navigate(BottomNavItem.Dashboard.route) {
