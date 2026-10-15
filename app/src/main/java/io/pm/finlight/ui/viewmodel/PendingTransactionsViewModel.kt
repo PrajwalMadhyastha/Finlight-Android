@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
 class PendingTransactionsViewModel(
     private val transactionRepository: ITransactionRepository,
     private val recurringTransactionRepository: IRecurringTransactionRepository,
-    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     /** All PENDING draft transactions, ordered oldest-first (most overdue first). */
     val pendingTransactions: StateFlow<List<Transaction>> =
@@ -39,11 +39,13 @@ class PendingTransactionsViewModel(
      * @param ruleId The ID of the recurring rule that generated this draft, or null.
      * @param confirmedAmount If non-null, overrides the draft amount before confirming.
      *                       Used when the user edits the amount on a variable bill.
+     * @param lastRunDate The timestamp of last execution (defaults to current system time).
      */
     fun confirmPending(
         draftId: Int,
         ruleId: Int? = null,
         confirmedAmount: Double? = null,
+        lastRunDate: Long = System.currentTimeMillis(),
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
             transactionRepository.confirmTransaction(draftId, confirmedAmount)
@@ -52,7 +54,7 @@ class PendingTransactionsViewModel(
                 // and reset skip counter on successful confirmation
                 recurringTransactionRepository.updateLastRunAndSkipCount(
                     ruleId = ruleId,
-                    lastRunDate = System.currentTimeMillis(),
+                    lastRunDate = lastRunDate,
                     skipCount = 0,
                 )
             }
@@ -63,33 +65,33 @@ class PendingTransactionsViewModel(
      * Skips the current cycle for a pending draft.
      *
      * @param draftId The ID of the PENDING Transaction to skip.
-     * @param ruleId The ID of the recurring rule that generated this draft.
+     * @param ruleId The ID of the recurring rule that generated this draft, or null.
      * @param lastRunDate The timestamp of last execution (defaults to current system time).
      * @param skipCount Optional target skip count. If null, the existing skip count is incremented by 1.
      */
     fun skipPending(
         draftId: Int,
-        ruleId: Int,
+        ruleId: Int? = null,
         lastRunDate: Long = System.currentTimeMillis(),
         skipCount: Int? = null,
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
             transactionRepository.skipTransaction(draftId)
-            val finalSkipCount =
-                if (skipCount != null) {
-                    skipCount
-                } else {
-                    val rule = recurringTransactionRepository.getRuleById(ruleId)
-                    rule?.let { it.skipCount + 1 }
+            if (ruleId != null) {
+                val finalSkipCount =
+                    if (skipCount != null) {
+                        skipCount
+                    } else {
+                        val rule = recurringTransactionRepository.getRuleById(ruleId)
+                        rule?.let { it.skipCount + 1 }
+                    }
+                if (finalSkipCount != null) {
+                    recurringTransactionRepository.updateLastRunAndSkipCount(
+                        ruleId = ruleId,
+                        lastRunDate = lastRunDate,
+                        skipCount = finalSkipCount,
+                    )
                 }
-            if (finalSkipCount != null) {
-                recurringTransactionRepository.updateLastRunAndSkipCount(
-                    ruleId = ruleId,
-                    lastRunDate = lastRunDate,
-                    skipCount = finalSkipCount,
-                )
-            } else {
-                recurringTransactionRepository.updateLastRunDate(ruleId, lastRunDate)
             }
         }
     }

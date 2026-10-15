@@ -92,7 +92,13 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     fun `confirmPending confirms transaction and resets skip count on recurring rule`() =
         runTest {
             // Act
-            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = null)
+            val testTimestamp = 1_700_000_000_000L
+            viewModel.confirmPending(
+                draftId = 1,
+                ruleId = 2,
+                confirmedAmount = null,
+                lastRunDate = testTimestamp,
+            )
             advanceUntilIdle()
 
             // Assert
@@ -100,7 +106,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             coVerify(exactly = 1) {
                 recurringTransactionRepository.updateLastRunAndSkipCount(
                     ruleId = 2,
-                    lastRunDate = any(),
+                    lastRunDate = testTimestamp,
                     skipCount = 0,
                 )
             }
@@ -110,11 +116,35 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     fun `confirmPending with custom amount confirms atomically via repository`() =
         runTest {
             // Act
-            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = 150.0)
+            val testTimestamp = 1_700_000_000_000L
+            viewModel.confirmPending(
+                draftId = 1,
+                ruleId = 2,
+                confirmedAmount = 150.0,
+                lastRunDate = testTimestamp,
+            )
             advanceUntilIdle()
 
             // Assert
             coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, 150.0) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = testTimestamp,
+                    skipCount = 0,
+                )
+            }
+        }
+
+    @Test
+    fun `confirmPending with default timestamp verifies execution`() =
+        runTest {
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2, confirmedAmount = 100.0)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, 100.0) }
             coVerify(exactly = 1) {
                 recurringTransactionRepository.updateLastRunAndSkipCount(
                     ruleId = 2,
@@ -160,7 +190,8 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             coEvery { recurringTransactionRepository.getRuleById(2) } returns rule
 
             // Act
-            viewModel.skipPending(draftId = 1, ruleId = 2)
+            val testTimestamp = 1_700_000_000_000L
+            viewModel.skipPending(draftId = 1, ruleId = 2, lastRunDate = testTimestamp)
             advanceUntilIdle()
 
             // Assert
@@ -169,7 +200,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             coVerify(exactly = 1) {
                 recurringTransactionRepository.updateLastRunAndSkipCount(
                     ruleId = 2,
-                    lastRunDate = any(),
+                    lastRunDate = testTimestamp,
                     skipCount = 2,
                 )
             }
@@ -177,7 +208,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `skipPending skips transaction and updates lastRunDate when rule does not exist`() =
+    fun `skipPending skips transaction and ignores recurring update when rule does not exist`() =
         runTest {
             // Arrange
             coEvery { recurringTransactionRepository.getRuleById(2) } returns null
@@ -192,7 +223,23 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
             coVerify(exactly = 0) {
                 recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any())
             }
-            coVerify(exactly = 1) { recurringTransactionRepository.updateLastRunDate(eq(2), any()) }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunDate(any(), any()) }
+        }
+
+    @Test
+    fun `skipPending without ruleId skips transaction and bypasses recurring rule lookup`() =
+        runTest {
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = null)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.skipTransaction(1) }
+            coVerify(exactly = 0) { recurringTransactionRepository.getRuleById(any()) }
+            coVerify(exactly = 0) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(any(), any(), any())
+            }
+            coVerify(exactly = 0) { recurringTransactionRepository.updateLastRunDate(any(), any()) }
         }
 
     @Test
