@@ -1,22 +1,46 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/SearchViewModel.kt
-// REASON: FEATURE (Drilldown Mode) - Added `isDrilldown` to `SearchUiState`.
-// This flag is set to true when `initialQuery` is provided, allowing the UI to
-// enter a focused mode (hiding the search bar) similar to the Analysis Details screen.
-// REFACTOR - Removed `searchTrend` logic as charts have been removed from the
-// Search Screen requirements.
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SearchViewModel.kt
+// REASON: REFACTOR (Domain 5 / Issue #339) - Decouple SearchViewModel from Raw DAOs
+// & Expose searchTransactions:
+// 1. Injected ITransactionRepository, IAccountRepository, ICategoryRepository,
+//    ITagRepository, and DispatcherProvider.
+// 2. Reactively combined metadata flows (accounts, categories, tags) into SearchUiState.
+// 3. Decoupled hasSearched and removed re-entrant _uiState.update mutation from flatMapLatest.
+// 4. Standardized package to io.pm.finlight.ui.viewmodel.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.dao.AccountDao
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.Account
+import io.pm.finlight.Category
+import io.pm.finlight.FinancialSummary
+import io.pm.finlight.IAccountRepository
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ITagRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.SearchFilter
+import io.pm.finlight.Tag
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
@@ -37,85 +61,101 @@ data class SearchUiState(
     val showStartDatePicker: Boolean = false,
     val showEndDatePicker: Boolean = false,
     val displayDate: String? = null,
-    // --- NEW: Flag for drilldown mode
+    // Flag for drilldown mode
     val isDrilldown: Boolean = false,
-)
+) {
+    val filtersAreActive: Boolean
+        get() =
+            selectedAccount != null ||
+                selectedCategory != null ||
+                selectedTag != null ||
+                (transactionType != "All" && transactionType.isNotBlank()) ||
+                startDate != null ||
+                endDate != null
+
+    val shouldSearch: Boolean
+        get() = keyword.isNotBlank() || filtersAreActive || isDrilldown
+}
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class SearchViewModel(
-    private val transactionQueryDao: TransactionQueryDao,
-    private val transactionAnalyticsDao: TransactionAnalyticsDao,
-    private val accountDao: AccountDao,
-    private val categoryDao: CategoryDao,
-    private val tagDao: TagDao,
-    private val initialCategoryId: Int?,
-    private val initialDateMillis: Long?,
-    private val initialQuery: String?,
+    private val transactionRepository: ITransactionRepository,
+    private val accountRepository: IAccountRepository,
+    private val categoryRepository: ICategoryRepository,
+    private val tagRepository: ITagRepository,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val initialCategoryId: Int? = null,
+    private val initialDateMillis: Long? = null,
+    private val initialQuery: String? = null,
 ) : ViewModel() {
-    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
-    constructor(
-        transactionDao: TransactionDao,
-        accountDao: AccountDao,
-        categoryDao: CategoryDao,
-        tagDao: TagDao,
-        initialCategoryId: Int?,
-        initialDateMillis: Long?,
-        initialQuery: String?,
-    ) : this(
-        transactionQueryDao = transactionDao,
-        transactionAnalyticsDao = transactionDao,
-        accountDao = accountDao,
-        categoryDao = categoryDao,
-        tagDao = tagDao,
-        initialCategoryId = initialCategoryId,
-        initialDateMillis = initialDateMillis,
-        initialQuery = initialQuery,
-    )
-
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private val _daySummary = MutableStateFlow<FinancialSummary?>(null)
     val daySummary: StateFlow<FinancialSummary?> = _daySummary.asStateFlow()
 
+    private data class SearchQueryParameters(
+        val keyword: String,
+        val selectedAccount: Account?,
+        val selectedCategory: Category?,
+        val selectedTag: Tag?,
+        val transactionType: String,
+        val startDate: Long?,
+        val endDate: Long?,
+        val isDrilldown: Boolean,
+    )
+
     val searchResults: StateFlow<List<TransactionDetails>> =
         uiState
-            .debounce(300L) // Debounce user input for performance
-            .flatMapLatest { state ->
+            .map { state ->
+                SearchQueryParameters(
+                    keyword = state.keyword,
+                    selectedAccount = state.selectedAccount,
+                    selectedCategory = state.selectedCategory,
+                    selectedTag = state.selectedTag,
+                    transactionType = state.transactionType,
+                    startDate = state.startDate,
+                    endDate = state.endDate,
+                    isDrilldown = state.isDrilldown,
+                )
+            }
+            .distinctUntilChanged()
+            .debounce(300L)
+            .flatMapLatest { params ->
                 val filtersAreActive =
-                    state.selectedAccount != null ||
-                        state.selectedCategory != null ||
-                        state.selectedTag != null ||
-                        state.transactionType != "All" ||
-                        state.startDate != null ||
-                        state.endDate != null
+                    params.selectedAccount != null ||
+                        params.selectedCategory != null ||
+                        params.selectedTag != null ||
+                        (params.transactionType != "All" && params.transactionType.isNotBlank()) ||
+                        params.startDate != null ||
+                        params.endDate != null
 
-                val shouldSearch = state.keyword.isNotBlank() || filtersAreActive || state.isDrilldown
-                _uiState.update { it.copy(hasSearched = shouldSearch) }
+                val shouldSearch = params.keyword.isNotBlank() || filtersAreActive || params.isDrilldown
 
                 if (shouldSearch) {
-                    transactionQueryDao.searchTransactions(
-                        keyword = state.keyword,
-                        accountId = state.selectedAccount?.id,
-                        categoryId = state.selectedCategory?.id,
-                        tagId = state.selectedTag?.id,
-                        transactionType =
-                            if (state.transactionType.equals(
-                                    "All",
-                                    ignoreCase = true,
-                                )
-                            ) {
-                                null
-                            } else {
-                                TransactionType.fromStringOrNull(state.transactionType)
-                            },
-                        startDate = state.startDate,
-                        endDate = state.endDate,
-                    )
+                    val resolvedType =
+                        if (params.transactionType.equals("All", ignoreCase = true)) {
+                            null
+                        } else {
+                            TransactionType.fromStringOrNull(params.transactionType)
+                        }
+                    transactionRepository.searchTransactions(
+                        query = params.keyword,
+                        filter =
+                            SearchFilter(
+                                accountId = params.selectedAccount?.id,
+                                categoryId = params.selectedCategory?.id,
+                                tagId = params.selectedTag?.id,
+                                transactionType = resolvedType,
+                                startDate = params.startDate,
+                                endDate = params.endDate,
+                            ),
+                    ).flowOn(dispatcherProvider.io)
                 } else {
                     flowOf(emptyList())
                 }
             }
+            .flowOn(dispatcherProvider.default)
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
@@ -123,36 +163,42 @@ class SearchViewModel(
             )
 
     init {
-        viewModelScope.launch {
-            accountDao.getAllAccounts().collect { accounts ->
-                _uiState.update { it.copy(accounts = accounts) }
-            }
-        }
-        viewModelScope.launch {
-            categoryDao.getAllCategories().collect { categories ->
-                _uiState.update { it.copy(categories = categories) }
-                if (initialCategoryId != null) {
-                    val initialCategory = categories.find { it.id == initialCategoryId }
-                    if (initialCategory != null) {
-                        _uiState.update { it.copy(selectedCategory = initialCategory) }
+        viewModelScope.launch(dispatcherProvider.main) {
+            combine(
+                accountRepository.allAccounts,
+                categoryRepository.allCategories,
+                tagRepository.allTags,
+            ) { accounts, categories, tags ->
+                Triple(accounts, categories, tags)
+            }.flowOn(dispatcherProvider.io)
+                .collect { (accounts, categories, tags) ->
+                    _uiState.update { current ->
+                        val resolvedCategory =
+                            if (initialCategoryId != null && current.selectedCategory == null) {
+                                categories.find { it.id == initialCategoryId }
+                            } else {
+                                current.selectedCategory
+                            }
+                        val next =
+                            current.copy(
+                                accounts = accounts,
+                                categories = categories,
+                                tags = tags,
+                                selectedCategory = resolvedCategory,
+                            )
+                        next.copy(hasSearched = next.shouldSearch)
                     }
                 }
-            }
-        }
-        viewModelScope.launch {
-            tagDao.getAllTags().collect { tags ->
-                _uiState.update { it.copy(tags = tags) }
-            }
         }
 
-        // --- UPDATED: Handle initial query and set Drilldown mode ---
         if (!initialQuery.isNullOrBlank()) {
-            _uiState.update {
-                it.copy(
-                    keyword = initialQuery,
-                    // Enable drilldown mode
-                    isDrilldown = true,
-                )
+            _uiState.update { current ->
+                val next =
+                    current.copy(
+                        keyword = initialQuery,
+                        isDrilldown = true,
+                    )
+                next.copy(hasSearched = next.shouldSearch)
             }
         }
 
@@ -171,44 +217,66 @@ class SearchViewModel(
             val dateFormatter = FormatUtils.getFormatter("MMMM d, yyyy", Locale.getDefault())
             val formattedDate = dateFormatter.format(cal.time)
 
-            _uiState.update {
-                it.copy(
-                    startDate = start,
-                    endDate = end,
-                    displayDate = formattedDate,
-                )
+            _uiState.update { current ->
+                val next =
+                    current.copy(
+                        startDate = start,
+                        endDate = end,
+                        displayDate = formattedDate,
+                    )
+                next.copy(hasSearched = next.shouldSearch)
             }
 
-            viewModelScope.launch {
-                transactionAnalyticsDao.getFinancialSummaryForRangeFlow(start, end).collect { summary ->
-                    _daySummary.value = summary
-                }
+            viewModelScope.launch(dispatcherProvider.main) {
+                transactionRepository.getFinancialSummaryForRangeFlow(start, end)
+                    .flowOn(dispatcherProvider.io)
+                    .collect { summary ->
+                        _daySummary.value = summary
+                    }
             }
         }
     }
 
     fun onKeywordChange(newKeyword: String) {
-        _uiState.update { it.copy(keyword = newKeyword) }
+        _uiState.update { current ->
+            val next = current.copy(keyword = newKeyword)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onAccountChange(account: Account?) {
-        _uiState.update { it.copy(selectedAccount = account) }
+        _uiState.update { current ->
+            val next = current.copy(selectedAccount = account)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onCategoryChange(category: Category?) {
-        _uiState.update { it.copy(selectedCategory = category) }
+        _uiState.update { current ->
+            val next = current.copy(selectedCategory = category)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onTagChange(tag: Tag?) {
-        _uiState.update { it.copy(selectedTag = tag) }
+        _uiState.update { current ->
+            val next = current.copy(selectedTag = tag)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onTypeChange(type: String?) {
-        _uiState.update { it.copy(transactionType = type ?: "All") }
+        _uiState.update { current ->
+            val next = current.copy(transactionType = type ?: "All")
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onStartDateSelected(startDateMillis: Long?) {
-        _uiState.update { it.copy(startDate = startDateMillis) }
+        _uiState.update { current ->
+            val next = current.copy(startDate = startDateMillis)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onEndDateSelected(endDateMillis: Long?) {
@@ -222,15 +290,24 @@ class SearchViewModel(
                     set(Calendar.MILLISECOND, 999)
                 }.timeInMillis
             }
-        _uiState.update { it.copy(endDate = adjustedEnd) }
+        _uiState.update { current ->
+            val next = current.copy(endDate = adjustedEnd)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onClearStartDate() {
-        _uiState.update { it.copy(startDate = null) }
+        _uiState.update { current ->
+            val next = current.copy(startDate = null)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onClearEndDate() {
-        _uiState.update { it.copy(endDate = null) }
+        _uiState.update { current ->
+            val next = current.copy(endDate = null)
+            next.copy(hasSearched = next.shouldSearch)
+        }
     }
 
     fun onShowStartDatePicker(show: Boolean) {
@@ -247,6 +324,7 @@ class SearchViewModel(
                 accounts = _uiState.value.accounts,
                 categories = _uiState.value.categories,
                 tags = _uiState.value.tags,
+                hasSearched = false,
             )
         _daySummary.value = null
     }

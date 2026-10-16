@@ -320,4 +320,16 @@ interface ITransactionRepository {
      * @param transactionId The ID of the pending draft transaction to skip.
      */
     suspend fun skipTransaction(transactionId: Int)
+
+    /**
+     * Searches transactions matching the specified keyword and filter criteria.
+     *
+     * @param query The search text matching description or notes.
+     * @param filter Filter criteria constraining account, category, tag, type, and date range.
+     * @return A cold [Flow] emitting the matching list of [TransactionDetails] ordered by date descending.
+     */
+    fun searchTransactions(
+        query: String,
+        filter: SearchFilter = SearchFilter(),
+    ): Flow<List<TransactionDetails>>
 }

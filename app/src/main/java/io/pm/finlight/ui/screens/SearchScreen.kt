@@ -45,6 +45,7 @@ import io.pm.finlight.*
 import io.pm.finlight.FinancialSummary
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
+import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils

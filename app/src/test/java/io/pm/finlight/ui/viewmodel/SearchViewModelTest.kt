@@ -1,40 +1,51 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/SearchViewModelTest.kt
-// REASON: FEATURE (Test) - Added new tests for the "Drilldown" feature (initialQuery).
-// - `init with initialQuery sets drilldown mode and keyword` verifies that
-//   passing a query string correctly puts the VM into drilldown mode.
-// - `init without initialQuery does not set drilldown mode` verifies the default state.
-//
-// REASON: FEATURE (Test) - Added new tests for the `displayDate` feature.
-// - `init with initialDateMillis sets date range and displayDate` now
-//   verifies the user-friendly formatted date string is correctly set.
-// - `init without initialDateMillis leaves displayDate null` ensures the
-//   date display doesn't appear on a normal search.
-// - `clearFilters resets uiState` is updated to confirm `displayDate` is
-//   reset to null.
-//
-// REASON: FIX (Test) - Added a mock for `transactionDao.getFinancialSummaryForRangeFlow`
-// in the `setup` block.
+// REASON: REFACTOR (Domain 5 / Issue #339) - Migrate SearchViewModelTest to use repository doubles:
+// 1. Replaced raw DAO mocks with ITransactionRepository, IAccountRepository,
+//    ICategoryRepository, ITagRepository, and TestDispatcherProvider.
+// 2. Added comprehensive tests for hasSearched flag, reactive metadata combination,
+//    filter combinations, and search debouncing.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.*
-import io.pm.finlight.data.db.dao.AccountDao
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.Account
+import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.Category
+import io.pm.finlight.IAccountRepository
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ITagRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.SearchFilter
+import io.pm.finlight.Tag
+import io.pm.finlight.TestApplication
+import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.*
-import org.junit.Assert.*
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
-import org.mockito.Mockito.*
+import org.mockito.kotlin.any
+import org.mockito.kotlin.atLeastOnce
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -45,52 +56,48 @@ import java.util.Locale
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class SearchViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var transactionRepository: ITransactionRepository
 
     @Mock
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var accountRepository: IAccountRepository
 
     @Mock
-    private lateinit var accountDao: AccountDao
+    private lateinit var categoryRepository: ICategoryRepository
 
     @Mock
-    private lateinit var categoryDao: CategoryDao
+    private lateinit var tagRepository: ITagRepository
 
-    @Mock
-    private lateinit var tagDao: TagDao
-
+    private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var viewModel: SearchViewModel
 
     @Before
     override fun setup() {
         super.setup()
+        testDispatcherProvider = TestDispatcherProvider(testDispatcher)
 
-        // Default mocks to prevent crashes during initialization
-        `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
-        `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
-        `when`(tagDao.getAllTags()).thenReturn(flowOf(emptyList()))
-        `when`(transactionQueryDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-        // --- FIX: Add mock for the new dependency in the init block ---
-        `when`(transactionAnalyticsDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
+        // Default repository doubles to prevent crashes during initialization
+        whenever(accountRepository.allAccounts).thenReturn(flowOf(emptyList()))
+        whenever(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
+        whenever(tagRepository.allTags).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.searchTransactions(any(), any())).thenReturn(flowOf(emptyList()))
+        whenever(transactionRepository.getFinancialSummaryForRangeFlow(any(), any())).thenReturn(flowOf(null))
     }
 
     private fun initializeViewModel(
         initialCategoryId: Int? = null,
         initialDateMillis: Long? = null,
-        // --- UPDATED: Added initialQuery parameter
         initialQuery: String? = null,
     ) {
         viewModel =
             SearchViewModel(
-                transactionQueryDao,
-                transactionAnalyticsDao,
-                accountDao,
-                categoryDao,
-                tagDao,
-                initialCategoryId,
-                initialDateMillis,
-                // --- UPDATED: Pass to constructor
-                initialQuery,
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                tagRepository = tagRepository,
+                dispatcherProvider = testDispatcherProvider,
+                initialCategoryId = initialCategoryId,
+                initialDateMillis = initialDateMillis,
+                initialQuery = initialQuery,
             )
     }
 
@@ -98,7 +105,6 @@ class SearchViewModelTest : BaseViewModelTest() {
     fun `clearFilters resets uiState and search results`() =
         runTest {
             // ARRANGE
-            // Set up a viewmodel with an initial date to ensure displayDate is populated
             val cal = Calendar.getInstance()
             initializeViewModel(initialDateMillis = cal.timeInMillis)
             advanceUntilIdle()
@@ -112,7 +118,8 @@ class SearchViewModelTest : BaseViewModelTest() {
             val populatedState = viewModel.uiState.first()
             assertEquals("Test", populatedState.keyword)
             assertNotNull(populatedState.selectedCategory)
-            assertNotNull(populatedState.displayDate) // Ensure displayDate was set
+            assertNotNull(populatedState.displayDate)
+            assertTrue(populatedState.hasSearched)
 
             // ACT
             viewModel.clearFilters()
@@ -123,7 +130,8 @@ class SearchViewModelTest : BaseViewModelTest() {
             assertEquals("", state.keyword)
             assertNull(state.selectedCategory)
             assertNull(state.selectedAccount)
-            assertNull(state.displayDate) // Verify displayDate is also reset to null
+            assertNull(state.displayDate)
+            assertFalse(state.hasSearched)
             assertEquals(emptyList<TransactionDetails>(), viewModel.searchResults.first())
         }
 
@@ -155,8 +163,8 @@ class SearchViewModelTest : BaseViewModelTest() {
                         null,
                     ),
                 )
-            `when`(transactionQueryDao.searchTransactions("Coffee", null, null, null, null, null, null)).thenReturn(flowOf(results1))
-            `when`(transactionQueryDao.searchTransactions("Tea", null, null, null, null, null, null)).thenReturn(flowOf(results2))
+            whenever(transactionRepository.searchTransactions(eq("Coffee"), any())).thenReturn(flowOf(results1))
+            whenever(transactionRepository.searchTransactions(eq("Tea"), any())).thenReturn(flowOf(results2))
             initializeViewModel()
 
             viewModel.searchResults.test {
@@ -170,8 +178,8 @@ class SearchViewModelTest : BaseViewModelTest() {
 
                 // Assert
                 assertEquals(results2, awaitItem())
-                verify(transactionQueryDao, never()).searchTransactions("Coffee", null, null, null, null, null, null)
-                verify(transactionQueryDao).searchTransactions("Tea", null, null, null, null, null, null)
+                verify(transactionRepository, never()).searchTransactions(eq("Coffee"), any())
+                verify(transactionRepository).searchTransactions(eq("Tea"), any())
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -181,12 +189,13 @@ class SearchViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val foodCategory = Category(1, "Food", "icon", "color")
-            `when`(categoryDao.getAllCategories()).thenReturn(flowOf(listOf(foodCategory)))
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(listOf(foodCategory)))
             initializeViewModel(initialCategoryId = 1)
             advanceUntilIdle()
 
             // Assert
             assertEquals(foodCategory, viewModel.uiState.value.selectedCategory)
+            assertTrue(viewModel.uiState.value.hasSearched)
         }
 
     @Test
@@ -207,10 +216,10 @@ class SearchViewModelTest : BaseViewModelTest() {
                 Calendar.getInstance().apply { timeInMillis = state.startDate!! }.get(Calendar.DAY_OF_YEAR),
             )
 
-            // --- NEW ASSERTION ---
             val dateFormatter = SimpleDateFormat("MMMM d, yyyy", Locale.getDefault())
             val expectedDate = dateFormatter.format(cal.time)
             assertEquals(expectedDate, state.displayDate)
+            assertTrue(state.hasSearched)
         }
 
     @Test
@@ -225,6 +234,7 @@ class SearchViewModelTest : BaseViewModelTest() {
             assertNull(state.startDate)
             assertNull(state.endDate)
             assertNull(state.displayDate)
+            assertFalse(state.hasSearched)
         }
 
     @Test
@@ -240,6 +250,7 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onAccountChange(account)
                 val updated = awaitItem()
                 assertEquals(account, updated.selectedAccount)
+                assertTrue(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -255,7 +266,9 @@ class SearchViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onCategoryChange(category)
-                assertEquals(category, awaitItem().selectedCategory)
+                val updated = awaitItem()
+                assertEquals(category, updated.selectedCategory)
+                assertTrue(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -271,7 +284,9 @@ class SearchViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onTagChange(tag)
-                assertEquals(tag, awaitItem().selectedTag)
+                val updated = awaitItem()
+                assertEquals(tag, updated.selectedTag)
+                assertTrue(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -287,9 +302,22 @@ class SearchViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onTypeChange(type)
-                assertEquals(type, awaitItem().transactionType)
+                val updated = awaitItem()
+                assertEquals(type, updated.transactionType)
+                assertTrue(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `onTypeChange with null resets to All`() =
+        runTest {
+            initializeViewModel()
+            viewModel.onTypeChange("Income")
+            viewModel.onTypeChange(null)
+
+            assertEquals("All", viewModel.uiState.value.transactionType)
+            assertFalse(viewModel.uiState.value.hasSearched)
         }
 
     @Test
@@ -303,10 +331,14 @@ class SearchViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onStartDateSelected(date)
-                assertEquals(date, awaitItem().startDate)
+                val startSelected = awaitItem()
+                assertEquals(date, startSelected.startDate)
+                assertTrue(startSelected.hasSearched)
 
                 viewModel.onClearStartDate()
-                assertNull(awaitItem().startDate)
+                val cleared = awaitItem()
+                assertNull(cleared.startDate)
+                assertFalse(cleared.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -322,10 +354,14 @@ class SearchViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onEndDateSelected(date)
-                assertNotNull(awaitItem().endDate) // Date is adjusted to end of day
+                val endSelected = awaitItem()
+                assertNotNull(endSelected.endDate)
+                assertTrue(endSelected.hasSearched)
 
                 viewModel.onClearEndDate()
-                assertNull(awaitItem().endDate)
+                val cleared = awaitItem()
+                assertNull(cleared.endDate)
+                assertFalse(cleared.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -357,8 +393,6 @@ class SearchViewModelTest : BaseViewModelTest() {
             }
         }
 
-    // --- NEW TESTS: Drilldown Mode ---
-
     @Test
     fun `init with initialQuery sets drilldown mode and keyword`() =
         runTest {
@@ -373,6 +407,7 @@ class SearchViewModelTest : BaseViewModelTest() {
             val state = viewModel.uiState.value
             assertEquals("Keyword should match initial query", query, state.keyword)
             assertTrue("isDrilldown should be true", state.isDrilldown)
+            assertTrue(state.hasSearched)
         }
 
     @Test
@@ -386,6 +421,7 @@ class SearchViewModelTest : BaseViewModelTest() {
             val state = viewModel.uiState.value
             assertEquals("", state.keyword)
             assertFalse("isDrilldown should be false by default", state.isDrilldown)
+            assertFalse(state.hasSearched)
         }
 
     @Test
@@ -399,39 +435,64 @@ class SearchViewModelTest : BaseViewModelTest() {
 
                 viewModel.onTypeChange("expense")
                 advanceTimeBy(350L)
-                verify(transactionQueryDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.EXPENSE), any(), any(), any())
+                verify(transactionRepository).searchTransactions(
+                    any(),
+                    eq(SearchFilter(transactionType = TransactionType.EXPENSE)),
+                )
 
                 viewModel.onTypeChange("income")
                 advanceTimeBy(350L)
-                verify(transactionQueryDao).searchTransactions(anyString(), any(), any(), eq(TransactionType.INCOME), any(), any(), any())
+                verify(transactionRepository).searchTransactions(
+                    any(),
+                    eq(SearchFilter(transactionType = TransactionType.INCOME)),
+                )
 
                 viewModel.onTypeChange("All Types")
                 advanceTimeBy(350L)
-                verify(transactionQueryDao, atLeastOnce()).searchTransactions(anyString(), any(), any(), isNull(), any(), any(), any())
+                verify(transactionRepository, atLeastOnce()).searchTransactions(
+                    any(),
+                    eq(SearchFilter(transactionType = null)),
+                )
 
                 cancelAndIgnoreRemainingEvents()
             }
         }
 
-    @Suppress("DEPRECATION")
     @Test
-    fun `legacy constructor initializes SearchViewModel properly`() =
+    fun `constructor initializes SearchViewModel properly with default dispatcher`() =
         runTest {
-            val legacyDao = mock(TransactionDao::class.java)
-            `when`(legacyDao.searchTransactions(anyString(), any(), any(), any(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-            `when`(legacyDao.getFinancialSummaryForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(null))
-
             val vm =
                 SearchViewModel(
-                    legacyDao,
-                    accountDao,
-                    categoryDao,
-                    tagDao,
-                    1,
-                    1000L,
-                    "query"
+                    transactionRepository = transactionRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    tagRepository = tagRepository,
+                    initialCategoryId = 1,
+                    initialDateMillis = 1000L,
+                    initialQuery = "query",
                 )
             assertNotNull(vm)
             assertEquals("query", vm.uiState.value.keyword)
+            assertTrue(vm.uiState.value.isDrilldown)
+        }
+
+    @Test
+    fun `metadata flows combine reactively into uiState`() =
+        runTest {
+            val accounts = listOf(Account(1, "Checking", "Bank"))
+            val categories = listOf(Category(1, "Food", "icon", "color"))
+            val tags = listOf(Tag(1, "Trip"))
+
+            whenever(accountRepository.allAccounts).thenReturn(flowOf(accounts))
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(categories))
+            whenever(tagRepository.allTags).thenReturn(flowOf(tags))
+
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(accounts, state.accounts)
+            assertEquals(categories, state.categories)
+            assertEquals(tags, state.tags)
         }
 }
