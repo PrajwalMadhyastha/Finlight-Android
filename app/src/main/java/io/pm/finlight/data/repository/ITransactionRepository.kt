@@ -1,6 +1,7 @@
 package io.pm.finlight
 
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import kotlinx.coroutines.flow.Flow
 
 interface ITransactionRepository {
@@ -178,6 +179,17 @@ interface ITransactionRepository {
         smsHash: String,
     )
 
+    suspend fun existsBySmsHash(hash: String): Boolean
+
+    suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    )
+
+    suspend fun existsDeletedSmsHash(hash: String): Boolean
+
+    suspend fun insertDeletedSmsHash(hash: String)
+
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
     suspend fun findSimilarTransactions(
@@ -277,4 +289,48 @@ interface ITransactionRepository {
         primaryTxnId: Int,
         secondaryTxnId: Int,
     )
+
+    /**
+     * Observes all draft pending transactions requiring user review, sorted by date descending.
+     *
+     * @return A cold [Flow] emitting the current list of [Transaction]s with [TransactionStatus.PENDING].
+     */
+    fun getPendingTransactionsFlow(): Flow<List<Transaction>>
+
+    /**
+     * Atomically confirms a draft transaction, optionally updating its amount beforehand
+     * (e.g., when the user adjusts a variable bill amount before confirming).
+     *
+     * Both the optional amount update and status change to [TransactionStatus.CONFIRMED]
+     * are executed atomically inside a database transaction on the IO dispatcher.
+     *
+     * @param transactionId The ID of the pending draft transaction to confirm.
+     * @param confirmedAmount The verified transaction amount if modified by the user, or null to keep existing draft amount.
+     * @throws IllegalArgumentException If [confirmedAmount] is non-null and is not positive or finite.
+     */
+    suspend fun confirmTransaction(
+        transactionId: Int,
+        confirmedAmount: Double? = null,
+    )
+
+    /**
+     * Marks a draft pending transaction as skipped ([TransactionStatus.SKIPPED]) without deleting it.
+     *
+     * Executed on the IO dispatcher.
+     *
+     * @param transactionId The ID of the pending draft transaction to skip.
+     */
+    suspend fun skipTransaction(transactionId: Int)
+
+    /**
+     * Searches transactions matching the specified keyword and filter criteria.
+     *
+     * @param query The search text matching description or notes.
+     * @param filter Filter criteria constraining account, category, tag, type, and date range.
+     * @return A cold [Flow] emitting the matching list of [TransactionDetails] ordered by date descending.
+     */
+    fun searchTransactions(
+        query: String,
+        filter: SearchFilter = SearchFilter(),
+    ): Flow<List<TransactionDetails>>
 }

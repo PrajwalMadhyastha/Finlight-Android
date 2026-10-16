@@ -17,14 +17,13 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
             val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val getMonthlyConsistencyDataUseCase =
                 GetMonthlyConsistencyDataUseCase(
                     settingsRepository = settingsRepository,
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
+                    transactionRepository = transactionRepository,
                     dispatcherProvider = dispatcherProvider,
                 )
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
 

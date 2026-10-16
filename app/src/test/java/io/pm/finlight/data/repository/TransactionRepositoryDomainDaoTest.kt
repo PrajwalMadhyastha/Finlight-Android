@@ -19,7 +19,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import app.cash.turbine.test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 
 import io.pm.finlight.utils.TestDispatcherProvider
@@ -115,6 +117,17 @@ class TransactionRepositoryDomainDaoTest {
         }
 
     @Test
+    fun testDelegationToGetDailySpendingForDateRange() =
+        runTest {
+            val dailyTotals = listOf(DailyTotal("2025-09-01", 100.0))
+            every { analyticsDao.getDailySpendingForDateRange(100L, 200L) } returns flowOf(dailyTotals)
+
+            val result = repository.getDailySpendingForDateRange(100L, 200L).first()
+            assertEquals(dailyTotals, result)
+            verify(exactly = 1) { analyticsDao.getDailySpendingForDateRange(100L, 200L) }
+        }
+
+    @Test
     fun testDelegationToReimbursementDao() =
         runTest {
             val incomeTxn = Transaction(id = 1, description = "Income", amount = 50.0, date = 1000L, accountId = 1, categoryId = 1, transactionType = TransactionType.INCOME, notes = null, parentReimbursementId = null)
@@ -147,16 +160,101 @@ class TransactionRepositoryDomainDaoTest {
     @Test
     fun testDelegationToLinkTransfer() =
         runTest {
-            mockkStatic("androidx.room.RoomDatabaseKt")
-            coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
-                val block = secondArg<suspend () -> Any?>()
-                block()
-            }
             coJustRun { writeDao.updateTransferLinkStatus(any(), any(), any()) }
 
             repository.linkTransfer(1, 2)
 
+            coVerify(exactly = 1) { any<AppDatabase>().withTransaction<Any?>(any()) }
             coVerify(exactly = 1) { writeDao.updateTransferLinkStatus(1, 2, true) }
             coVerify(exactly = 1) { writeDao.updateTransferLinkStatus(2, 1, true) }
+        }
+
+    @Test
+    fun testDelegationToGetPendingTransactionsFlow() =
+        runTest {
+            val pendingTxn =
+                Transaction(
+                    id = 1,
+                    description = "Pending Bill",
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.PENDING,
+                )
+            every { queryDao.getPendingTransactions() } returns flowOf(listOf(pendingTxn))
+
+            repository.getPendingTransactionsFlow().test {
+                assertEquals(listOf(pendingTxn), awaitItem())
+                awaitComplete()
+            }
+            verify(exactly = 1) { queryDao.getPendingTransactions() }
+        }
+
+    @Test
+    fun testDelegationToConfirmTransactionWithoutAmount() =
+        runTest {
+            coJustRun { writeDao.confirmTransaction(any()) }
+
+            repository.confirmTransaction(transactionId = 42)
+
+            coVerify(exactly = 1) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerify(exactly = 0) { writeDao.updateAmount(any(), any()) }
+            coVerify(exactly = 1) { writeDao.confirmTransaction(42) }
+        }
+
+    @Test
+    fun testDelegationToConfirmTransactionWithAmount() =
+        runTest {
+            coJustRun { writeDao.updateAmount(any(), any()) }
+            coJustRun { writeDao.confirmTransaction(any()) }
+
+            repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+
+            coVerify(exactly = 1) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerifyOrder {
+                writeDao.updateAmount(42, 150.0)
+                writeDao.confirmTransaction(42)
+            }
+        }
+
+    @Test
+    fun testDelegationToConfirmTransactionPropagatesExceptionWhenUpdateAmountFails() =
+        runTest {
+            coEvery { writeDao.updateAmount(42, 150.0) } throws RuntimeException("DB write failed")
+
+            assertFailsWith<RuntimeException> {
+                repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+            }
+
+            coVerify(exactly = 1) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerify(exactly = 1) { writeDao.updateAmount(42, 150.0) }
+            coVerify(exactly = 0) { writeDao.confirmTransaction(42) }
+        }
+
+    @Test
+    fun testConfirmTransactionWithInvalidAmountThrowsIllegalArgumentException() =
+        runTest {
+            val invalidAmounts = listOf(0.0, -50.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            for (invalidAmount in invalidAmounts) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = 42, confirmedAmount = invalidAmount)
+                }
+            }
+
+            coVerify(exactly = 0) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerify(exactly = 0) { writeDao.updateAmount(any(), any()) }
+            coVerify(exactly = 0) { writeDao.confirmTransaction(any()) }
+        }
+
+    @Test
+    fun testDelegationToSkipTransaction() =
+        runTest {
+            coJustRun { writeDao.skipTransaction(any()) }
+
+            repository.skipTransaction(transactionId = 42)
+
+            coVerify(exactly = 1) { writeDao.skipTransaction(42) }
         }
 }

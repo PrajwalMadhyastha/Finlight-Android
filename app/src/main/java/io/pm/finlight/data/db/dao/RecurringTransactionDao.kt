@@ -45,10 +45,20 @@ interface RecurringTransactionDao {
     @Query("SELECT * FROM recurring_transactions WHERE smsSenderId = :smsSenderId AND isVariableBill = 1 LIMIT 1")
     suspend fun getRuleBySmsSenderId(smsSenderId: String): RecurringTransaction?
 
+    @Query("SELECT * FROM recurring_transactions WHERE id = :id")
+    suspend fun getRuleById(id: Int): RecurringTransaction?
+
     // --- NEW: Update the skip counter after a cycle is missed ---
     @Query("UPDATE recurring_transactions SET skipCount = :skipCount WHERE id = :id")
     suspend fun updateSkipCount(
         id: Int,
+        skipCount: Int,
+    )
+
+    @Query("UPDATE recurring_transactions SET lastRunDate = :lastRunDate, skipCount = :skipCount WHERE id = :id")
+    suspend fun updateLastRunAndSkipCount(
+        id: Int,
+        lastRunDate: Long,
         skipCount: Int,
     )
 

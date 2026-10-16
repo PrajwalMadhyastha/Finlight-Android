@@ -10,11 +10,14 @@ package io.pm.finlight
 import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -38,6 +41,7 @@ class TransactionRepository(
             db = db,
             dispatcherProvider = dispatcherProvider,
         ),
+    private val deletedSmsHashDao: DeletedSmsHashDao = db.deletedSmsHashDao(),
 ) : ITransactionRepository {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
@@ -60,6 +64,7 @@ class TransactionRepository(
         db = db,
         dispatcherProvider = dispatcherProvider,
         manageReimbursementUseCase = manageReimbursementUseCase,
+        deletedSmsHashDao = db.deletedSmsHashDao(),
     )
 
     // --- NEW: Function for Spending Velocity feature ---
@@ -361,6 +366,25 @@ class TransactionRepository(
         transactionWriteDao.setSmsHash(transactionId, smsHash)
     }
 
+    override suspend fun existsBySmsHash(hash: String): Boolean {
+        return transactionQueryDao.existsBySmsHash(hash)
+    }
+
+    override suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    ) {
+        transactionWriteDao.updateSmsHashByLegacy(oldHash = oldHash, newHash = newHash)
+    }
+
+    override suspend fun existsDeletedSmsHash(hash: String): Boolean {
+        return deletedSmsHashDao.existsByHash(hash)
+    }
+
+    override suspend fun insertDeletedSmsHash(hash: String) {
+        deletedSmsHashDao.insert(DeletedSmsHash(hash))
+    }
+
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }
@@ -534,5 +558,49 @@ class TransactionRepository(
             transactionWriteDao.updateTransferLinkStatus(primaryTxnId, secondaryTxnId, true)
             transactionWriteDao.updateTransferLinkStatus(secondaryTxnId, primaryTxnId, true)
         }
+    }
+
+    // ─── Pending Transactions, Confirmation & Skip ─────────────────────────
+
+    override fun getPendingTransactionsFlow(): Flow<List<Transaction>> =
+        transactionQueryDao.getPendingTransactions()
+
+    override suspend fun confirmTransaction(
+        transactionId: Int,
+        confirmedAmount: Double?,
+    ) {
+        if (confirmedAmount != null) {
+            require(confirmedAmount > 0.0 && !confirmedAmount.isNaN() && !confirmedAmount.isInfinite()) {
+                "Confirmed amount must be positive and finite, but was: $confirmedAmount"
+            }
+        }
+        withContext(dispatcherProvider.io) {
+            db.withTransaction {
+                if (confirmedAmount != null) {
+                    transactionWriteDao.updateAmount(transactionId, confirmedAmount)
+                }
+                transactionWriteDao.confirmTransaction(transactionId)
+            }
+        }
+    }
+
+    override suspend fun skipTransaction(transactionId: Int) =
+        withContext(dispatcherProvider.io) {
+            transactionWriteDao.skipTransaction(transactionId)
+        }
+
+    override fun searchTransactions(
+        query: String,
+        filter: SearchFilter,
+    ): Flow<List<TransactionDetails>> {
+        return transactionQueryDao.searchTransactions(
+            keyword = query,
+            accountId = filter.accountId,
+            categoryId = filter.categoryId,
+            transactionType = filter.transactionType,
+            startDate = filter.startDate,
+            endDate = filter.endDate,
+            tagId = filter.tagId,
+        )
     }
 }

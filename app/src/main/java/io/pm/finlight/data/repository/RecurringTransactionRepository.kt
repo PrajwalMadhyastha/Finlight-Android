@@ -31,4 +31,23 @@ class RecurringTransactionRepository(
     override suspend fun delete(recurringTransaction: RecurringTransaction) {
         recurringTransactionDao.delete(recurringTransaction)
     }
+
+    override suspend fun getRuleById(id: Int): RecurringTransaction? {
+        return recurringTransactionDao.getRuleById(id)
+    }
+
+    override suspend fun updateLastRunDate(
+        ruleId: Int,
+        lastRunDate: Long,
+    ) {
+        recurringTransactionDao.updateLastRunDate(ruleId, lastRunDate)
+    }
+
+    override suspend fun updateLastRunAndSkipCount(
+        ruleId: Int,
+        lastRunDate: Long,
+        skipCount: Int,
+    ) {
+        recurringTransactionDao.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+    }
 }

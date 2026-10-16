@@ -25,6 +25,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -57,7 +58,7 @@ class SettingsViewModel(
     private val accountRepository: IAccountRepository,
     private val categoryRepository: ICategoryRepository,
     private val smsRepository: ISmsRepository,
-    private val transactionViewModel: TransactionViewModel,
+    private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
     private val smsClassifier: SmsClassifier,
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
@@ -74,7 +75,7 @@ class SettingsViewModel(
         accountRepository: IAccountRepository,
         categoryRepository: ICategoryRepository,
         smsRepository: ISmsRepository,
-        transactionViewModel: TransactionViewModel,
+        autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
         smsClassifier: SmsClassifier,
         nerExtractor: SmsEntityExtractor,
         transactionRunner: TransactionRunner,
@@ -88,7 +89,7 @@ class SettingsViewModel(
         accountRepository = accountRepository,
         categoryRepository = categoryRepository,
         smsRepository = smsRepository,
-        transactionViewModel = transactionViewModel,
+        autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
         smsClassifier = smsClassifier,
         nerExtractorProvider = { nerExtractor },
         transactionRunner = transactionRunner,
@@ -290,7 +291,7 @@ class SettingsViewModel(
 
         for (txn in currentList) {
             if (txn.merchantName != null && txn.merchantName.equals(mapping.parsedName, ignoreCase = true)) {
-                val success = transactionViewModel.autoSaveSmsTransaction(txn.copy(categoryId = mapping.categoryId), source = "Imported")
+                val success = autoSaveSmsTransactionUseCase(txn.copy(categoryId = mapping.categoryId), source = "Imported")
                 if (success) {
                     autoImportedCount++
                 }
@@ -442,7 +443,7 @@ class SettingsViewModel(
                     filterAndUpgradePotentialTransactions(parsedList, existingSmsHashes, deletedSmsHashes)
 
                 for (potentialTxn in newPotentialTransactions) {
-                    val success = transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")
+                    val success = autoSaveSmsTransactionUseCase(potentialTxn, source = "Imported")
                     if (success) {
                         newTransactionsFound++
                         potentialTxn.sourceSmsHash?.let { existingSmsHashes.add(it) }
@@ -580,7 +581,7 @@ class SettingsViewModel(
                             filterAndUpgradePotentialTransactions(parsedList, existingSmsHashes, deletedSmsHashes)
 
                         for (potentialTxn in newPotentialTransactions) {
-                            if (transactionViewModel.autoSaveSmsTransaction(potentialTxn, source = "Imported")) {
+                            if (autoSaveSmsTransactionUseCase(potentialTxn, source = "Imported")) {
                                 autoImportedCount++
                                 potentialTxn.sourceSmsHash?.let { existingSmsHashes.add(it) }
                             }

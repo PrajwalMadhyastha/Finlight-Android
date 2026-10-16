@@ -74,6 +74,8 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
+import io.pm.finlight.ui.viewmodel.SearchViewModel
+import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
@@ -1304,7 +1306,11 @@ fun AppNavHost(
                     navArgument("transactionId") { type = NavType.IntType },
                     navArgument("ruleId") { type = NavType.IntType }
                 ),
-            deepLinks = listOf(navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending/{transactionId}/{ruleId}" })
+            deepLinks =
+                listOf(
+                    navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending_transaction/{transactionId}/{ruleId}" },
+                    navDeepLink { uriPattern = "app://finlight.pm.io/confirm_pending/{transactionId}/{ruleId}" },
+                ),
         ) { backStackEntry ->
             LaunchedEffect(Unit) {
                 navController.navigate(BottomNavItem.Dashboard.route) {
