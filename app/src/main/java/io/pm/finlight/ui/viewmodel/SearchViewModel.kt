@@ -45,6 +45,29 @@ import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
 
+data class SearchQueryParameters(
+    val keyword: String = "",
+    val selectedAccount: Account? = null,
+    val selectedCategory: Category? = null,
+    val selectedTag: Tag? = null,
+    val transactionType: String = "All",
+    val startDate: Long? = null,
+    val endDate: Long? = null,
+    val isDrilldown: Boolean = false,
+) {
+    val filtersAreActive: Boolean
+        get() =
+            selectedAccount != null ||
+                selectedCategory != null ||
+                selectedTag != null ||
+                (!transactionType.equals("All", ignoreCase = true) && transactionType.isNotBlank()) ||
+                startDate != null ||
+                endDate != null
+
+    val shouldSearch: Boolean
+        get() = keyword.isNotBlank() || filtersAreActive || isDrilldown
+}
+
 data class SearchUiState(
     val keyword: String = "",
     val selectedAccount: Account? = null,
@@ -64,17 +87,23 @@ data class SearchUiState(
     // Flag for drilldown mode
     val isDrilldown: Boolean = false,
 ) {
+    fun toQueryParameters(): SearchQueryParameters =
+        SearchQueryParameters(
+            keyword = keyword,
+            selectedAccount = selectedAccount,
+            selectedCategory = selectedCategory,
+            selectedTag = selectedTag,
+            transactionType = transactionType,
+            startDate = startDate,
+            endDate = endDate,
+            isDrilldown = isDrilldown,
+        )
+
     val filtersAreActive: Boolean
-        get() =
-            selectedAccount != null ||
-                selectedCategory != null ||
-                selectedTag != null ||
-                (transactionType != "All" && transactionType.isNotBlank()) ||
-                startDate != null ||
-                endDate != null
+        get() = toQueryParameters().filtersAreActive
 
     val shouldSearch: Boolean
-        get() = keyword.isNotBlank() || filtersAreActive || isDrilldown
+        get() = toQueryParameters().shouldSearch
 }
 
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
@@ -94,45 +123,13 @@ class SearchViewModel(
     private val _daySummary = MutableStateFlow<FinancialSummary?>(null)
     val daySummary: StateFlow<FinancialSummary?> = _daySummary.asStateFlow()
 
-    private data class SearchQueryParameters(
-        val keyword: String,
-        val selectedAccount: Account?,
-        val selectedCategory: Category?,
-        val selectedTag: Tag?,
-        val transactionType: String,
-        val startDate: Long?,
-        val endDate: Long?,
-        val isDrilldown: Boolean,
-    )
-
     val searchResults: StateFlow<List<TransactionDetails>> =
         uiState
-            .map { state ->
-                SearchQueryParameters(
-                    keyword = state.keyword,
-                    selectedAccount = state.selectedAccount,
-                    selectedCategory = state.selectedCategory,
-                    selectedTag = state.selectedTag,
-                    transactionType = state.transactionType,
-                    startDate = state.startDate,
-                    endDate = state.endDate,
-                    isDrilldown = state.isDrilldown,
-                )
-            }
+            .map { it.toQueryParameters() }
             .distinctUntilChanged()
             .debounce(300L)
             .flatMapLatest { params ->
-                val filtersAreActive =
-                    params.selectedAccount != null ||
-                        params.selectedCategory != null ||
-                        params.selectedTag != null ||
-                        (params.transactionType != "All" && params.transactionType.isNotBlank()) ||
-                        params.startDate != null ||
-                        params.endDate != null
-
-                val shouldSearch = params.keyword.isNotBlank() || filtersAreActive || params.isDrilldown
-
-                if (shouldSearch) {
+                if (params.shouldSearch) {
                     val resolvedType =
                         if (params.transactionType.equals("All", ignoreCase = true)) {
                             null
@@ -207,11 +204,13 @@ class SearchViewModel(
             cal.set(Calendar.HOUR_OF_DAY, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
             val start = cal.timeInMillis
 
             cal.set(Calendar.HOUR_OF_DAY, 23)
             cal.set(Calendar.MINUTE, 59)
             cal.set(Calendar.SECOND, 59)
+            cal.set(Calendar.MILLISECOND, 999)
             val end = cal.timeInMillis
 
             val dateFormatter = FormatUtils.getFormatter("MMMM d, yyyy", Locale.getDefault())
@@ -319,13 +318,14 @@ class SearchViewModel(
     }
 
     fun clearFilters() {
-        _uiState.value =
+        _uiState.update { current ->
             SearchUiState(
-                accounts = _uiState.value.accounts,
-                categories = _uiState.value.categories,
-                tags = _uiState.value.tags,
+                accounts = current.accounts,
+                categories = current.categories,
+                tags = current.tags,
                 hasSearched = false,
             )
+        }
         _daySummary.value = null
     }
 }

@@ -14,6 +14,7 @@ import app.cash.turbine.test
 import io.pm.finlight.Account
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.Category
+import io.pm.finlight.FinancialSummary
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ITagRepository
@@ -26,6 +27,7 @@ import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceTimeBy
@@ -494,5 +496,263 @@ class SearchViewModelTest : BaseViewModelTest() {
             assertEquals(accounts, state.accounts)
             assertEquals(categories, state.categories)
             assertEquals(tags, state.tags)
+        }
+
+    @Test
+    fun `onAccountChange triggers search with accountId filter after debounce`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val account = Account(id = 42, name = "Checking", type = "Bank")
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onAccountChange(account)
+                advanceTimeBy(350L)
+
+                verify(transactionRepository).searchTransactions(
+                    eq(""),
+                    eq(SearchFilter(accountId = 42)),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `onCategoryChange triggers search with categoryId filter after debounce`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val category = Category(id = 7, name = "Groceries", iconKey = "icon", colorKey = "green")
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onCategoryChange(category)
+                advanceTimeBy(350L)
+
+                verify(transactionRepository).searchTransactions(
+                    eq(""),
+                    eq(SearchFilter(categoryId = 7)),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `onTagChange triggers search with tagId filter after debounce`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val tag = Tag(id = 99, name = "Vacation")
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onTagChange(tag)
+                advanceTimeBy(350L)
+
+                verify(transactionRepository).searchTransactions(
+                    eq(""),
+                    eq(SearchFilter(tagId = 99)),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `onStartDateSelected and onEndDateSelected trigger search with date range filter after debounce`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val startMillis = 100_000L
+            val endInputMillis = 200_000L
+            val expectedEndMillis =
+                Calendar.getInstance().apply {
+                    timeInMillis = endInputMillis
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onStartDateSelected(startMillis)
+                advanceTimeBy(350L)
+                verify(transactionRepository).searchTransactions(
+                    eq(""),
+                    eq(SearchFilter(startDate = startMillis)),
+                )
+
+                viewModel.onEndDateSelected(endInputMillis)
+                advanceTimeBy(350L)
+                verify(transactionRepository).searchTransactions(
+                    eq(""),
+                    eq(SearchFilter(startDate = startMillis, endDate = expectedEndMillis)),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `onEndDateSelected with null sets endDate to null`() =
+        runTest {
+            initializeViewModel()
+            viewModel.onEndDateSelected(null)
+            assertNull(viewModel.uiState.value.endDate)
+        }
+
+    @Test
+    fun `init with initialDateMillis minus one does not configure date range`() =
+        runTest {
+            initializeViewModel(initialDateMillis = -1L)
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertNull(state.startDate)
+            assertNull(state.endDate)
+            assertNull(state.displayDate)
+            assertFalse(state.hasSearched)
+            verify(transactionRepository, never()).getFinancialSummaryForRangeFlow(any(), any())
+        }
+
+    @Test
+    fun `init with initialCategoryId when category is not found leaves selectedCategory null`() =
+        runTest {
+            val categories = listOf(Category(id = 2, name = "Health", iconKey = "h", colorKey = "blue"))
+            whenever(categoryRepository.allCategories).thenReturn(flowOf(categories))
+
+            initializeViewModel(initialCategoryId = 999)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.selectedCategory)
+        }
+
+    @Test
+    fun `metadata flow does not overwrite existing selectedCategory when initialCategoryId is provided`() =
+        runTest {
+            val manualCategory = Category(id = 10, name = "Custom", iconKey = "c", colorKey = "red")
+            val loadedCategories = listOf(Category(id = 5, name = "Initial", iconKey = "i", colorKey = "yellow"))
+            val categoriesFlow = MutableSharedFlow<List<Category>>()
+            whenever(categoryRepository.allCategories).thenReturn(categoriesFlow)
+
+            initializeViewModel(initialCategoryId = 5)
+            // Pre-select a category before metadata emission completes
+            viewModel.onCategoryChange(manualCategory)
+
+            categoriesFlow.emit(loadedCategories)
+            advanceUntilIdle()
+
+            assertEquals(manualCategory, viewModel.uiState.value.selectedCategory)
+        }
+
+    @Test
+    fun `onTypeChange with case insensitive all does not trigger type filter`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onTypeChange("ALL")
+                advanceTimeBy(350L)
+
+                verify(transactionRepository, never()).searchTransactions(any(), any())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `SearchQueryParameters with blank transactionType does not activate filters`() {
+        val params = SearchQueryParameters(transactionType = "   ")
+        assertFalse(params.filtersAreActive)
+        assertFalse(params.shouldSearch)
+    }
+
+    @Test
+    fun `daySummary collects emissions when initialDateMillis is provided`() =
+        runTest {
+            val summary = FinancialSummary(totalIncome = 5000.0, totalExpenses = 1500.0)
+            whenever(transactionRepository.getFinancialSummaryForRangeFlow(any(), any()))
+                .thenReturn(flowOf(summary))
+
+            initializeViewModel(initialDateMillis = 1000L)
+            advanceUntilIdle()
+
+            assertEquals(summary, viewModel.daySummary.first())
+        }
+
+    @Test
+    fun `clearFilters resets daySummary to null`() =
+        runTest {
+            val summary = FinancialSummary(totalIncome = 5000.0, totalExpenses = 1500.0)
+            whenever(transactionRepository.getFinancialSummaryForRangeFlow(any(), any()))
+                .thenReturn(flowOf(summary))
+
+            initializeViewModel(initialDateMillis = 1000L)
+            advanceUntilIdle()
+            assertEquals(summary, viewModel.daySummary.first())
+
+            viewModel.clearFilters()
+            advanceUntilIdle()
+
+            assertNull(viewModel.daySummary.first())
+        }
+
+    @Test
+    fun `combined search triggers repository with all filter fields populated`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val account = Account(id = 1, name = "Bank", type = "Checking")
+            val category = Category(id = 2, name = "Food", iconKey = "f", colorKey = "orange")
+            val tag = Tag(id = 3, name = "Dining")
+            val startMillis = 500L
+            val endMillis = 900L
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onKeywordChange("Dinner")
+                viewModel.onAccountChange(account)
+                viewModel.onCategoryChange(category)
+                viewModel.onTagChange(tag)
+                viewModel.onTypeChange("expense")
+                viewModel.onStartDateSelected(startMillis)
+                viewModel.onEndDateSelected(endMillis)
+
+                advanceTimeBy(350L)
+
+                verify(transactionRepository).searchTransactions(
+                    eq("Dinner"),
+                    eq(
+                        SearchFilter(
+                            accountId = 1,
+                            categoryId = 2,
+                            tagId = 3,
+                            transactionType = TransactionType.EXPENSE,
+                            startDate = startMillis,
+                            endDate =
+                                Calendar.getInstance().apply {
+                                    timeInMillis = endMillis
+                                    set(Calendar.HOUR_OF_DAY, 23)
+                                    set(Calendar.MINUTE, 59)
+                                    set(Calendar.SECOND, 59)
+                                    set(Calendar.MILLISECOND, 999)
+                                }.timeInMillis,
+                        ),
+                    ),
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }
