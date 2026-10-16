@@ -74,6 +74,8 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
+import io.pm.finlight.ui.viewmodel.SearchViewModel
+import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground

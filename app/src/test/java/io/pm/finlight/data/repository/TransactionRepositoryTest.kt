@@ -14,6 +14,7 @@ import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.TestDispatcherProvider
@@ -668,5 +669,66 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             assertNotNull(repo)
             assertEquals(customDispatcher, repo.dispatcherProvider)
+        }
+
+    @Test
+    fun `searchTransactions delegates to transactionQueryDao with filter parameters`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedResults =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 10, description = "Coffee", amount = 4.5, date = 1000L, accountId = 1, categoryId = 2, notes = null),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            val filter =
+                SearchFilter(
+                    accountId = 1,
+                    categoryId = 2,
+                    tagId = 3,
+                    transactionType = TransactionType.EXPENSE,
+                    startDate = 500L,
+                    endDate = 1500L,
+                )
+            `when`(
+                transactionDao.searchTransactions(
+                    keyword = "Coffee",
+                    accountId = 1,
+                    categoryId = 2,
+                    transactionType = TransactionType.EXPENSE,
+                    startDate = 500L,
+                    endDate = 1500L,
+                    tagId = 3,
+                ),
+            ).thenReturn(flowOf(expectedResults))
+
+            val resultFlow =
+                repository.searchTransactions(
+                    query = "Coffee",
+                    filter = filter,
+                )
+
+            resultFlow.test {
+                val emitted = awaitItem()
+                assertEquals(expectedResults, emitted)
+                awaitComplete()
+            }
+
+            verify(transactionDao).searchTransactions(
+                keyword = "Coffee",
+                accountId = 1,
+                categoryId = 2,
+                transactionType = TransactionType.EXPENSE,
+                startDate = 500L,
+                endDate = 1500L,
+                tagId = 3,
+            )
         }
 }

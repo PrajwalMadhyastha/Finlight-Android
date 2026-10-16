@@ -17,6 +17,7 @@ import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -587,4 +588,19 @@ class TransactionRepository(
         withContext(dispatcherProvider.io) {
             transactionWriteDao.skipTransaction(transactionId)
         }
+
+    override fun searchTransactions(
+        query: String,
+        filter: SearchFilter,
+    ): Flow<List<TransactionDetails>> {
+        return transactionQueryDao.searchTransactions(
+            keyword = query,
+            accountId = filter.accountId,
+            categoryId = filter.categoryId,
+            transactionType = filter.transactionType,
+            startDate = filter.startDate,
+            endDate = filter.endDate,
+            tagId = filter.tagId,
+        )
+    }
 }
