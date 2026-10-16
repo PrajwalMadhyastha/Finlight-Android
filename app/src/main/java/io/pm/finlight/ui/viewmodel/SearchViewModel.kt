@@ -28,6 +28,7 @@ import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -123,6 +125,9 @@ class SearchViewModel(
     private val _daySummary = MutableStateFlow<FinancialSummary?>(null)
     val daySummary: StateFlow<FinancialSummary?> = _daySummary.asStateFlow()
 
+    private var initialCategoryResolved = initialCategoryId == null
+    private var daySummaryJob: Job? = null
+
     val searchResults: StateFlow<List<TransactionDetails>> =
         uiState
             .map { it.toQueryParameters() }
@@ -137,7 +142,7 @@ class SearchViewModel(
                             TransactionType.fromStringOrNull(params.transactionType)
                         }
                     transactionRepository.searchTransactions(
-                        query = params.keyword,
+                        query = params.keyword.trim(),
                         filter =
                             SearchFilter(
                                 accountId = params.selectedAccount?.id,
@@ -147,15 +152,20 @@ class SearchViewModel(
                                 startDate = params.startDate,
                                 endDate = params.endDate,
                             ),
-                    ).flowOn(dispatcherProvider.io)
+                    )
+                        .flowOn(dispatcherProvider.io)
+                        .onEach {
+                            _uiState.update { current -> current.copy(hasSearched = true) }
+                        }
                 } else {
+                    _uiState.update { current -> current.copy(hasSearched = false) }
                     flowOf(emptyList())
                 }
             }
             .flowOn(dispatcherProvider.default)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
+                started = SharingStarted.Eagerly,
                 initialValue = emptyList(),
             )
 
@@ -171,31 +181,31 @@ class SearchViewModel(
                 .collect { (accounts, categories, tags) ->
                     _uiState.update { current ->
                         val resolvedCategory =
-                            if (initialCategoryId != null && current.selectedCategory == null) {
-                                categories.find { it.id == initialCategoryId }
+                            if (!initialCategoryResolved && initialCategoryId != null && current.selectedCategory == null) {
+                                val found = categories.find { it.id == initialCategoryId }
+                                if (found != null || categories.isNotEmpty()) {
+                                    initialCategoryResolved = true
+                                }
+                                found
                             } else {
                                 current.selectedCategory
                             }
-                        val next =
-                            current.copy(
-                                accounts = accounts,
-                                categories = categories,
-                                tags = tags,
-                                selectedCategory = resolvedCategory,
-                            )
-                        next.copy(hasSearched = next.shouldSearch)
+                        current.copy(
+                            accounts = accounts,
+                            categories = categories,
+                            tags = tags,
+                            selectedCategory = resolvedCategory,
+                        )
                     }
                 }
         }
 
         if (!initialQuery.isNullOrBlank()) {
             _uiState.update { current ->
-                val next =
-                    current.copy(
-                        keyword = initialQuery,
-                        isDrilldown = true,
-                    )
-                next.copy(hasSearched = next.shouldSearch)
+                current.copy(
+                    keyword = initialQuery,
+                    isDrilldown = true,
+                )
             }
         }
 
@@ -217,64 +227,68 @@ class SearchViewModel(
             val formattedDate = dateFormatter.format(cal.time)
 
             _uiState.update { current ->
-                val next =
-                    current.copy(
-                        startDate = start,
-                        endDate = end,
-                        displayDate = formattedDate,
-                    )
-                next.copy(hasSearched = next.shouldSearch)
+                current.copy(
+                    startDate = start,
+                    endDate = end,
+                    displayDate = formattedDate,
+                )
             }
 
-            viewModelScope.launch(dispatcherProvider.main) {
-                transactionRepository.getFinancialSummaryForRangeFlow(start, end)
-                    .flowOn(dispatcherProvider.io)
-                    .collect { summary ->
-                        _daySummary.value = summary
-                    }
-            }
+            daySummaryJob =
+                viewModelScope.launch(dispatcherProvider.main) {
+                    transactionRepository.getFinancialSummaryForRangeFlow(start, end)
+                        .flowOn(dispatcherProvider.io)
+                        .collect { summary ->
+                            _daySummary.value = summary
+                        }
+                }
         }
     }
 
     fun onKeywordChange(newKeyword: String) {
         _uiState.update { current ->
-            val next = current.copy(keyword = newKeyword)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(keyword = newKeyword, hasSearched = false)
         }
     }
 
     fun onAccountChange(account: Account?) {
         _uiState.update { current ->
-            val next = current.copy(selectedAccount = account)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(selectedAccount = account, hasSearched = false)
         }
     }
 
     fun onCategoryChange(category: Category?) {
+        initialCategoryResolved = true
         _uiState.update { current ->
-            val next = current.copy(selectedCategory = category)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(selectedCategory = category, hasSearched = false)
         }
     }
 
     fun onTagChange(tag: Tag?) {
         _uiState.update { current ->
-            val next = current.copy(selectedTag = tag)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(selectedTag = tag, hasSearched = false)
         }
     }
 
     fun onTypeChange(type: String?) {
         _uiState.update { current ->
-            val next = current.copy(transactionType = type ?: "All")
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(transactionType = type ?: "All", hasSearched = false)
         }
     }
 
     fun onStartDateSelected(startDateMillis: Long?) {
+        val adjustedStart =
+            startDateMillis?.let {
+                Calendar.getInstance().apply {
+                    timeInMillis = it
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+            }
         _uiState.update { current ->
-            val next = current.copy(startDate = startDateMillis)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(startDate = adjustedStart, hasSearched = false)
         }
     }
 
@@ -290,22 +304,19 @@ class SearchViewModel(
                 }.timeInMillis
             }
         _uiState.update { current ->
-            val next = current.copy(endDate = adjustedEnd)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(endDate = adjustedEnd, hasSearched = false)
         }
     }
 
     fun onClearStartDate() {
         _uiState.update { current ->
-            val next = current.copy(startDate = null)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(startDate = null, hasSearched = false)
         }
     }
 
     fun onClearEndDate() {
         _uiState.update { current ->
-            val next = current.copy(endDate = null)
-            next.copy(hasSearched = next.shouldSearch)
+            current.copy(endDate = null, hasSearched = false)
         }
     }
 
@@ -318,6 +329,9 @@ class SearchViewModel(
     }
 
     fun clearFilters() {
+        initialCategoryResolved = true
+        daySummaryJob?.cancel()
+        daySummaryJob = null
         _uiState.update { current ->
             SearchUiState(
                 accounts = current.accounts,

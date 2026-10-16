@@ -240,8 +240,8 @@ class SearchViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `onAccountChange updates uiState`() =
-        runTest {
+    fun `onAccountChange updates uiState and sets hasSearched after debounce`() =
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val account = Account(1, "Test Account", "Bank")
@@ -252,14 +252,16 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onAccountChange(account)
                 val updated = awaitItem()
                 assertEquals(account, updated.selectedAccount)
-                assertTrue(updated.hasSearched)
+                assertFalse(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
+            advanceTimeBy(350L)
+            assertTrue(viewModel.uiState.value.hasSearched)
         }
 
     @Test
-    fun `onCategoryChange updates uiState`() =
-        runTest {
+    fun `onCategoryChange updates uiState and sets hasSearched after debounce`() =
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val category = Category(1, "Test Category", "", "")
@@ -270,14 +272,16 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onCategoryChange(category)
                 val updated = awaitItem()
                 assertEquals(category, updated.selectedCategory)
-                assertTrue(updated.hasSearched)
+                assertFalse(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
+            advanceTimeBy(350L)
+            assertTrue(viewModel.uiState.value.hasSearched)
         }
 
     @Test
-    fun `onTagChange updates uiState`() =
-        runTest {
+    fun `onTagChange updates uiState and sets hasSearched after debounce`() =
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val tag = Tag(1, "Test Tag")
@@ -288,14 +292,16 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onTagChange(tag)
                 val updated = awaitItem()
                 assertEquals(tag, updated.selectedTag)
-                assertTrue(updated.hasSearched)
+                assertFalse(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
+            advanceTimeBy(350L)
+            assertTrue(viewModel.uiState.value.hasSearched)
         }
 
     @Test
-    fun `onTypeChange updates uiState`() =
-        runTest {
+    fun `onTypeChange updates uiState and sets hasSearched after debounce`() =
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val type = "Income"
@@ -306,9 +312,11 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onTypeChange(type)
                 val updated = awaitItem()
                 assertEquals(type, updated.transactionType)
-                assertTrue(updated.hasSearched)
+                assertFalse(updated.hasSearched)
                 cancelAndIgnoreRemainingEvents()
             }
+            advanceTimeBy(350L)
+            assertTrue(viewModel.uiState.value.hasSearched)
         }
 
     @Test
@@ -324,18 +332,26 @@ class SearchViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `onStartDateSelected and onClearStartDate update uiState`() =
-        runTest {
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val date = 123456789L
+            val expectedStart =
+                Calendar.getInstance().apply {
+                    timeInMillis = date
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
 
             // Act & Assert
             viewModel.uiState.test {
                 awaitItem() // initial
                 viewModel.onStartDateSelected(date)
                 val startSelected = awaitItem()
-                assertEquals(date, startSelected.startDate)
-                assertTrue(startSelected.hasSearched)
+                assertEquals(expectedStart, startSelected.startDate)
+                assertFalse(startSelected.hasSearched)
 
                 viewModel.onClearStartDate()
                 val cleared = awaitItem()
@@ -347,7 +363,7 @@ class SearchViewModelTest : BaseViewModelTest() {
 
     @Test
     fun `onEndDateSelected and onClearEndDate update uiState`() =
-        runTest {
+        runTest(testDispatcher) {
             // Arrange
             initializeViewModel()
             val date = 987654321L
@@ -358,7 +374,7 @@ class SearchViewModelTest : BaseViewModelTest() {
                 viewModel.onEndDateSelected(date)
                 val endSelected = awaitItem()
                 assertNotNull(endSelected.endDate)
-                assertTrue(endSelected.hasSearched)
+                assertFalse(endSelected.hasSearched)
 
                 viewModel.onClearEndDate()
                 val cleared = awaitItem()
@@ -571,6 +587,14 @@ class SearchViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             val startMillis = 100_000L
+            val expectedStartMillis =
+                Calendar.getInstance().apply {
+                    timeInMillis = startMillis
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
             val endInputMillis = 200_000L
             val expectedEndMillis =
                 Calendar.getInstance().apply {
@@ -588,14 +612,14 @@ class SearchViewModelTest : BaseViewModelTest() {
                 advanceTimeBy(350L)
                 verify(transactionRepository).searchTransactions(
                     eq(""),
-                    eq(SearchFilter(startDate = startMillis)),
+                    eq(SearchFilter(startDate = expectedStartMillis)),
                 )
 
                 viewModel.onEndDateSelected(endInputMillis)
                 advanceTimeBy(350L)
                 verify(transactionRepository).searchTransactions(
                     eq(""),
-                    eq(SearchFilter(startDate = startMillis, endDate = expectedEndMillis)),
+                    eq(SearchFilter(startDate = expectedStartMillis, endDate = expectedEndMillis)),
                 )
                 cancelAndIgnoreRemainingEvents()
             }
@@ -717,6 +741,14 @@ class SearchViewModelTest : BaseViewModelTest() {
             val category = Category(id = 2, name = "Food", iconKey = "f", colorKey = "orange")
             val tag = Tag(id = 3, name = "Dining")
             val startMillis = 500L
+            val expectedStartMillis =
+                Calendar.getInstance().apply {
+                    timeInMillis = startMillis
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
             val endMillis = 900L
 
             viewModel.searchResults.test {
@@ -740,7 +772,7 @@ class SearchViewModelTest : BaseViewModelTest() {
                             categoryId = 2,
                             tagId = 3,
                             transactionType = TransactionType.EXPENSE,
-                            startDate = startMillis,
+                            startDate = expectedStartMillis,
                             endDate =
                                 Calendar.getInstance().apply {
                                     timeInMillis = endMillis
@@ -754,5 +786,146 @@ class SearchViewModelTest : BaseViewModelTest() {
                 )
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `keystroke does not set hasSearched during debounce to prevent empty-state flicker`() =
+        runTest(testDispatcher) {
+            whenever(transactionRepository.searchTransactions(eq("Coffee"), any()))
+                .thenReturn(flowOf(emptyList()))
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Initial state
+            assertFalse(viewModel.uiState.value.hasSearched)
+            assertEquals(emptyList<TransactionDetails>(), viewModel.searchResults.value)
+
+            // User types keystroke
+            viewModel.onKeywordChange("Coffee")
+
+            // Advance partially into debounce window (150ms of 300ms)
+            advanceTimeBy(150L)
+
+            // ASSERT: During debounce, hasSearched remains false, preventing "No transactions match your criteria."
+            assertFalse(
+                "hasSearched must be false during debounce to avoid UI flicker",
+                viewModel.uiState.value.hasSearched,
+            )
+            assertEquals(emptyList<TransactionDetails>(), viewModel.searchResults.value)
+
+            // Advance past debounce window (300ms total)
+            advanceTimeBy(151L)
+
+            // ASSERT: After search execution completes, hasSearched becomes true
+            assertTrue(
+                "hasSearched must be true after search execution completes",
+                viewModel.uiState.value.hasSearched,
+            )
+        }
+
+    @Test
+    fun `subsequent allCategories emissions after clearFilters do not resurrect initialCategoryId`() =
+        runTest {
+            val initialCategory = Category(id = 5, name = "Groceries", iconKey = "g", colorKey = "green")
+            val updatedCategories =
+                listOf(
+                    initialCategory,
+                    Category(id = 6, name = "Dining", iconKey = "d", colorKey = "orange"),
+                )
+            val categoriesFlow = MutableSharedFlow<List<Category>>()
+            whenever(categoryRepository.allCategories).thenReturn(categoriesFlow)
+
+            initializeViewModel(initialCategoryId = 5)
+            // Emit initial categories
+            categoriesFlow.emit(listOf(initialCategory))
+            advanceUntilIdle()
+
+            assertEquals(initialCategory, viewModel.uiState.value.selectedCategory)
+
+            // User clears filters
+            viewModel.clearFilters()
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.selectedCategory)
+
+            // External event triggers category re-emission (e.g. background sync or SMS parse)
+            categoriesFlow.emit(updatedCategories)
+            advanceUntilIdle()
+
+            // Category must NOT be resurrected
+            assertNull(viewModel.uiState.value.selectedCategory)
+        }
+
+    @Test
+    fun `daySummary does not re-emit after clearFilters`() =
+        runTest {
+            val initialSummary = FinancialSummary(totalIncome = 500.0, totalExpenses = 200.0)
+            val subsequentSummary = FinancialSummary(totalIncome = 1000.0, totalExpenses = 400.0)
+            val summaryFlow = MutableSharedFlow<FinancialSummary?>()
+            whenever(transactionRepository.getFinancialSummaryForRangeFlow(any(), any()))
+                .thenReturn(summaryFlow)
+
+            initializeViewModel(initialDateMillis = 1000L)
+            summaryFlow.emit(initialSummary)
+            advanceUntilIdle()
+
+            assertEquals(initialSummary, viewModel.daySummary.first())
+
+            // Clear filters
+            viewModel.clearFilters()
+            advanceUntilIdle()
+            assertNull(viewModel.daySummary.first())
+
+            // Flow re-emits due to transaction insertion in that range
+            summaryFlow.emit(subsequentSummary)
+            advanceUntilIdle()
+
+            // daySummary must remain null (coroutine job was cancelled)
+            assertNull(viewModel.daySummary.first())
+        }
+
+    @Test
+    fun `onStartDateSelected normalizes timestamp to start-of-day 00 00 00 000`() =
+        runTest {
+            initializeViewModel()
+            val inputMillis = 1_700_000_123_456L
+            val expectedStartMillis =
+                Calendar.getInstance().apply {
+                    timeInMillis = inputMillis
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+
+            viewModel.onStartDateSelected(inputMillis)
+
+            assertEquals(expectedStartMillis, viewModel.uiState.value.startDate)
+        }
+
+    @Test
+    fun `searchTransactions receives trimmed keyword when filters are active`() =
+        runTest(testDispatcher) {
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val account = Account(id = 1, name = "Checking", type = "Bank")
+            viewModel.onAccountChange(account)
+            viewModel.onKeywordChange("   ")
+            advanceTimeBy(350L)
+
+            // When user enters whitespace alongside an active filter, query passed must be trimmed to ""
+            verify(transactionRepository).searchTransactions(
+                eq(""),
+                eq(SearchFilter(accountId = 1)),
+            )
+
+            viewModel.onKeywordChange("  Starbucks  ")
+            advanceTimeBy(350L)
+
+            // Leading and trailing whitespace should be trimmed
+            verify(transactionRepository).searchTransactions(
+                eq("Starbucks"),
+                eq(SearchFilter(accountId = 1)),
+            )
         }
 }
