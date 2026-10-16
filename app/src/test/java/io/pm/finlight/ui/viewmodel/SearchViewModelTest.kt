@@ -29,7 +29,10 @@ import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -663,7 +666,11 @@ class SearchViewModelTest : BaseViewModelTest() {
     fun `metadata flow does not overwrite existing selectedCategory when initialCategoryId is provided`() =
         runTest {
             val manualCategory = Category(id = 10, name = "Custom", iconKey = "c", colorKey = "red")
-            val loadedCategories = listOf(Category(id = 5, name = "Initial", iconKey = "i", colorKey = "yellow"))
+            val loadedCategories =
+                listOf(
+                    Category(id = 5, name = "Initial", iconKey = "i", colorKey = "yellow"),
+                    manualCategory,
+                )
             val categoriesFlow = MutableSharedFlow<List<Category>>()
             whenever(categoryRepository.allCategories).thenReturn(categoriesFlow)
 
@@ -908,6 +915,10 @@ class SearchViewModelTest : BaseViewModelTest() {
             initializeViewModel()
             advanceUntilIdle()
 
+            backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+                viewModel.searchResults.collect {}
+            }
+
             val account = Account(id = 1, name = "Checking", type = "Bank")
             viewModel.onAccountChange(account)
             viewModel.onKeywordChange("   ")
@@ -927,5 +938,153 @@ class SearchViewModelTest : BaseViewModelTest() {
                 eq("Starbucks"),
                 eq(SearchFilter(accountId = 1)),
             )
+        }
+
+    @Test
+    fun `allCategories re-emission refreshes selectedCategory when entity attributes change`() =
+        runTest {
+            val initialCategory = Category(id = 1, name = "Food", iconKey = "food", colorKey = "green")
+            val updatedCategory = Category(id = 1, name = "Groceries", iconKey = "cart", colorKey = "blue")
+            val categoriesFlow = MutableSharedFlow<List<Category>>()
+            whenever(categoryRepository.allCategories).thenReturn(categoriesFlow)
+
+            initializeViewModel()
+            viewModel.onCategoryChange(initialCategory)
+            advanceUntilIdle()
+
+            assertEquals("Food", viewModel.uiState.value.selectedCategory?.name)
+
+            categoriesFlow.emit(listOf(updatedCategory))
+            advanceUntilIdle()
+
+            assertEquals("Groceries", viewModel.uiState.value.selectedCategory?.name)
+            assertEquals("cart", viewModel.uiState.value.selectedCategory?.iconKey)
+            assertEquals("blue", viewModel.uiState.value.selectedCategory?.colorKey)
+        }
+
+    @Test
+    fun `allCategories re-emission clears selectedCategory when entity is deleted`() =
+        runTest {
+            val selectedCategory = Category(id = 1, name = "Food", iconKey = "food", colorKey = "green")
+            val otherCategory = Category(id = 2, name = "Bills", iconKey = "bill", colorKey = "red")
+            val categoriesFlow = MutableSharedFlow<List<Category>>()
+            whenever(categoryRepository.allCategories).thenReturn(categoriesFlow)
+
+            initializeViewModel()
+            viewModel.onCategoryChange(selectedCategory)
+            advanceUntilIdle()
+
+            assertEquals(selectedCategory, viewModel.uiState.value.selectedCategory)
+
+            // Emit list omitting id 1 (simulating deletion in database)
+            categoriesFlow.emit(listOf(otherCategory))
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.selectedCategory)
+        }
+
+    @Test
+    fun `searchTransactions flow exception is caught by catch operator and safely emits emptyList`() =
+        runTest(testDispatcher) {
+            val validResult =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 1, description = "Test", amount = 10.0, date = 0L, accountId = 1, categoryId = 1, notes = null),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            whenever(transactionRepository.searchTransactions(eq("Valid"), any()))
+                .thenReturn(flowOf(validResult))
+            whenever(transactionRepository.searchTransactions(eq("Error"), any()))
+                .thenReturn(
+                    flow {
+                        throw RuntimeException("Simulated SQLite failure")
+                    },
+                )
+            initializeViewModel()
+            advanceUntilIdle()
+
+            viewModel.searchResults.test {
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+
+                viewModel.onKeywordChange("Valid")
+                advanceTimeBy(350L)
+                assertEquals(validResult, awaitItem())
+
+                viewModel.onKeywordChange("Error")
+                advanceTimeBy(350L)
+                assertEquals(emptyList<TransactionDetails>(), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `date mutations and clears reset displayDate cancel daySummaryJob and clear daySummary`() =
+        runTest {
+            val cal = Calendar.getInstance()
+            val initialMillis = cal.timeInMillis
+            val summaryFlow = MutableSharedFlow<FinancialSummary?>()
+            whenever(transactionRepository.getFinancialSummaryForRangeFlow(any(), any()))
+                .thenReturn(summaryFlow)
+
+            initializeViewModel(initialDateMillis = initialMillis)
+            advanceUntilIdle()
+
+            val initialSummary = FinancialSummary(totalIncome = 200.0, totalExpenses = 100.0)
+            summaryFlow.emit(initialSummary)
+            advanceUntilIdle()
+
+            assertNotNull(viewModel.uiState.value.displayDate)
+            assertEquals(initialSummary, viewModel.daySummary.value)
+
+            // Test onClearStartDate clears displayDate and daySummary
+            viewModel.onClearStartDate()
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.displayDate)
+            assertNull(viewModel.daySummary.value)
+
+            // Reset initialDateMillis state
+            initializeViewModel(initialDateMillis = initialMillis)
+            advanceUntilIdle()
+            summaryFlow.emit(initialSummary)
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.displayDate)
+
+            // Test onClearEndDate clears displayDate and daySummary
+            viewModel.onClearEndDate()
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.displayDate)
+            assertNull(viewModel.daySummary.value)
+
+            // Reset initialDateMillis state
+            initializeViewModel(initialDateMillis = initialMillis)
+            advanceUntilIdle()
+            summaryFlow.emit(initialSummary)
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.displayDate)
+
+            // Test onStartDateSelected clears displayDate and daySummary
+            viewModel.onStartDateSelected(123456L)
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.displayDate)
+            assertNull(viewModel.daySummary.value)
+
+            // Reset initialDateMillis state
+            initializeViewModel(initialDateMillis = initialMillis)
+            advanceUntilIdle()
+            summaryFlow.emit(initialSummary)
+            advanceUntilIdle()
+            assertNotNull(viewModel.uiState.value.displayDate)
+
+            // Test onEndDateSelected clears displayDate and daySummary
+            viewModel.onEndDateSelected(654321L)
+            advanceUntilIdle()
+            assertNull(viewModel.uiState.value.displayDate)
+            assertNull(viewModel.daySummary.value)
         }
 }

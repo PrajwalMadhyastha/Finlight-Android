@@ -37,10 +37,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -153,23 +153,32 @@ class SearchViewModel(
                                 endDate = params.endDate,
                             ),
                     )
+                        .catch { emit(emptyList()) }
                         .flowOn(dispatcherProvider.io)
-                        .onEach {
-                            _uiState.update { current -> current.copy(hasSearched = true) }
-                        }
                 } else {
-                    _uiState.update { current -> current.copy(hasSearched = false) }
                     flowOf(emptyList())
                 }
             }
             .flowOn(dispatcherProvider.default)
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.Eagerly,
+                started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList(),
             )
 
     init {
+        viewModelScope.launch(dispatcherProvider.main) {
+            uiState
+                .map { it.toQueryParameters() }
+                .distinctUntilChanged()
+                .debounce(300L)
+                .collect { params ->
+                    _uiState.update { current ->
+                        current.copy(hasSearched = params.shouldSearch)
+                    }
+                }
+        }
+
         viewModelScope.launch(dispatcherProvider.main) {
             combine(
                 accountRepository.allAccounts,
@@ -187,8 +196,10 @@ class SearchViewModel(
                                     initialCategoryResolved = true
                                 }
                                 found
+                            } else if (current.selectedCategory != null) {
+                                categories.find { it.id == current.selectedCategory.id }
                             } else {
-                                current.selectedCategory
+                                null
                             }
                         current.copy(
                             accounts = accounts,
@@ -287,8 +298,11 @@ class SearchViewModel(
                     set(Calendar.MILLISECOND, 0)
                 }.timeInMillis
             }
+        daySummaryJob?.cancel()
+        daySummaryJob = null
+        _daySummary.value = null
         _uiState.update { current ->
-            current.copy(startDate = adjustedStart, hasSearched = false)
+            current.copy(startDate = adjustedStart, displayDate = null, hasSearched = false)
         }
     }
 
@@ -303,20 +317,29 @@ class SearchViewModel(
                     set(Calendar.MILLISECOND, 999)
                 }.timeInMillis
             }
+        daySummaryJob?.cancel()
+        daySummaryJob = null
+        _daySummary.value = null
         _uiState.update { current ->
-            current.copy(endDate = adjustedEnd, hasSearched = false)
+            current.copy(endDate = adjustedEnd, displayDate = null, hasSearched = false)
         }
     }
 
     fun onClearStartDate() {
+        daySummaryJob?.cancel()
+        daySummaryJob = null
+        _daySummary.value = null
         _uiState.update { current ->
-            current.copy(startDate = null, hasSearched = false)
+            current.copy(startDate = null, displayDate = null, hasSearched = false)
         }
     }
 
     fun onClearEndDate() {
+        daySummaryJob?.cancel()
+        daySummaryJob = null
+        _daySummary.value = null
         _uiState.update { current ->
-            current.copy(endDate = null, hasSearched = false)
+            current.copy(endDate = null, displayDate = null, hasSearched = false)
         }
     }
 
