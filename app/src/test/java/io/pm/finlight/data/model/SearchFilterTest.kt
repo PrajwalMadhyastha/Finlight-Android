@@ -1,6 +1,5 @@
 package io.pm.finlight.data.model
 
-import io.pm.finlight.SearchFilter
 import io.pm.finlight.TransactionType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

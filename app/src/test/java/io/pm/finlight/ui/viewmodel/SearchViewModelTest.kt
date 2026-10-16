@@ -19,7 +19,7 @@ import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SearchFilter
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.Tag
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
@@ -981,6 +981,86 @@ class SearchViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertNull(viewModel.uiState.value.selectedCategory)
+        }
+
+    @Test
+    fun `allAccounts re-emission refreshes selectedAccount when entity attributes change`() =
+        runTest {
+            val initialAccount = Account(id = 1, name = "Checking", type = "Bank")
+            val updatedAccount = Account(id = 1, name = "Primary Checking", type = "Bank")
+            val accountsFlow = MutableSharedFlow<List<Account>>()
+            whenever(accountRepository.allAccounts).thenReturn(accountsFlow)
+
+            initializeViewModel()
+            viewModel.onAccountChange(initialAccount)
+            advanceUntilIdle()
+
+            assertEquals("Checking", viewModel.uiState.value.selectedAccount?.name)
+
+            accountsFlow.emit(listOf(updatedAccount))
+            advanceUntilIdle()
+
+            assertEquals("Primary Checking", viewModel.uiState.value.selectedAccount?.name)
+        }
+
+    @Test
+    fun `allAccounts re-emission clears selectedAccount when entity is deleted`() =
+        runTest {
+            val selectedAccount = Account(id = 1, name = "Checking", type = "Bank")
+            val otherAccount = Account(id = 2, name = "Savings", type = "Bank")
+            val accountsFlow = MutableSharedFlow<List<Account>>()
+            whenever(accountRepository.allAccounts).thenReturn(accountsFlow)
+
+            initializeViewModel()
+            viewModel.onAccountChange(selectedAccount)
+            advanceUntilIdle()
+
+            assertEquals(selectedAccount, viewModel.uiState.value.selectedAccount)
+
+            accountsFlow.emit(listOf(otherAccount))
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.selectedAccount)
+        }
+
+    @Test
+    fun `allTags re-emission refreshes selectedTag when entity attributes change`() =
+        runTest {
+            val initialTag = Tag(id = 1, name = "Trip")
+            val updatedTag = Tag(id = 1, name = "Vacation")
+            val tagsFlow = MutableSharedFlow<List<Tag>>()
+            whenever(tagRepository.allTags).thenReturn(tagsFlow)
+
+            initializeViewModel()
+            viewModel.onTagChange(initialTag)
+            advanceUntilIdle()
+
+            assertEquals("Trip", viewModel.uiState.value.selectedTag?.name)
+
+            tagsFlow.emit(listOf(updatedTag))
+            advanceUntilIdle()
+
+            assertEquals("Vacation", viewModel.uiState.value.selectedTag?.name)
+        }
+
+    @Test
+    fun `allTags re-emission clears selectedTag when entity is deleted`() =
+        runTest {
+            val selectedTag = Tag(id = 1, name = "Trip")
+            val otherTag = Tag(id = 2, name = "Groceries")
+            val tagsFlow = MutableSharedFlow<List<Tag>>()
+            whenever(tagRepository.allTags).thenReturn(tagsFlow)
+
+            initializeViewModel()
+            viewModel.onTagChange(selectedTag)
+            advanceUntilIdle()
+
+            assertEquals(selectedTag, viewModel.uiState.value.selectedTag)
+
+            tagsFlow.emit(listOf(otherTag))
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.selectedTag)
         }
 
     @Test

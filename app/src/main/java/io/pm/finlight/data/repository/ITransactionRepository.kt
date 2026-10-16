@@ -1,6 +1,7 @@
 package io.pm.finlight
 
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import kotlinx.coroutines.flow.Flow
 
 interface ITransactionRepository {

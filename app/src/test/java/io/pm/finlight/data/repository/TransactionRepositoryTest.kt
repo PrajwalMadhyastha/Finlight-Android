@@ -14,6 +14,7 @@ import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.TestDispatcherProvider

@@ -1,4 +1,6 @@
-package io.pm.finlight
+package io.pm.finlight.data.model
+
+import io.pm.finlight.TransactionType
 
 /**
  * Filter parameters for searching transactions across accounts, categories, tags, types, and dates.

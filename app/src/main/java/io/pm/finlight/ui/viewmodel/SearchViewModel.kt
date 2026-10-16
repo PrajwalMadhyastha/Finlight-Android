@@ -19,7 +19,7 @@ import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SearchFilter
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.Tag
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
@@ -189,6 +189,10 @@ class SearchViewModel(
             }.flowOn(dispatcherProvider.io)
                 .collect { (accounts, categories, tags) ->
                     _uiState.update { current ->
+                        val resolvedAccount =
+                            current.selectedAccount?.let { acc ->
+                                accounts.find { it.id == acc.id }
+                            }
                         val resolvedCategory =
                             if (!initialCategoryResolved && initialCategoryId != null && current.selectedCategory == null) {
                                 val found = categories.find { it.id == initialCategoryId }
@@ -201,11 +205,17 @@ class SearchViewModel(
                             } else {
                                 null
                             }
+                        val resolvedTag =
+                            current.selectedTag?.let { tag ->
+                                tags.find { it.id == tag.id }
+                            }
                         current.copy(
                             accounts = accounts,
                             categories = categories,
                             tags = tags,
+                            selectedAccount = resolvedAccount,
                             selectedCategory = resolvedCategory,
+                            selectedTag = resolvedTag,
                         )
                     }
                 }
