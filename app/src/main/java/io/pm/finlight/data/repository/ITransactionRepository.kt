@@ -333,4 +333,48 @@ interface ITransactionRepository {
         query: String,
         filter: SearchFilter = SearchFilter(),
     ): Flow<List<TransactionDetails>>
+
+    suspend fun getFinancialSummaryForRange(
+        startDate: Long,
+        endDate: Long,
+    ): FinancialSummary?
+
+    suspend fun getTopSpendingCategoriesForRange(
+        startDate: Long,
+        endDate: Long,
+    ): List<CategorySpending>
+
+    fun getDailyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTrend>>
+
+    fun getWeeklyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<WeeklyTrend>>
+
+    fun getTransactionsForCategoryName(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
+
+    fun getTransactionsForMerchantName(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
+
+    fun getMonthlySpendingForCategory(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
+
+    fun getMonthlySpendingForMerchant(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>>
 }

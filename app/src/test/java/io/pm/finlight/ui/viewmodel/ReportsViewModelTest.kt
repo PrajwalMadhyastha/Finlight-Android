@@ -32,7 +32,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
     private lateinit var transactionRepository: TransactionRepository
 
     @Mock
-    private lateinit var categoryDao: CategoryDao
+    private lateinit var categoryRepository: ICategoryRepository
 
     @Mock
     private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -44,7 +44,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
         super.setup()
 
         // Setup default mocks for initialization
-        `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
+        `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
         `when`(
             transactionRepository.getSpendingByCategoryForMonth(anyLong(), anyLong(), any(), any(), any(), eq(TransactionType.EXPENSE)),
         ).thenReturn(flowOf(emptyList()))
@@ -54,20 +54,20 @@ class ReportsViewModelTest : BaseViewModelTest() {
         // Mock the consistency use case dependency
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
-        viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+        viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
     }
 
     private fun initializeViewModel() {
-        viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+        viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
     }
 
     @Test
-    fun `allCategories flow emits categories from DAO`() =
+    fun `allCategories flow emits categories from repository`() =
         runTest {
             // Arrange
             val categories = listOf(Category(1, "Food", "icon", "color"))
-            `when`(categoryDao.getAllCategories()).thenReturn(flowOf(categories))
-            viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
+            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
 
             // Assert
             viewModel.allCategories.test {
@@ -95,7 +95,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(previousSummary)) // Second call for previous
             `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(topCategory))
 
-            viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
 
             // Act
             viewModel.selectPeriod(ReportPeriod.MONTH) // Trigger the flatMapLatest
@@ -280,7 +280,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(topCategory))
 
             // Act
-            viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 
@@ -327,7 +327,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(previousSummary))
 
             // Act
-            val viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+            val viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 
@@ -350,7 +350,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(null))
 
             // Act
-            val viewModel = ReportsViewModel(transactionRepository, categoryDao, getMonthlyConsistencyDataUseCase)
+            val viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 

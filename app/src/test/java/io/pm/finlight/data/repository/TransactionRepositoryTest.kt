@@ -731,4 +731,144 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 tagId = 3,
             )
         }
+
+    @Test
+    fun `getFinancialSummaryForRange delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedSummary = FinancialSummary(totalIncome = 500.0, totalExpenses = 250.0)
+            `when`(transactionDao.getFinancialSummaryForRange(100L, 200L)).thenReturn(expectedSummary)
+
+            val result = repository.getFinancialSummaryForRange(100L, 200L)
+
+            assertEquals(expectedSummary, result)
+            verify(transactionDao).getFinancialSummaryForRange(100L, 200L)
+        }
+
+    @Test
+    fun `getTopSpendingCategoriesForRange delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedCategories = listOf(CategorySpending("Food", 150.0, "red", "food_icon"))
+            `when`(transactionDao.getTopSpendingCategoriesForRange(100L, 200L)).thenReturn(expectedCategories)
+
+            val result = repository.getTopSpendingCategoriesForRange(100L, 200L)
+
+            assertEquals(expectedCategories, result)
+            verify(transactionDao).getTopSpendingCategoriesForRange(100L, 200L)
+        }
+
+    @Test
+    fun `getDailyTrends delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTrends = listOf(DailyTrend("2026-01-01", 100.0, 50.0))
+            `when`(transactionDao.getDailyTrends(100L, 200L)).thenReturn(flowOf(expectedTrends))
+
+            repository.getDailyTrends(100L, 200L).test {
+                assertEquals(expectedTrends, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getDailyTrends(100L, 200L)
+        }
+
+    @Test
+    fun `getWeeklyTrends delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTrends = listOf(WeeklyTrend("2026-01", 700.0, 350.0))
+            `when`(transactionDao.getWeeklyTrends(100L, 200L)).thenReturn(flowOf(expectedTrends))
+
+            repository.getWeeklyTrends(100L, 200L).test {
+                assertEquals(expectedTrends, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getWeeklyTrends(100L, 200L)
+        }
+
+    @Test
+    fun `getTransactionsForCategoryName delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 1, description = "Lunch", categoryId = 1, amount = 25.0, date = 150L, accountId = 1, notes = null),
+                        emptyList(),
+                        "Account",
+                        "Food",
+                        "icon",
+                        "color",
+                        null,
+                    ),
+                )
+            `when`(transactionDao.getTransactionsForCategoryName("Food", 100L, 200L)).thenReturn(flowOf(expectedTransactions))
+
+            repository.getTransactionsForCategoryName("Food", 100L, 200L).test {
+                assertEquals(expectedTransactions, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTransactionsForCategoryName("Food", 100L, 200L)
+        }
+
+    @Test
+    fun `getTransactionsForMerchantName delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 2, description = "Amazon", categoryId = 2, amount = 45.0, date = 150L, accountId = 1, notes = null),
+                        emptyList(),
+                        "Account",
+                        "Shopping",
+                        "icon",
+                        "color",
+                        null,
+                    ),
+                )
+            `when`(transactionDao.getTransactionsForMerchantName("Amazon", 100L, 200L)).thenReturn(flowOf(expectedTransactions))
+
+            repository.getTransactionsForMerchantName("Amazon", 100L, 200L).test {
+                assertEquals(expectedTransactions, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTransactionsForMerchantName("Amazon", 100L, 200L)
+        }
+
+    @Test
+    fun `getMonthlySpendingForCategory delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTotals = listOf(PeriodTotal("2026-01", 120.0))
+            `when`(transactionDao.getMonthlySpendingForCategory("Food", 100L, 200L)).thenReturn(flowOf(expectedTotals))
+
+            repository.getMonthlySpendingForCategory("Food", 100L, 200L).test {
+                assertEquals(expectedTotals, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getMonthlySpendingForCategory("Food", 100L, 200L)
+        }
+
+    @Test
+    fun `getMonthlySpendingForMerchant delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTotals = listOf(PeriodTotal("2026-01", 85.0))
+            `when`(transactionDao.getMonthlySpendingForMerchant("Amazon", 100L, 200L)).thenReturn(flowOf(expectedTotals))
+
+            repository.getMonthlySpendingForMerchant("Amazon", 100L, 200L).test {
+                assertEquals(expectedTotals, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getMonthlySpendingForMerchant("Amazon", 100L, 200L)
+        }
 }

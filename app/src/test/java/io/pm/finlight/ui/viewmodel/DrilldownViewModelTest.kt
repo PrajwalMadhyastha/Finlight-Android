@@ -10,13 +10,12 @@ import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.DrilldownType
-import io.pm.finlight.DrilldownViewModel
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.MonthlyTrend
 import io.pm.finlight.PeriodTotal
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -26,6 +25,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -46,9 +46,10 @@ class DrilldownViewModelTest {
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
 
     @Mock
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionRepository: ITransactionRepository
 
     private lateinit var viewModel: DrilldownViewModel
 
@@ -83,22 +84,22 @@ class DrilldownViewModelTest {
         )
 
     @Test
-    fun `when dimension is CATEGORY, it calls correct DAO methods`() =
+    fun `when dimension is CATEGORY, it calls correct repository methods`() =
         runTest {
             // Arrange
             val categoryName = "Food"
             val mockMonthlyTrends =
                 listOf(
-                    io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
-                    io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
+                    MonthlyTrend("2025-01", 50.0, 100.0),
+                    MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionAnalyticsDao.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.CATEGORY, categoryName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, categoryName, 1, 2025, testDispatcherProvider)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -108,33 +109,34 @@ class DrilldownViewModelTest {
 
             viewModel.monthlyTrendChartData.test {
                 // Test that the chart data is processed correctly
-                val chartData = awaitItem()
+                val item = awaitItem()
+                val chartData = if (item == null) awaitItem() else item
                 assertEquals(6, chartData?.second?.size) // 6 months of labels
                 assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets (income + expense)
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionAnalyticsDao).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
-            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
+            verify(transactionRepository).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
+            verify(transactionRepository).getMonthlyTrends(anyLong())
         }
 
     @Test
-    fun `when dimension is MERCHANT, it calls correct DAO methods`() =
+    fun `when dimension is MERCHANT, it calls correct repository methods`() =
         runTest {
             // Arrange
             val merchantName = "Amazon"
             val mockMonthlyTrends =
                 listOf(
-                    io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
-                    io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
+                    MonthlyTrend("2025-01", 50.0, 100.0),
+                    MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionAnalyticsDao.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
+                transactionRepository.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.MERCHANT, merchantName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.MERCHANT, merchantName, 1, 2025, testDispatcherProvider)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -143,13 +145,33 @@ class DrilldownViewModelTest {
             }
 
             viewModel.monthlyTrendChartData.test {
-                val chartData = awaitItem()
+                val item = awaitItem()
+                val chartData = if (item == null) awaitItem() else item
                 assertEquals(6, chartData?.second?.size)
                 assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionAnalyticsDao).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
-            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
+            verify(transactionRepository).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
+            verify(transactionRepository).getMonthlyTrends(anyLong())
+        }
+
+    @Test
+    fun `when monthly trends are empty, monthlyTrendChartData emits null`() =
+        runTest {
+            // Arrange
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+            ).thenReturn(flowOf(mockTransactionDetails))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+
+            // Act
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, "Food", 1, 2025, testDispatcherProvider)
+
+            // Assert
+            viewModel.monthlyTrendChartData.test {
+                assertNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

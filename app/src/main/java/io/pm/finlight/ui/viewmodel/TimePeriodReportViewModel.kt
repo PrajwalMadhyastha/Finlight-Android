@@ -5,15 +5,21 @@
 // This ensures that the overall summary card reflects the same adjusted values used
 // for averages, providing consistent feedback to the user.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
+import io.pm.finlight.CalendarDayStatus
+import io.pm.finlight.ConsistencyStats
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ReportInsights
+import io.pm.finlight.SpendingStatus
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionType
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -38,8 +44,6 @@ data class MonthlyBreakdown(
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimePeriodReportViewModel(
-    private val transactionQueryDao: TransactionQueryDao,
-    private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
     private val timePeriod: TimePeriod,
@@ -53,26 +57,6 @@ class TimePeriodReportViewModel(
             dispatcherProvider = dispatcherProvider,
         ),
 ) : ViewModel() {
-    @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
-    constructor(
-        transactionDao: TransactionDao,
-        transactionRepository: ITransactionRepository,
-        settingsRepository: ISettingsRepository,
-        timePeriod: TimePeriod,
-        initialDateMillis: Long?,
-        showPreviousMonth: Boolean,
-        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
-    ) : this(
-        transactionQueryDao = transactionDao,
-        transactionAnalyticsDao = transactionDao,
-        transactionRepository = transactionRepository,
-        settingsRepository = settingsRepository,
-        timePeriod = timePeriod,
-        initialDateMillis = initialDateMillis,
-        showPreviousMonth = showPreviousMonth,
-        dispatcherProvider = dispatcherProvider,
-    )
-
     private val _selectedDate =
         MutableStateFlow(
             Calendar.getInstance().apply {
@@ -88,7 +72,7 @@ class TimePeriodReportViewModel(
     val transactionsForPeriod: StateFlow<List<TransactionDetails>> =
         _selectedDate.flatMapLatest { calendar ->
             val (start, end) = getPeriodDateRange(calendar)
-            transactionQueryDao.getTransactionDetailsForRange(start, end, null, null, null)
+            transactionRepository.getTransactionDetailsForRange(start, end, null, null, null)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val excludedIncomeMonths: StateFlow<Set<String>> =
@@ -213,9 +197,9 @@ class TimePeriodReportViewModel(
                         }
                     }
 
-                val currentSummary = transactionAnalyticsDao.getFinancialSummaryForRange(currentStart, currentEnd)
-                val previousSummary = transactionAnalyticsDao.getFinancialSummaryForRange(previousStart, previousEnd)
-                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(currentStart, currentEnd)
+                val currentSummary = transactionRepository.getFinancialSummaryForRange(currentStart, currentEnd)
+                val previousSummary = transactionRepository.getFinancialSummaryForRange(previousStart, previousEnd)
+                val topCategories = transactionRepository.getTopSpendingCategoriesForRange(currentStart, currentEnd)
 
                 val percentageChange =
                     if (previousSummary != null && previousSummary.totalExpenses > 0) {
@@ -247,7 +231,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.SECOND, 0)
                         }
 
-                    transactionAnalyticsDao.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
+                    transactionRepository.getDailyTrends(startCal.timeInMillis, endCal.timeInMillis).map { dailyTrends ->
                         if (dailyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -291,7 +275,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
                         }
 
-                    transactionAnalyticsDao.getWeeklyTrends(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTrends ->
+                    transactionRepository.getWeeklyTrends(startCal.timeInMillis, endCal.timeInMillis).map { weeklyTrends ->
                         if (weeklyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -331,7 +315,7 @@ class TimePeriodReportViewModel(
                             set(Calendar.DAY_OF_MONTH, 1)
                         }
 
-                    transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    transactionRepository.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
                         if (monthlyTrends.isEmpty()) return@map null
 
                         val incomeEntries = mutableListOf<BarEntry>()
@@ -381,7 +365,7 @@ class TimePeriodReportViewModel(
                         }
 
                     // Use getMonthlyTrends but filter results to only include current year
-                    transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
+                    transactionRepository.getMonthlyTrends(startCal.timeInMillis).map { monthlyTrends ->
                         val incomeEntries = mutableListOf<BarEntry>()
                         val expenseEntries = mutableListOf<BarEntry>()
                         val labels = mutableListOf<String>()

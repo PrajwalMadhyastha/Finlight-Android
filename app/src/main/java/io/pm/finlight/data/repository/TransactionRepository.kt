@@ -603,4 +603,64 @@ class TransactionRepository(
             tagId = filter.tagId,
         )
     }
+
+    override suspend fun getFinancialSummaryForRange(
+        startDate: Long,
+        endDate: Long,
+    ): FinancialSummary? {
+        return transactionAnalyticsDao.getFinancialSummaryForRange(startDate, endDate)
+    }
+
+    override suspend fun getTopSpendingCategoriesForRange(
+        startDate: Long,
+        endDate: Long,
+    ): List<CategorySpending> {
+        return transactionAnalyticsDao.getTopSpendingCategoriesForRange(startDate, endDate)
+    }
+
+    override fun getDailyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTrend>> {
+        return transactionAnalyticsDao.getDailyTrends(startDate, endDate)
+    }
+
+    override fun getWeeklyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<WeeklyTrend>> {
+        return transactionAnalyticsDao.getWeeklyTrends(startDate, endDate)
+    }
+
+    override fun getTransactionsForCategoryName(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>> {
+        return transactionAnalyticsDao.getTransactionsForCategoryName(categoryName, startDate, endDate)
+    }
+
+    override fun getTransactionsForMerchantName(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>> {
+        return transactionAnalyticsDao.getTransactionsForMerchantName(merchantName, startDate, endDate)
+    }
+
+    override fun getMonthlySpendingForCategory(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>> {
+        return transactionAnalyticsDao.getMonthlySpendingForCategory(categoryName, startDate, endDate)
+    }
+
+    override fun getMonthlySpendingForMerchant(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<PeriodTotal>> {
+        return transactionAnalyticsDao.getMonthlySpendingForMerchant(merchantName, startDate, endDate)
+    }
 }

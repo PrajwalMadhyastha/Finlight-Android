@@ -5,7 +5,7 @@
 // chart and a list of transactions for a specific entity (category or merchant)
 // within a given month.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
@@ -14,8 +14,11 @@ import androidx.lifecycle.viewModelScope
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.*
 import java.util.*
@@ -34,14 +37,16 @@ class DrilldownViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DrilldownViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
             return DrilldownViewModel(
-                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                transactionRepository = transactionRepository,
                 drilldownType = drilldownType,
                 entityName = entityName,
                 month = month,
                 year = year,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
@@ -49,11 +54,12 @@ class DrilldownViewModelFactory(
 }
 
 class DrilldownViewModel(
-    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val transactionRepository: ITransactionRepository,
     private val drilldownType: DrilldownType,
     val entityName: String,
     private val month: Int,
     private val year: Int,
+    val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val transactionsForMonth: StateFlow<List<TransactionDetails>>
     val monthlyTrendChartData: StateFlow<Pair<BarData, List<String>>?>
@@ -78,8 +84,8 @@ class DrilldownViewModel(
 
         transactionsForMonth =
             when (drilldownType) {
-                DrilldownType.CATEGORY -> transactionAnalyticsDao.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
-                DrilldownType.MERCHANT -> transactionAnalyticsDao.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
+                DrilldownType.CATEGORY -> transactionRepository.getTransactionsForCategoryName(entityName, monthStart, monthEnd)
+                DrilldownType.MERCHANT -> transactionRepository.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         monthlyTrendChartData =
@@ -97,7 +103,7 @@ class DrilldownViewModel(
                     }
 
                 // Use getMonthlyTrends to show both income and expense
-                val monthlyTrends = transactionAnalyticsDao.getMonthlyTrends(startCal.timeInMillis).first()
+                val monthlyTrends = transactionRepository.getMonthlyTrends(startCal.timeInMillis).first()
 
                 if (monthlyTrends.isEmpty()) {
                     emit(null)
@@ -130,6 +136,7 @@ class DrilldownViewModel(
                         color = 0xFFEF5350.toInt() // Red
                     }
                 emit(Pair(BarData(incomeDataSet, expenseDataSet), labels))
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+            }.flowOn(dispatcherProvider.default)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     }
 }
