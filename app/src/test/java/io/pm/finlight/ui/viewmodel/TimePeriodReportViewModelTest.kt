@@ -957,4 +957,85 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `monthlyConsistencyData emits data when timePeriod is MONTHLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val year = testCal.get(Calendar.YEAR)
+            val month = testCal.get(Calendar.MONTH) + 1
+            val mockData =
+                listOf(
+                    CalendarDayStatus(testCal.time, SpendingStatus.WITHIN_LIMIT, 50L, 100L),
+                    CalendarDayStatus(testCal.time, SpendingStatus.OVER_LIMIT, 150L, 100L),
+                )
+            `when`(getMonthlyConsistencyDataUseCase(year, month)).thenReturn(flowOf(mockData))
+
+            val viewModel = createViewModel(timePeriod = TimePeriod.MONTHLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.monthlyConsistencyData.test {
+                val item = awaitItem()
+                assertEquals(mockData, item)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `monthlyConsistencyData emits emptyList when timePeriod is not MONTHLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val viewModel = createViewModel(timePeriod = TimePeriod.YEARLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.monthlyConsistencyData.test {
+                assertEquals(emptyList<CalendarDayStatus>(), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `yearlyConsistencyData emits flattened data across all 12 months when timePeriod is YEARLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.JUNE, 1) }
+            val year = testCal.get(Calendar.YEAR)
+
+            for (m in 1..12) {
+                val dayStatus = CalendarDayStatus(testCal.time, SpendingStatus.WITHIN_LIMIT, m * 10L, 100L)
+                `when`(getMonthlyConsistencyDataUseCase(year, m)).thenReturn(flowOf(listOf(dayStatus)))
+            }
+
+            val viewModel = createViewModel(timePeriod = TimePeriod.YEARLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.yearlyConsistencyData.test {
+                val items = awaitItem()
+                assertEquals(12, items.size)
+                assertEquals(10L, items[0].amountSpent)
+                assertEquals(120L, items[11].amountSpent)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            viewModel.consistencyStats.test {
+                val stats = awaitItem()
+                assertEquals(12, stats.goodDays)
+                assertEquals(0, stats.badDays)
+                assertEquals(0, stats.noSpendDays)
+                assertEquals(0, stats.noDataDays)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `yearlyConsistencyData emits emptyList when timePeriod is not YEARLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val viewModel = createViewModel(timePeriod = TimePeriod.MONTHLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.yearlyConsistencyData.test {
+                assertEquals(emptyList<CalendarDayStatus>(), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

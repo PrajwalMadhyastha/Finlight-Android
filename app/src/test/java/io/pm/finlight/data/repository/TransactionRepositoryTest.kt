@@ -841,34 +841,4 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             }
             verify(transactionDao).getTransactionsForMerchantName("Amazon", 100L, 200L)
         }
-
-    @Test
-    fun `getMonthlySpendingForCategory delegates to transactionAnalyticsDao`() =
-        runTest {
-            setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
-            val expectedTotals = listOf(PeriodTotal("2026-01", 120.0))
-            `when`(transactionDao.getMonthlySpendingForCategory("Food", 100L, 200L)).thenReturn(flowOf(expectedTotals))
-
-            repository.getMonthlySpendingForCategory("Food", 100L, 200L).test {
-                assertEquals(expectedTotals, awaitItem())
-                awaitComplete()
-            }
-            verify(transactionDao).getMonthlySpendingForCategory("Food", 100L, 200L)
-        }
-
-    @Test
-    fun `getMonthlySpendingForMerchant delegates to transactionAnalyticsDao`() =
-        runTest {
-            setupDefaultPropertyMocks()
-            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
-            val expectedTotals = listOf(PeriodTotal("2026-01", 85.0))
-            `when`(transactionDao.getMonthlySpendingForMerchant("Amazon", 100L, 200L)).thenReturn(flowOf(expectedTotals))
-
-            repository.getMonthlySpendingForMerchant("Amazon", 100L, 200L).test {
-                assertEquals(expectedTotals, awaitItem())
-                awaitComplete()
-            }
-            verify(transactionDao).getMonthlySpendingForMerchant("Amazon", 100L, 200L)
-        }
 }

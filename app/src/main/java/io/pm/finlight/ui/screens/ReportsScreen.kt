@@ -40,7 +40,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
@@ -65,7 +64,7 @@ import kotlin.math.sqrt
 @Composable
 fun ReportsScreen(
     navController: NavController,
-    viewModel: ReportsViewModel = viewModel(),
+    viewModel: ReportsViewModel,
 ) {
     val reportData by viewModel.reportData.collectAsState()
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()

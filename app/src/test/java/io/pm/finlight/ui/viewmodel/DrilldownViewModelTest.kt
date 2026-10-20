@@ -12,7 +12,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.MonthlyTrend
-import io.pm.finlight.PeriodTotal
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
@@ -75,12 +74,6 @@ class DrilldownViewModelTest {
                 "color",
                 null,
             ),
-        )
-
-    private val mockPeriodTotals =
-        listOf(
-            PeriodTotal("2025-01", 100.0),
-            PeriodTotal("2025-02", 150.0),
         )
 
     @Test

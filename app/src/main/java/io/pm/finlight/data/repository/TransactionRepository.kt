@@ -647,20 +647,4 @@ class TransactionRepository(
     ): Flow<List<TransactionDetails>> {
         return transactionAnalyticsDao.getTransactionsForMerchantName(merchantName, startDate, endDate)
     }
-
-    override fun getMonthlySpendingForCategory(
-        categoryName: String,
-        startDate: Long,
-        endDate: Long,
-    ): Flow<List<PeriodTotal>> {
-        return transactionAnalyticsDao.getMonthlySpendingForCategory(categoryName, startDate, endDate)
-    }
-
-    override fun getMonthlySpendingForMerchant(
-        merchantName: String,
-        startDate: Long,
-        endDate: Long,
-    ): Flow<List<PeriodTotal>> {
-        return transactionAnalyticsDao.getMonthlySpendingForMerchant(merchantName, startDate, endDate)
-    }
 }

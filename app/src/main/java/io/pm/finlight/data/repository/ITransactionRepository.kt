@@ -365,16 +365,4 @@ interface ITransactionRepository {
         startDate: Long,
         endDate: Long,
     ): Flow<List<TransactionDetails>>
-
-    fun getMonthlySpendingForCategory(
-        categoryName: String,
-        startDate: Long,
-        endDate: Long,
-    ): Flow<List<PeriodTotal>>
-
-    fun getMonthlySpendingForMerchant(
-        merchantName: String,
-        startDate: Long,
-        endDate: Long,
-    ): Flow<List<PeriodTotal>>
 }
