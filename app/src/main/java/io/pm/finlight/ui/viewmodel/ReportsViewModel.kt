@@ -158,11 +158,12 @@ class ReportsViewModel(
 
                     ReportScreenData(finalPieData, finalTrendData, periodTitle, insights)
                 }
-            }.stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = ReportScreenData(null, null, "This Month", null),
-            )
+            }.flowOn(dispatcherProvider.default)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = ReportScreenData(null, null, "This Month", null),
+                )
 
         // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
         consistencyCalendarData =

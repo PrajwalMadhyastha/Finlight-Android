@@ -47,7 +47,9 @@ class TimePeriodReportViewModelFactoryTest {
     @Test
     fun create_withTimePeriodReportViewModelClass_resolvesRepositoriesFromServiceLocator() {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
         ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockUseCase)
 
         val viewModel = factory.create(TimePeriodReportViewModel::class.java)
 
@@ -62,13 +64,7 @@ class TimePeriodReportViewModelFactoryTest {
             TimePeriodReportViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
                 isAccessible = true
             }.get(viewModel) as GetMonthlyConsistencyDataUseCase
-        assertNotNull(useCase)
-
-        val useCaseTxnRepo =
-            GetMonthlyConsistencyDataUseCase::class.java.getDeclaredField("transactionRepository").apply {
-                isAccessible = true
-            }.get(useCase)
-        assertSame(mockTxnRepo, useCaseTxnRepo)
+        assertSame(mockUseCase, useCase)
     }
 
     @Test

@@ -50,12 +50,7 @@ class TimePeriodReportViewModel(
     initialDateMillis: Long?,
     showPreviousMonth: Boolean,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
-    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase =
-        GetMonthlyConsistencyDataUseCase(
-            settingsRepository = settingsRepository,
-            transactionRepository = transactionRepository,
-            dispatcherProvider = dispatcherProvider,
-        ),
+    private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
 ) : ViewModel() {
     private val _selectedDate =
         MutableStateFlow(

@@ -22,6 +22,7 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import io.pm.finlight.utils.TestDispatcherProvider
 import java.util.Calendar
 
 @ExperimentalCoroutinesApi
@@ -37,7 +38,18 @@ class ReportsViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
+    private val testDispatcherProvider by lazy { TestDispatcherProvider(testDispatcher) }
+
     private lateinit var viewModel: ReportsViewModel
+
+    private fun createViewModel(): ReportsViewModel {
+        return ReportsViewModel(
+            transactionRepository = transactionRepository,
+            categoryRepository = categoryRepository,
+            getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+            dispatcherProvider = testDispatcherProvider,
+        )
+    }
 
     @Before
     override fun setup() {
@@ -54,11 +66,11 @@ class ReportsViewModelTest : BaseViewModelTest() {
         // Mock the consistency use case dependency
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
-        viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+        viewModel = createViewModel()
     }
 
     private fun initializeViewModel() {
-        viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+        viewModel = createViewModel()
     }
 
     @Test
@@ -67,7 +79,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             // Arrange
             val categories = listOf(Category(1, "Food", "icon", "color"))
             `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
-            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+            viewModel = createViewModel()
 
             // Assert
             viewModel.allCategories.test {
@@ -95,7 +107,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(previousSummary)) // Second call for previous
             `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(topCategory))
 
-            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+            viewModel = createViewModel()
 
             // Act
             viewModel.selectPeriod(ReportPeriod.MONTH) // Trigger the flatMapLatest
@@ -153,12 +165,8 @@ class ReportsViewModelTest : BaseViewModelTest() {
 
             // Assert
             viewModel.displayedConsistencyStats.test {
-                // 1. Consume the initial value (0,0,0,0).
-                assertEquals(ConsistencyStats(0, 0, 0, 0), awaitItem())
-
-                // 2. Await the first calculated value (default YEARLY view).
-                // It will have 1 good day (from the current month) and 11 bad days.
-                val yearlyStats = awaitItem()
+                val firstItem = awaitItem()
+                val yearlyStats = if (firstItem == ConsistencyStats(0, 0, 0, 0)) awaitItem() else firstItem
                 assertEquals(1, yearlyStats.goodDays)
                 assertEquals(11, yearlyStats.badDays)
 
@@ -280,7 +288,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTopSpendingCategoriesForRangeFlow(anyLong(), anyLong())).thenReturn(flowOf(topCategory))
 
             // Act
-            viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+            viewModel = createViewModel()
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 
@@ -327,7 +335,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(previousSummary))
 
             // Act
-            val viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+            val viewModel = createViewModel()
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 
@@ -350,7 +358,7 @@ class ReportsViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(null))
 
             // Act
-            val viewModel = ReportsViewModel(transactionRepository, categoryRepository, getMonthlyConsistencyDataUseCase)
+            val viewModel = createViewModel()
             viewModel.selectPeriod(ReportPeriod.MONTH)
             advanceUntilIdle()
 

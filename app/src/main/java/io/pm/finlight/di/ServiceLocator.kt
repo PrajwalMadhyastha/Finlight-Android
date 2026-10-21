@@ -48,6 +48,7 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
@@ -124,6 +125,9 @@ object ServiceLocator {
 
     @Volatile
     private var autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null
+
+    @Volatile
+    private var getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase? = null
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
@@ -437,6 +441,23 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [GetMonthlyConsistencyDataUseCase] instance.
+     */
+    fun provideGetMonthlyConsistencyDataUseCase(context: Context): GetMonthlyConsistencyDataUseCase {
+        return getMonthlyConsistencyDataUseCase ?: synchronized(this) {
+            getMonthlyConsistencyDataUseCase ?: run {
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = provideSettingsRepository(context),
+                    transactionRepository = provideTransactionRepository(context),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    getMonthlyConsistencyDataUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
      * Resolves the singleton [IMerchantMappingRepository] instance.
      *
      * Note: Once initialized, the cached singleton instance is returned on subsequent calls
@@ -698,6 +719,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setGetMonthlyConsistencyDataUseCase(useCase: GetMonthlyConsistencyDataUseCase?) {
+        getMonthlyConsistencyDataUseCase = useCase
+    }
+
+    @VisibleForTesting
     fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
         merchantMappingRepository = repository
     }
@@ -750,6 +776,7 @@ object ServiceLocator {
         manageReimbursementUseCase = null
         mergeTransactionsUseCase = null
         autoSaveSmsTransactionUseCase = null
+        getMonthlyConsistencyDataUseCase = null
         merchantMappingRepository = null
         budgetRepository = null
         recurringTransactionRepository = null

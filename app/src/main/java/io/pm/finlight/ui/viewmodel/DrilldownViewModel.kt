@@ -74,12 +74,17 @@ class DrilldownViewModel(
             (calendar.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_MONTH, 1)
                 set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
             }.timeInMillis
         val monthEnd =
             (calendar.clone() as Calendar).apply {
-                add(Calendar.MONTH, 1)
-                add(Calendar.DAY_OF_MONTH, -1)
+                set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
                 set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
         transactionsForMonth =
@@ -88,55 +93,60 @@ class DrilldownViewModel(
                 DrilldownType.MERCHANT -> transactionRepository.getTransactionsForMerchantName(entityName, monthStart, monthEnd)
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+        val endCal =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, year)
+                set(Calendar.MONTH, month - 1)
+                set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+                set(Calendar.HOUR_OF_DAY, 23)
+                set(Calendar.MINUTE, 59)
+                set(Calendar.SECOND, 59)
+                set(Calendar.MILLISECOND, 999)
+            }
+        val startCal =
+            (endCal.clone() as Calendar).apply {
+                add(Calendar.MONTH, -5)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
         monthlyTrendChartData =
-            flow {
-                val endCal =
-                    Calendar.getInstance().apply {
-                        set(Calendar.YEAR, year)
-                        set(Calendar.MONTH, month - 1)
-                        set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+            transactionRepository.getMonthlyTrends(startCal.timeInMillis)
+                .map { monthlyTrends ->
+                    if (monthlyTrends.isEmpty()) {
+                        null
+                    } else {
+                        val incomeEntries = mutableListOf<BarEntry>()
+                        val expenseEntries = mutableListOf<BarEntry>()
+                        val labels = mutableListOf<String>()
+                        val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
+                        val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
+                        val trendsMap = monthlyTrends.associateBy { it.monthYear }
+
+                        for (i in 0..5) {
+                            val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
+                            val yearMonth = yearMonthFormat.format(monthCal.time)
+
+                            val trend = trendsMap[yearMonth]
+                            incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
+                            expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
+                            labels.add(monthFormat.format(monthCal.time))
+                        }
+
+                        val incomeDataSet =
+                            BarDataSet(incomeEntries, "Income").apply {
+                                color = 0xFF66BB6A.toInt() // Green
+                            }
+                        val expenseDataSet =
+                            BarDataSet(expenseEntries, "Expense").apply {
+                                color = 0xFFEF5350.toInt() // Red
+                            }
+                        Pair(BarData(incomeDataSet, expenseDataSet), labels)
                     }
-                val startCal =
-                    (endCal.clone() as Calendar).apply {
-                        add(Calendar.MONTH, -5)
-                        set(Calendar.DAY_OF_MONTH, 1)
-                    }
-
-                // Use getMonthlyTrends to show both income and expense
-                val monthlyTrends = transactionRepository.getMonthlyTrends(startCal.timeInMillis).first()
-
-                if (monthlyTrends.isEmpty()) {
-                    emit(null)
-                    return@flow
-                }
-
-                val incomeEntries = mutableListOf<BarEntry>()
-                val expenseEntries = mutableListOf<BarEntry>()
-                val labels = mutableListOf<String>()
-                val monthFormat = FormatUtils.getFormatter("MMM", Locale.getDefault())
-                val yearMonthFormat = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault())
-                val trendsMap = monthlyTrends.associateBy { it.monthYear }
-
-                for (i in 0..5) {
-                    val monthCal = (startCal.clone() as Calendar).apply { add(Calendar.MONTH, i) }
-                    val yearMonth = yearMonthFormat.format(monthCal.time)
-
-                    val trend = trendsMap[yearMonth]
-                    incomeEntries.add(BarEntry(i.toFloat(), trend?.totalIncome?.toFloat() ?: 0f))
-                    expenseEntries.add(BarEntry(i.toFloat(), trend?.totalExpenses?.toFloat() ?: 0f))
-                    labels.add(monthFormat.format(monthCal.time))
-                }
-
-                val incomeDataSet =
-                    BarDataSet(incomeEntries, "Income").apply {
-                        color = 0xFF66BB6A.toInt() // Green
-                    }
-                val expenseDataSet =
-                    BarDataSet(expenseEntries, "Expense").apply {
-                        color = 0xFFEF5350.toInt() // Red
-                    }
-                emit(Pair(BarData(incomeDataSet, expenseDataSet), labels))
-            }.flowOn(dispatcherProvider.default)
+                }.flowOn(dispatcherProvider.default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     }
 }

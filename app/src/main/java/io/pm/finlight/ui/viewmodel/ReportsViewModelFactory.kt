@@ -4,21 +4,14 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 class ReportsViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ReportsViewModel::class.java)) {
-            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
-            val getMonthlyConsistencyDataUseCase =
-                GetMonthlyConsistencyDataUseCase(
-                    settingsRepository = settingsRepository,
-                    transactionRepository = transactionRepository,
-                    dispatcherProvider = dispatcherProvider,
-                )
+            val getMonthlyConsistencyDataUseCase = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
 
             @Suppress("UNCHECKED_CAST")
             return ReportsViewModel(

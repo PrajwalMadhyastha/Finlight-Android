@@ -15,8 +15,10 @@ import io.pm.finlight.MonthlyTrend
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
+import java.util.Calendar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -24,11 +26,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
@@ -109,8 +113,28 @@ class DrilldownViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionRepository).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+            verify(transactionRepository).getTransactionsForCategoryName(anyString(), startCaptor.capture(), endCaptor.capture())
             verify(transactionRepository).getMonthlyTrends(anyLong())
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2025, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2025, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, endCal.get(Calendar.MONTH))
+            assertEquals(31, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
         }
 
     @Test
@@ -164,6 +188,42 @@ class DrilldownViewModelTest {
             // Assert
             viewModel.monthlyTrendChartData.test {
                 assertNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `monthlyTrendChartData reactively updates when repository flow emits new trends`() =
+        runTest {
+            val trendsFlow = MutableSharedFlow<List<MonthlyTrend>>()
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+            ).thenReturn(flowOf(mockTransactionDetails))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(trendsFlow)
+
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, "Food", 1, 2025, testDispatcherProvider)
+
+            viewModel.monthlyTrendChartData.test {
+                // Initial emission before any trends emitted
+                assertNull(awaitItem())
+
+                // First emission: 1 month of trends
+                trendsFlow.emit(listOf(MonthlyTrend("2025-01", 50.0, 100.0)))
+                val firstData = awaitItem()
+                assertNotNull(firstData)
+                assertEquals(6, firstData!!.second.size)
+
+                // Second emission: Updated trends
+                trendsFlow.emit(
+                    listOf(
+                        MonthlyTrend("2025-01", 50.0, 100.0),
+                        MonthlyTrend("2025-02", 75.0, 150.0),
+                    ),
+                )
+                val secondData = awaitItem()
+                assertNotNull(secondData)
+                assertEquals(6, secondData!!.second.size)
+
                 cancelAndIgnoreRemainingEvents()
             }
         }
