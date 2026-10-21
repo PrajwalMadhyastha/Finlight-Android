@@ -227,4 +227,43 @@ class DrilldownViewModelTest {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `when initialized for February, month boundaries match expected days without rollover`() =
+        runTest {
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), startCaptor.capture(), endCaptor.capture()),
+            ).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+
+            // Act - Feb 2025 (28 days)
+            DrilldownViewModel(
+                transactionRepository = transactionRepository,
+                drilldownType = DrilldownType.CATEGORY,
+                entityName = "Groceries",
+                month = 2,
+                year = 2025,
+                dispatcherProvider = testDispatcherProvider,
+            )
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2025, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.FEBRUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2025, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.FEBRUARY, endCal.get(Calendar.MONTH))
+            assertEquals(28, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
+        }
 }

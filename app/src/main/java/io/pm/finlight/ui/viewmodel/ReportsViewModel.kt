@@ -205,13 +205,13 @@ class ReportsViewModel(
             }.flowOn(dispatcherProvider.default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val today = Calendar.getInstance()
         displayedConsistencyStats =
             combine(
                 reportViewType,
                 consistencyCalendarData,
                 detailedMonthData,
             ) { viewType, yearlyData, monthlyData ->
+                val today = Calendar.getInstance()
                 val dataToProcess =
                     if (viewType == ReportViewType.YEARLY) {
                         yearlyData

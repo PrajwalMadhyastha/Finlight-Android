@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/DrilldownViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/DrilldownViewModel.kt
 // REASON: NEW FILE - This ViewModel and its associated factory power the new
 // Category and Merchant detail screens. It provides a monthly spending trend
 // chart and a list of transactions for a specific entity (category or merchant)
@@ -67,6 +67,7 @@ class DrilldownViewModel(
     init {
         val calendar =
             Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
             }
@@ -95,6 +96,7 @@ class DrilldownViewModel(
 
         val endCal =
             Calendar.getInstance().apply {
+                set(Calendar.DAY_OF_MONTH, 1)
                 set(Calendar.YEAR, year)
                 set(Calendar.MONTH, month - 1)
                 set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
