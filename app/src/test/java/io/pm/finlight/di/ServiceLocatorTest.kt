@@ -33,6 +33,7 @@ import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
@@ -151,6 +152,15 @@ class ServiceLocatorTest {
     fun provideAutoSaveSmsTransactionUseCase_returnsSingletonInstance() {
         val useCase1 = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
         val useCase2 = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
+
+        assertNotNull(useCase1)
+        assertSame(useCase1, useCase2)
+    }
+
+    @Test
+    fun provideGetMonthlyConsistencyDataUseCase_returnsSingletonInstance() {
+        val useCase1 = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
+        val useCase2 = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
 
         assertNotNull(useCase1)
         assertSame(useCase1, useCase2)
@@ -448,6 +458,22 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun setGetMonthlyConsistencyDataUseCase_overridesInstance() {
+        val mockUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockUseCase)
+        assertSame(mockUseCase, ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application))
+
+        val mockUseCase2: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockUseCase2)
+        assertSame(mockUseCase2, ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application))
+
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(null)
+        val defaultUseCase = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
+        assertNotNull(defaultUseCase)
+        assertNotSame(mockUseCase2, defaultUseCase)
+    }
+
+    @Test
     fun setMerchantMappingRepository_overridesInstance() {
         val mockRepo: IMerchantMappingRepository = mockk(relaxed = true)
         ServiceLocator.setMerchantMappingRepository(mockRepo)
@@ -556,6 +582,7 @@ class ServiceLocatorTest {
         val mockManageReimbursement: ManageReimbursementUseCase = mockk(relaxed = true)
         val mockMergeTransactions: MergeTransactionsUseCase = mockk(relaxed = true)
         val mockAutoSave: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        val mockGetMonthlyConsistency: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
         val mockMerchantMapping: IMerchantMappingRepository = mockk(relaxed = true)
         val mockBudget: IBudgetRepository = mockk(relaxed = true)
         val mockRecurring: IRecurringTransactionRepository = mockk(relaxed = true)
@@ -572,6 +599,7 @@ class ServiceLocatorTest {
         ServiceLocator.setManageReimbursementUseCase(mockManageReimbursement)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactions)
         ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSave)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockGetMonthlyConsistency)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMapping)
         ServiceLocator.setBudgetRepository(mockBudget)
         ServiceLocator.setRecurringTransactionRepository(mockRecurring)
@@ -588,6 +616,7 @@ class ServiceLocatorTest {
         assertSame(mockManageReimbursement, ServiceLocator.provideManageReimbursementUseCase(application))
         assertSame(mockMergeTransactions, ServiceLocator.provideMergeTransactionsUseCase(application))
         assertSame(mockAutoSave, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
+        assertSame(mockGetMonthlyConsistency, ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application))
         assertSame(mockMerchantMapping, ServiceLocator.provideMerchantMappingRepository(application))
         assertSame(mockBudget, ServiceLocator.provideBudgetRepository(application))
         assertSame(mockRecurring, ServiceLocator.provideRecurringTransactionRepository(application))
@@ -606,6 +635,7 @@ class ServiceLocatorTest {
         val newManageReimbursement = ServiceLocator.provideManageReimbursementUseCase(application)
         val newMergeTransactions = ServiceLocator.provideMergeTransactionsUseCase(application)
         val newAutoSave = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
+        val newGetMonthlyConsistency = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
         val newMerchantMapping = ServiceLocator.provideMerchantMappingRepository(application)
         val newBudget = ServiceLocator.provideBudgetRepository(application)
         val newRecurring = ServiceLocator.provideRecurringTransactionRepository(application)
@@ -631,6 +661,8 @@ class ServiceLocatorTest {
         assertNotSame(mockMergeTransactions, newMergeTransactions)
         assertNotNull(newAutoSave)
         assertNotSame(mockAutoSave, newAutoSave)
+        assertNotNull(newGetMonthlyConsistency)
+        assertNotSame(mockGetMonthlyConsistency, newGetMonthlyConsistency)
         assertNotNull(newMerchantMapping)
         assertNotSame(mockMerchantMapping, newMerchantMapping)
         assertNotNull(newBudget)

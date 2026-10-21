@@ -3,15 +3,11 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
-import io.pm.finlight.TimePeriodReportViewModel
-import io.pm.finlight.TimePeriodReportViewModelFactory
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -29,16 +25,10 @@ import org.robolectric.annotation.Config
 class TimePeriodReportViewModelFactoryTest {
     private lateinit var application: Application
     private lateinit var factory: TimePeriodReportViewModelFactory
-    private lateinit var db: AppDatabase
 
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
-        db =
-            Room.inMemoryDatabaseBuilder(application, AppDatabase::class.java)
-                .allowMainThreadQueries()
-                .build()
-        AppDatabase.setTestInstance(db)
         factory =
             TimePeriodReportViewModelFactory(
                 application = application,
@@ -51,14 +41,15 @@ class TimePeriodReportViewModelFactoryTest {
 
     @After
     fun tearDown() {
-        db.close()
         ServiceLocator.reset()
     }
 
     @Test
     fun create_withTimePeriodReportViewModelClass_resolvesRepositoriesFromServiceLocator() {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
         ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockUseCase)
 
         val viewModel = factory.create(TimePeriodReportViewModel::class.java)
 
@@ -73,13 +64,7 @@ class TimePeriodReportViewModelFactoryTest {
             TimePeriodReportViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
                 isAccessible = true
             }.get(viewModel) as GetMonthlyConsistencyDataUseCase
-        assertNotNull(useCase)
-
-        val useCaseTxnRepo =
-            GetMonthlyConsistencyDataUseCase::class.java.getDeclaredField("transactionRepository").apply {
-                isAccessible = true
-            }.get(useCase)
-        assertSame(mockTxnRepo, useCaseTxnRepo)
+        assertSame(mockUseCase, useCase)
     }
 
     @Test

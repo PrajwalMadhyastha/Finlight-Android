@@ -20,10 +20,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import io.pm.finlight.DrilldownType
-import io.pm.finlight.DrilldownViewModel
-import io.pm.finlight.DrilldownViewModelFactory
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.ui.viewmodel.DrilldownType
+import io.pm.finlight.ui.viewmodel.DrilldownViewModel
+import io.pm.finlight.ui.viewmodel.DrilldownViewModelFactory
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.ModernTrendChart
 import io.pm.finlight.ui.components.TransactionItem
