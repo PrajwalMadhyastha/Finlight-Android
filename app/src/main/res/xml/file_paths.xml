@@ -9,4 +9,5 @@
         name="my_images"
         path="Pictures" />
     <cache-path name="shared_images" path="images/"/>
+    <cache-path name="diagnostics" path="diagnostics/"/>
 </paths>

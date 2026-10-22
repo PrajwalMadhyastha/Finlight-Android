@@ -64,6 +64,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                 transactionRepository,
                 settingsRepository,
                 mergeAccountsUseCase,
+                testDispatcher,
             )
     }
 
@@ -86,6 +87,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                     transactionRepository,
                     settingsRepository,
                     mergeAccountsUseCase,
+                    testDispatcher,
                 )
             val result = viewModel.accountsWithBalance.first()
 
@@ -172,6 +174,7 @@ class AccountViewModelTest : BaseViewModelTest() {
                     transactionRepository,
                     settingsRepository,
                     mergeAccountsUseCase,
+                    testDispatcher,
                 )
             // Ensure all coroutines launched in init complete before we assert
             advanceUntilIdle()
@@ -691,5 +694,40 @@ class AccountViewModelTest : BaseViewModelTest() {
             verify(accountRepository).update(account)
             assertTrue(callbackTriggered)
             assertTrue(successResult)
+        }
+
+    @Test
+    fun `checkAccountName handles extremely long names without freezing`() =
+        runTest {
+            val longName = "A".repeat(10_000)
+            val existing = Account(id = 1, name = "A".repeat(10_000), type = "Bank")
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(existing))
+
+            val match = viewModel.checkAccountName(longName)
+            assertEquals(MatchType.EXACT, match.matchType)
+            assertEquals(1, match.account?.id)
+        }
+
+    @Test
+    fun `suggestedMerges handles massive account name pair safely`() =
+        runTest {
+            val account1 = Account(id = 1, name = "A".repeat(5000), type = "Bank")
+            val account2 = Account(id = 2, name = "A".repeat(5000), type = "Bank")
+            `when`(accountRepository.accountsWithBalance).thenReturn(
+                flowOf(listOf(AccountWithBalance(account1, 0.0), AccountWithBalance(account2, 0.0))),
+            )
+
+            val vm =
+                AccountViewModel(
+                    ApplicationProvider.getApplicationContext(),
+                    accountRepository,
+                    transactionRepository,
+                    settingsRepository,
+                    mergeAccountsUseCase,
+                    testDispatcher,
+                )
+            advanceUntilIdle()
+
+            assertTrue(vm.suggestedMerges.value.isNotEmpty())
         }
 }

@@ -123,7 +123,10 @@ fun AccountListScreen(
                 }
             }
 
-            items(accounts, key = { it.account.id }) { accountWithBalance ->
+            items(
+                items = accounts.distinctBy { it.account.id },
+                key = { "acc_${it.account.id}" },
+            ) { accountWithBalance ->
                 AccountListItem(
                     modifier = Modifier.animateItemPlacement(),
                     accountWithBalance = accountWithBalance,
@@ -233,7 +236,7 @@ private fun AccountListItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(accountWithBalance.account.name)),
+                painter = painterResource(id = BankLogoHelper.safeGetLogoForAccount(accountWithBalance.account.name)),
                 contentDescription = "${accountWithBalance.account.name} Logo",
                 modifier = Modifier.size(40.dp),
             )

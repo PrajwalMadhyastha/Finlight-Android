@@ -50,7 +50,11 @@ class SmsRuleSettingsRepository(
                     Calendar.getInstance().apply {
                         add(Calendar.DAY_OF_YEAR, -30)
                     }.timeInMillis
-                preferences[KEY_SMS_SCAN_START_DATE] ?: thirtyDaysAgo
+                try {
+                    preferences[KEY_SMS_SCAN_START_DATE] ?: thirtyDaysAgo
+                } catch (_: ClassCastException) {
+                    thirtyDaysAgo
+                }
             }
             .distinctUntilChanged()
     }
@@ -63,7 +67,12 @@ class SmsRuleSettingsRepository(
 
     override suspend fun getIgnoreRulesChecksum(): Int {
         return try {
-            dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
+            val preferences = dataStore.data.first()
+            try {
+                preferences[KEY_IGNORE_RULES_CHECKSUM] ?: 0
+            } catch (_: ClassCastException) {
+                0
+            }
         } catch (e: IOException) {
             0
         }
@@ -79,7 +88,11 @@ class SmsRuleSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_DISMISSED_MERGES] ?: emptySet()
+                try {
+                    preferences[KEY_DISMISSED_MERGES] ?: emptySet()
+                } catch (_: ClassCastException) {
+                    emptySet()
+                }
             }
             .distinctUntilChanged()
     }
