@@ -52,6 +52,14 @@ object DatabaseHealthChecker {
             stringSetPreferencesKey("excluded_expense_months"),
             booleanPreferencesKey("app_lock_enabled"),
             booleanPreferencesKey("privacy_mode_enabled"),
+            booleanPreferencesKey("simulator_privacy_mode_enabled"),
+            booleanPreferencesKey("google_drive_backup_enabled"),
+            booleanPreferencesKey("auto_backup_enabled"),
+            booleanPreferencesKey("auto_backup_notification_enabled"),
+            longPreferencesKey("last_backup_timestamp"),
+            booleanPreferencesKey("recurring_transactions_enabled"),
+            intPreferencesKey("goal_income_threshold"),
+            booleanPreferencesKey("goal_nudges_enabled"),
             booleanPreferencesKey("daily_report_enabled"),
             intPreferencesKey("daily_report_hour"),
             intPreferencesKey("daily_report_minute"),
@@ -72,6 +80,50 @@ object DatabaseHealthChecker {
     val REGISTERED_INTERNAL_KEYS: List<Preferences.Key<*>> =
         listOf(
             booleanPreferencesKey("is_first_launch_complete"),
+        )
+
+    private val FINANCE_KEY_EXPECTED_TYPES: Map<String, Class<*>> =
+        mapOf(
+            "user_name" to String::class.java,
+            "home_currency_code" to String::class.java,
+            "selected_app_theme" to String::class.java,
+            "dashboard_card_order" to String::class.java,
+            "travel_mode_settings" to String::class.java,
+            "sms_scan_start_date" to java.lang.Long::class.java,
+            "ignore_rules_checksum" to java.lang.Integer::class.java,
+            "dismissed_merge_suggestions" to Set::class.java,
+            "excluded_income_months" to Set::class.java,
+            "excluded_expense_months" to Set::class.java,
+            "app_lock_enabled" to java.lang.Boolean::class.java,
+            "privacy_mode_enabled" to java.lang.Boolean::class.java,
+            "simulator_privacy_mode_enabled" to java.lang.Boolean::class.java,
+            "google_drive_backup_enabled" to java.lang.Boolean::class.java,
+            "auto_backup_enabled" to java.lang.Boolean::class.java,
+            "auto_backup_notification_enabled" to java.lang.Boolean::class.java,
+            "last_backup_timestamp" to java.lang.Long::class.java,
+            "recurring_transactions_enabled" to java.lang.Boolean::class.java,
+            "goal_income_threshold" to java.lang.Integer::class.java,
+            "goal_nudges_enabled" to java.lang.Boolean::class.java,
+            "daily_report_enabled" to java.lang.Boolean::class.java,
+            "daily_report_hour" to java.lang.Integer::class.java,
+            "daily_report_minute" to java.lang.Integer::class.java,
+            "weekly_summary_enabled" to java.lang.Boolean::class.java,
+            "weekly_report_day" to java.lang.Integer::class.java,
+            "weekly_report_hour" to java.lang.Integer::class.java,
+            "weekly_report_minute" to java.lang.Integer::class.java,
+            "monthly_summary_enabled" to java.lang.Boolean::class.java,
+            "monthly_report_day" to java.lang.Integer::class.java,
+            "monthly_report_hour" to java.lang.Integer::class.java,
+            "monthly_report_minute" to java.lang.Integer::class.java,
+            "autocapture_notification_enabled" to java.lang.Boolean::class.java,
+            "unknown_transaction_popup_enabled" to java.lang.Boolean::class.java,
+            "profile_picture_uri" to String::class.java,
+            "has_seen_onboarding" to java.lang.Boolean::class.java,
+        )
+
+    private val INTERNAL_KEY_EXPECTED_TYPES: Map<String, Class<*>> =
+        mapOf(
+            "is_first_launch_complete" to java.lang.Boolean::class.java,
         )
 
     suspend fun checkHealth(
@@ -141,12 +193,25 @@ object DatabaseHealthChecker {
                 try {
                     val financeDataStore = context.financeSettingsDataStore
                     val financePrefs = financeDataStore.data.first()
-                    for (key in REGISTERED_FINANCE_KEYS) {
-                        try {
-                            financePrefs[key]
-                        } catch (_: Exception) {
+                    val prefsMap = financePrefs.asMap()
+                    for ((keyName, expectedType) in FINANCE_KEY_EXPECTED_TYPES) {
+                        val entry = prefsMap.entries.find { it.key.name == keyName }
+                        if (entry != null && !expectedType.isInstance(entry.value)) {
                             corruptedPreferences++
-                            issues.add("Preference key '${key.name}' is corrupted or has an incompatible type.")
+                            issues.add("Preference key '$keyName' is corrupted or has an incompatible type.")
+                        }
+                    }
+                    for ((k, value) in prefsMap) {
+                        if (k.name.startsWith("overall_budget_")) {
+                            if (!java.lang.Float::class.java.isInstance(value)) {
+                                corruptedPreferences++
+                                issues.add("Preference key '${k.name}' is corrupted or has an incompatible type.")
+                            }
+                        } else if (k.name.startsWith("last_month_summary_dismissed_")) {
+                            if (!java.lang.Boolean::class.java.isInstance(value)) {
+                                corruptedPreferences++
+                                issues.add("Preference key '${k.name}' is corrupted or has an incompatible type.")
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -157,12 +222,12 @@ object DatabaseHealthChecker {
                 try {
                     val internalDataStore = context.internalSettingsDataStore
                     val internalPrefs = internalDataStore.data.first()
-                    for (key in REGISTERED_INTERNAL_KEYS) {
-                        try {
-                            internalPrefs[key]
-                        } catch (_: Exception) {
+                    val internalMap = internalPrefs.asMap()
+                    for ((keyName, expectedType) in INTERNAL_KEY_EXPECTED_TYPES) {
+                        val entry = internalMap.entries.find { it.key.name == keyName }
+                        if (entry != null && !expectedType.isInstance(entry.value)) {
                             corruptedPreferences++
-                            issues.add("Preference key '${key.name}' in internal settings is corrupted.")
+                            issues.add("Preference key '$keyName' in internal settings is corrupted.")
                         }
                     }
                 } catch (e: Exception) {
@@ -291,17 +356,29 @@ object DatabaseHealthChecker {
                 try {
                     val financeDataStore = context.financeSettingsDataStore
                     val financePrefs = financeDataStore.data.first()
+                    val prefsMap = financePrefs.asMap()
                     val corruptedFinanceKeys = mutableListOf<Preferences.Key<*>>()
-                    for (key in REGISTERED_FINANCE_KEYS) {
-                        try {
-                            financePrefs[key]
-                        } catch (_: Exception) {
-                            corruptedFinanceKeys.add(key)
+                    for ((keyName, expectedType) in FINANCE_KEY_EXPECTED_TYPES) {
+                        val entry = prefsMap.entries.find { it.key.name == keyName }
+                        if (entry != null && !expectedType.isInstance(entry.value)) {
+                            corruptedFinanceKeys.add(entry.key)
                         }
                     }
-                    if (corruptedFinanceKeys.isNotEmpty()) {
+                    for ((k, value) in prefsMap) {
+                        if (k.name.startsWith("overall_budget_")) {
+                            if (!java.lang.Float::class.java.isInstance(value)) {
+                                corruptedFinanceKeys.add(k)
+                            }
+                        } else if (k.name.startsWith("last_month_summary_dismissed_")) {
+                            if (!java.lang.Boolean::class.java.isInstance(value)) {
+                                corruptedFinanceKeys.add(k)
+                            }
+                        }
+                    }
+                    val uniqueFinanceKeysToRepair = corruptedFinanceKeys.distinctBy { it.name }
+                    if (uniqueFinanceKeysToRepair.isNotEmpty()) {
                         financeDataStore.edit { prefs ->
-                            for (key in corruptedFinanceKeys) {
+                            for (key in uniqueFinanceKeysToRepair) {
                                 try {
                                     prefs.remove(key)
                                     repairedPreferences++
@@ -316,17 +393,18 @@ object DatabaseHealthChecker {
                 try {
                     val internalDataStore = context.internalSettingsDataStore
                     val internalPrefs = internalDataStore.data.first()
+                    val internalMap = internalPrefs.asMap()
                     val corruptedInternalKeys = mutableListOf<Preferences.Key<*>>()
-                    for (key in REGISTERED_INTERNAL_KEYS) {
-                        try {
-                            internalPrefs[key]
-                        } catch (_: Exception) {
-                            corruptedInternalKeys.add(key)
+                    for ((keyName, expectedType) in INTERNAL_KEY_EXPECTED_TYPES) {
+                        val entry = internalMap.entries.find { it.key.name == keyName }
+                        if (entry != null && !expectedType.isInstance(entry.value)) {
+                            corruptedInternalKeys.add(entry.key)
                         }
                     }
-                    if (corruptedInternalKeys.isNotEmpty()) {
+                    val uniqueInternalKeysToRepair = corruptedInternalKeys.distinctBy { it.name }
+                    if (uniqueInternalKeysToRepair.isNotEmpty()) {
                         internalDataStore.edit { prefs ->
-                            for (key in corruptedInternalKeys) {
+                            for (key in uniqueInternalKeysToRepair) {
                                 try {
                                     prefs.remove(key)
                                     repairedPreferences++

@@ -41,7 +41,7 @@ object DiagnosticsExportService {
     ): AggregateMetrics {
         if (database == null) return AggregateMetrics()
 
-        val dbFile = context.getDatabasePath("finlight_database")
+        val dbFile = context.getDatabasePath("finance_database")
         val dbSizeKb = if (dbFile.exists()) dbFile.length() / 1024 else 0L
 
         var accounts = 0L

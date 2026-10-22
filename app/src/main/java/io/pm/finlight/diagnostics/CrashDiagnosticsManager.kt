@@ -3,6 +3,7 @@ package io.pm.finlight.diagnostics
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.pm.PackageInfoCompat
 import com.google.gson.Gson
 import java.io.File
@@ -14,6 +15,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Data representation of an uncaught crash captured locally.
@@ -39,7 +41,10 @@ data class CrashReport(
 object CrashDiagnosticsManager {
     const val CRASH_REPORT_FILE_NAME = "last_crash_report.json"
 
+    private val isInstalled = AtomicBoolean(false)
+
     fun install(context: Context) {
+        if (!isInstalled.compareAndSet(false, true)) return
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
@@ -50,6 +55,11 @@ object CrashDiagnosticsManager {
                 defaultHandler?.uncaughtException(thread, throwable)
             }
         }
+    }
+
+    @VisibleForTesting
+    internal fun resetInstalledStateForTesting() {
+        isInstalled.set(false)
     }
 
     fun recordCrash(

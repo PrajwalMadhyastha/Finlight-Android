@@ -14,9 +14,9 @@ object PiiSanitizer {
     private val EMAIL_REGEX =
         Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}""")
 
-    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00, Rs. 1500)
+    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00, Rs. 1500, ₹ -500, -$50.00)
     private val CURRENCY_AMOUNT_REGEX =
-        Regex("""(?i)(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b""")
+        Regex("""(?i)(?:-\s*)?(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)\s*-?\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b""")
 
     // Phone numbers: international with +, bracketed area codes, or 3-3-4 / 5-5 separated digits
     private val PHONE_REGEX =

@@ -1,9 +1,14 @@
 package io.pm.finlight.data.health
 
 import android.os.Build
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Account
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.financeSettingsDataStore
+import io.pm.finlight.data.internalSettingsDataStore
 import io.pm.finlight.util.DatabaseTestRule
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -145,7 +150,7 @@ class DatabaseHealthCheckerTest {
     @Test
     fun checkHealth_withValidDataStoreContext_reportsHealthyPreferences() =
         runTest {
-            val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
             val result = DatabaseHealthChecker.checkHealth(dbRule.db, context)
             assertTrue(result.isHealthy)
             assertEquals(0, result.corruptedPreferencesCount)
@@ -153,5 +158,38 @@ class DatabaseHealthCheckerTest {
             val repairResult = DatabaseHealthChecker.repair(dbRule.db, context)
             assertTrue(repairResult.success)
             assertEquals(0, repairResult.repairedPreferencesCount)
+        }
+
+    @Test
+    fun checkHealth_and_repair_withCorruptedPreferences_detectsAndRepairsCorruptedKeys() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+
+            // Inject corrupted (type mismatch) preferences
+            context.financeSettingsDataStore.edit { prefs ->
+                // Inject string where boolean is expected
+                prefs[stringPreferencesKey("app_lock_enabled")] = "not_a_boolean"
+                // Inject string where float is expected for dynamic budget key
+                prefs[stringPreferencesKey("overall_budget_2026_10")] = "not_a_float"
+            }
+            context.internalSettingsDataStore.edit { prefs ->
+                // Inject string where boolean is expected
+                prefs[stringPreferencesKey("is_first_launch_complete")] = "not_a_boolean"
+            }
+
+            val checkBefore = DatabaseHealthChecker.checkHealth(dbRule.db, context)
+            assertFalse(checkBefore.isHealthy)
+            assertTrue(checkBefore.corruptedPreferencesCount >= 3)
+            assertTrue(checkBefore.issuesDescription.any { it.contains("app_lock_enabled") })
+            assertTrue(checkBefore.issuesDescription.any { it.contains("overall_budget_2026_10") })
+            assertTrue(checkBefore.issuesDescription.any { it.contains("is_first_launch_complete") })
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db, context)
+            assertTrue(repairResult.success)
+            assertTrue(repairResult.repairedPreferencesCount >= 3)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db, context)
+            assertEquals(0, checkAfter.corruptedPreferencesCount)
+            assertTrue(checkAfter.isHealthy)
         }
 }

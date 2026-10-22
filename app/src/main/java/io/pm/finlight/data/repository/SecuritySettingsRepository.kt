@@ -42,7 +42,11 @@ class SecuritySettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_APP_LOCK_ENABLED] ?: false
+                try {
+                    preferences[KEY_APP_LOCK_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
+                }
             }
             .distinctUntilChanged()
     }
@@ -63,7 +67,11 @@ class SecuritySettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_PRIVACY_MODE_ENABLED] ?: false
+                try {
+                    preferences[KEY_PRIVACY_MODE_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
+                }
             }
             .distinctUntilChanged()
     }
@@ -84,7 +92,11 @@ class SecuritySettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] ?: false
+                try {
+                    preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
+                }
             }
             .distinctUntilChanged()
     }

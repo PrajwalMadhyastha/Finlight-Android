@@ -27,6 +27,13 @@ class PiiSanitizerTest {
     }
 
     @Test
+    fun sanitize_redactsNegativeCurrencies() {
+        val input = "Balances: ₹ -500, $-50.00, -₹250, -$10 and - $75"
+        val output = PiiSanitizer.sanitize(input)
+        assertEquals("Balances: [REDACTED_AMOUNT], [REDACTED_AMOUNT], [REDACTED_AMOUNT], [REDACTED_AMOUNT] and [REDACTED_AMOUNT]", output)
+    }
+
+    @Test
     fun sanitize_redactsEmails() {
         val input = "Contact user at support.finlight@example.com for help"
         val output = PiiSanitizer.sanitize(input)

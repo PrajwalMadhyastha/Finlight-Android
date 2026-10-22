@@ -34,6 +34,10 @@ class DiagnosticsExportServiceTest {
     @After
     fun tearDown() {
         CrashDiagnosticsManager.clearCrash(context)
+        val dbFile = context.getDatabasePath("finance_database")
+        if (dbFile.exists()) {
+            dbFile.delete()
+        }
         val dir = File(context.cacheDir, DiagnosticsExportService.DIAGNOSTICS_DIR)
         if (dir.exists()) {
             dir.deleteRecursively()
@@ -124,11 +128,16 @@ class DiagnosticsExportServiceTest {
             """.trimIndent(),
         )
 
+        val dbFile = context.getDatabasePath("finance_database")
+        dbFile.parentFile?.mkdirs()
+        dbFile.writeBytes(ByteArray(4096))
+
         val aggregates = DiagnosticsExportService.fetchAggregates(context, dbRule.db)
         assertEquals(1L, aggregates.accountsCount)
         assertEquals(1L, aggregates.transactionsCount)
         assertEquals(1L, aggregates.categoriesCount)
         assertEquals(1L, aggregates.recurringPatternsCount)
+        assertTrue(aggregates.databaseSizeKb > 0)
         assertTrue(aggregates.sqliteVersion.isNotEmpty())
         assertTrue(aggregates.sqliteVersion != "Unknown")
 
@@ -137,6 +146,7 @@ class DiagnosticsExportServiceTest {
         assertTrue(report.contains("Total Transactions:    1"))
         assertTrue(report.contains("Total Categories:      1"))
         assertTrue(report.contains("Total Recurring Rules: 1"))
+        assertTrue(report.contains("Database Size:         ${aggregates.databaseSizeKb} KB"))
         assertTrue(report.contains("Database Schema Ver:   ${dbRule.db.openHelper.readableDatabase.version}"))
     }
 }

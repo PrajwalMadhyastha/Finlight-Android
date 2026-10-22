@@ -44,7 +44,11 @@ class BackupSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_BACKUP_ENABLED] ?: true
+                try {
+                    preferences[KEY_BACKUP_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
+                }
             }
             .distinctUntilChanged()
     }
@@ -65,7 +69,11 @@ class BackupSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_AUTO_BACKUP_ENABLED] ?: true
+                try {
+                    preferences[KEY_AUTO_BACKUP_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
+                }
             }
             .distinctUntilChanged()
     }
@@ -86,7 +94,11 @@ class BackupSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+                try {
+                    preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
+                }
             }
             .distinctUntilChanged()
     }
@@ -107,7 +119,11 @@ class BackupSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_LAST_BACKUP_TIMESTAMP] ?: 0L
+                try {
+                    preferences[KEY_LAST_BACKUP_TIMESTAMP] ?: 0L
+                } catch (_: ClassCastException) {
+                    0L
+                }
             }
             .distinctUntilChanged()
     }

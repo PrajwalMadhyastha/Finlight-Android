@@ -53,8 +53,22 @@ class TravelSettingsRepository(
                 }
             }
             .map { preferences ->
-                val json = preferences[KEY_TRAVEL_MODE_SETTINGS]
-                val settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
+                val json =
+                    try {
+                        preferences[KEY_TRAVEL_MODE_SETTINGS]
+                    } catch (_: ClassCastException) {
+                        null
+                    }
+                val settings =
+                    if (json == null) {
+                        null
+                    } else {
+                        try {
+                            gson.fromJson(json, TravelModeSettings::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
 
                 if (settings != null && System.currentTimeMillis() > settings.endDate) {
                     null
@@ -74,10 +88,20 @@ class TravelSettingsRepository(
         val preferences =
             try {
                 dataStore.data.first()
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 emptyPreferences()
             }
-        val json = preferences[KEY_TRAVEL_MODE_SETTINGS] ?: return null
-        return gson.fromJson(json, TravelModeSettings::class.java)
+        val json =
+            try {
+                preferences[KEY_TRAVEL_MODE_SETTINGS]
+            } catch (_: ClassCastException) {
+                null
+            } ?: return null
+        return try {
+            gson.fromJson(json, TravelModeSettings::class.java)
+        } catch (_: Exception) {
+            null
+        }
     }
 }

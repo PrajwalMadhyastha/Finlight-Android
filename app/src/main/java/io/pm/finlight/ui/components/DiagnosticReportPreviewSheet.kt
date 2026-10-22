@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -48,14 +49,15 @@ fun DiagnosticReportPreviewSheet(
     var includeDevice by remember { mutableStateOf(true) }
     var includeHealth by remember { mutableStateOf(true) }
     var includeCrash by remember { mutableStateOf(true) }
-    val hasCrash = remember { CrashDiagnosticsManager.hasRecordedCrash(context) }
+    var hasCrash by remember { mutableStateOf(CrashDiagnosticsManager.hasRecordedCrash(context)) }
+    var reloadTrigger by remember { mutableStateOf(0) }
 
     var reportText by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(true) }
 
     val resolvedDb = remember { database ?: AppDatabase.getInstance(context) }
 
-    LaunchedEffect(includeDevice, includeHealth, includeCrash) {
+    LaunchedEffect(includeDevice, includeHealth, includeCrash, reloadTrigger) {
         isLoading = true
         reportText =
             withContext(Dispatchers.IO) {
@@ -218,7 +220,22 @@ fun DiagnosticReportPreviewSheet(
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Share")
+                }
+            }
+
+            if (hasCrash) {
+                OutlinedButton(
+                    onClick = {
+                        CrashDiagnosticsManager.clearCrash(context)
+                        hasCrash = false
+                        reloadTrigger++
+                        Toast.makeText(context, "Crash log cleared", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Clear Crash Log")
                 }
             }
 

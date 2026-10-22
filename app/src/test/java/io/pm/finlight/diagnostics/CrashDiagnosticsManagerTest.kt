@@ -31,6 +31,7 @@ class CrashDiagnosticsManagerTest {
     @After
     fun tearDown() {
         CrashDiagnosticsManager.clearCrash(context)
+        CrashDiagnosticsManager.resetInstalledStateForTesting()
     }
 
     @Test
@@ -85,6 +86,23 @@ class CrashDiagnosticsManagerTest {
             CrashDiagnosticsManager.install(context)
             val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
             assertNotNull(currentHandler)
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun install_isIdempotent_doesNotChainMultipleTimes() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        try {
+            CrashDiagnosticsManager.install(context)
+            val firstHandler = Thread.getDefaultUncaughtExceptionHandler()
+
+            CrashDiagnosticsManager.install(context)
+            val secondHandler = Thread.getDefaultUncaughtExceptionHandler()
+
+            // Handler should be identical because subsequent install() calls are no-ops
+            assertEquals(firstHandler, secondHandler)
         } finally {
             Thread.setDefaultUncaughtExceptionHandler(previousHandler)
         }

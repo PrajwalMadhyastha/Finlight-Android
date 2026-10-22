@@ -46,7 +46,11 @@ class FeatureSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] ?: false
+                try {
+                    preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
+                }
             }
             .distinctUntilChanged()
     }
@@ -67,7 +71,11 @@ class FeatureSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_GOAL_INCOME_THRESHOLD] ?: 5000
+                try {
+                    preferences[KEY_GOAL_INCOME_THRESHOLD] ?: 5000
+                } catch (_: ClassCastException) {
+                    5000
+                }
             }
             .distinctUntilChanged()
     }
@@ -88,7 +96,11 @@ class FeatureSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[KEY_GOAL_NUDGES_ENABLED] ?: true
+                try {
+                    preferences[KEY_GOAL_NUDGES_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
+                }
             }
             .distinctUntilChanged()
     }
@@ -115,7 +127,11 @@ class FeatureSettingsRepository(
                 }
             }
             .map { preferences ->
-                preferences[key] ?: emptySet()
+                try {
+                    preferences[key] ?: emptySet()
+                } catch (_: ClassCastException) {
+                    emptySet()
+                }
             }
             .distinctUntilChanged()
     }
