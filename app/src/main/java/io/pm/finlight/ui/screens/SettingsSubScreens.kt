@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,6 +51,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.ui.components.ConfirmationDialog
+import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
@@ -463,6 +465,11 @@ fun DataSettingsScreen(
     var showImportJsonDialog by remember { mutableStateOf(false) }
     var showRestoreSnapshotDialog by remember { mutableStateOf(false) }
     var showCsvInfoDialog by remember { mutableStateOf(false) }
+    var showDiagnosticPreviewSheet by remember { mutableStateOf(false) }
+    val healthCheckResult by settingsViewModel.healthCheckResult.collectAsState()
+    val isCheckingHealth by settingsViewModel.isCheckingHealth.collectAsState()
+    val isRepairingDb by settingsViewModel.isRepairingDb.collectAsState()
+    val repairResultMessage by settingsViewModel.repairResultMessage.collectAsState()
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -479,6 +486,13 @@ fun DataSettingsScreen(
     LaunchedEffect(Unit) {
         settingsViewModel.uiEvent.collectLatest { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    LaunchedEffect(repairResultMessage) {
+        repairResultMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            settingsViewModel.clearRepairResultMessage()
         }
     }
 
@@ -582,7 +596,7 @@ fun DataSettingsScreen(
         )
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("data_settings_lazy_column"),
         contentPadding = PaddingValues(16.dp),
     ) {
         item {
@@ -694,6 +708,22 @@ fun DataSettingsScreen(
                         onClick = { showRestoreSnapshotDialog = true },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Diagnostic Report & Logs",
+                        subtitle = "Inspect and export privacy-redacted diagnostics",
+                        icon = Icons.Default.BugReport,
+                        onClick = { showDiagnosticPreviewSheet = true },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                    SettingsActionItem(
+                        text = "Run Database Health Check",
+                        subtitle = if (isCheckingHealth) "Analyzing database integrity..." else "Verify integrity and repair corrupted records",
+                        icon = Icons.Default.HealthAndSafety,
+                        onClick = {
+                            settingsViewModel.runDatabaseHealthCheck()
+                        },
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     // --- Photo receipts disclaimer ---
                     Row(
                         modifier =
@@ -765,6 +795,83 @@ fun DataSettingsScreen(
                 showRestoreSnapshotDialog = false
                 settingsViewModel.restoreFromBackupSnapshot()
             },
+        )
+    }
+
+    healthCheckResult?.let { result ->
+        AlertDialog(
+            onDismissRequest = {
+                if (!isRepairingDb) settingsViewModel.dismissHealthCheckResult()
+            },
+            containerColor = popupContainerColor,
+            icon = {
+                Icon(
+                    imageVector = if (result.isHealthy) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = if (result.isHealthy) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(36.dp),
+                )
+            },
+            title = {
+                Text(if (result.isHealthy) "Database Healthy" else "Issues Detected")
+            },
+            text = {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (result.isHealthy) {
+                        Text("SQLite integrity check passed with 0 errors. All account, transaction, and preference relations are valid.")
+                    } else {
+                        Text("The database self-health check detected the following issues:")
+                        for (issue in result.issuesDescription) {
+                            Text("• $issue", style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (!result.isHealthy) {
+                    Button(
+                        enabled = !isRepairingDb,
+                        onClick = {
+                            settingsViewModel.repairDatabase()
+                        },
+                    ) {
+                        if (isRepairingDb) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Repairing...")
+                        } else {
+                            Text("Repair Database")
+                        }
+                    }
+                } else {
+                    Button(onClick = { settingsViewModel.dismissHealthCheckResult() }) {
+                        Text("OK")
+                    }
+                }
+            },
+            dismissButton = {
+                if (!result.isHealthy) {
+                    TextButton(
+                        enabled = !isRepairingDb,
+                        onClick = { settingsViewModel.dismissHealthCheckResult() },
+                    ) {
+                        Text("Close")
+                    }
+                }
+            },
+        )
+    }
+
+    if (showDiagnosticPreviewSheet) {
+        DiagnosticReportPreviewSheet(
+            onDismissRequest = { showDiagnosticPreviewSheet = false },
         )
     }
 }

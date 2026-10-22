@@ -76,9 +76,12 @@ import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
+import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
+import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.screenTitles
 import io.pm.finlight.ui.screens.*
@@ -344,6 +347,12 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val isAccountSelectionMode by accountViewModel.isSelectionModeActive.collectAsState()
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
     val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
+
+    var showCrashRecoveryDialog by remember {
+        mutableStateOf(CrashDiagnosticsManager.hasRecordedCrash(context))
+    }
+    var showDiagnosticPreviewSheet by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val bottomNavItems =
         listOf(
@@ -691,6 +700,106 @@ fun MainAppScreen(shortcutAction: String? = null) {
                     TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
                 },
                 containerColor = popupContainerColor,
+            )
+        }
+
+        if (showCrashRecoveryDialog) {
+            val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+            var isRepairing by remember { mutableStateOf(false) }
+
+            AlertDialog(
+                onDismissRequest = {
+                    if (!isRepairing) {
+                        CrashDiagnosticsManager.clearCrash(context)
+                        showCrashRecoveryDialog = false
+                    }
+                },
+                icon = {
+                    Icon(
+                        Icons.Default.Healing,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                },
+                title = { Text("App Recovered") },
+                text = {
+                    Text(
+                        "Finlight recovered from an unexpected error. Your financial data is safe. You can view the privacy-redacted diagnostic report or run a quick database self-repair.",
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        enabled = !isRepairing,
+                        onClick = {
+                            if (isRepairing) return@Button
+                            isRepairing = true
+                            coroutineScope.launch {
+                                try {
+                                    val db = AppDatabase.getInstance(context)
+                                    val result =
+                                        withContext(Dispatchers.IO) {
+                                            DatabaseHealthChecker.repair(db, context)
+                                        }
+                                    CrashDiagnosticsManager.clearCrash(context)
+                                    showCrashRecoveryDialog = false
+                                    val msg =
+                                        if (result.success) {
+                                            val totalFixed =
+                                                result.repairedAccountsCount +
+                                                    result.relinkedTransactionsCount +
+                                                    result.repairedPreferencesCount
+                                            if (totalFixed > 0) {
+                                                "Database repaired: $totalFixed issues resolved."
+                                            } else {
+                                                "Database verified and healthy."
+                                            }
+                                        } else {
+                                            "Database repair completed with warnings."
+                                        }
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isRepairing = false
+                                }
+                            }
+                        },
+                    ) {
+                        Text(if (isRepairing) "Repairing..." else "Self-Repair")
+                    }
+                },
+                dismissButton = {
+                    Row {
+                        TextButton(
+                            enabled = !isRepairing,
+                            onClick = {
+                                showCrashRecoveryDialog = false
+                                showDiagnosticPreviewSheet = true
+                            },
+                        ) {
+                            Text("View Report")
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        TextButton(
+                            enabled = !isRepairing,
+                            onClick = {
+                                CrashDiagnosticsManager.clearCrash(context)
+                                showCrashRecoveryDialog = false
+                            },
+                        ) {
+                            Text("Dismiss")
+                        }
+                    }
+                },
+                containerColor = popupContainerColor,
+            )
+        }
+
+        if (showDiagnosticPreviewSheet) {
+            DiagnosticReportPreviewSheet(
+                onDismissRequest = {
+                    CrashDiagnosticsManager.clearCrash(context)
+                    showDiagnosticPreviewSheet = false
+                },
             )
         }
     }

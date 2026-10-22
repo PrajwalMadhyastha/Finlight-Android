@@ -153,20 +153,20 @@ class NotificationSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getters rethrow non-IOException exceptions`() =
+    fun `getters handle non-IOException exceptions by emitting defaults`() =
         runTest {
             val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = NotificationSettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDailyReportEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDailyReportTime().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getWeeklySummaryEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getWeeklyReportTime().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getMonthlySummaryEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getMonthlyReportTime().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAutoCaptureNotificationEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getUnknownTransactionPopupEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.hasLastMonthSummaryBeenDismissed().first() }
+            assertTrue(repo.getDailyReportEnabled().first())
+            assertEquals(Pair(23, 0), repo.getDailyReportTime().first())
+            assertTrue(repo.getWeeklySummaryEnabled().first())
+            assertEquals(Triple(java.util.Calendar.SUNDAY, 9, 0), repo.getWeeklyReportTime().first())
+            assertTrue(repo.getMonthlySummaryEnabled().first())
+            assertEquals(Triple(1, 9, 0), repo.getMonthlyReportTime().first())
+            assertTrue(repo.getAutoCaptureNotificationEnabled().first())
+            assertTrue(repo.getUnknownTransactionPopupEnabled().first())
+            assertFalse(repo.hasLastMonthSummaryBeenDismissed().first())
         }
 }

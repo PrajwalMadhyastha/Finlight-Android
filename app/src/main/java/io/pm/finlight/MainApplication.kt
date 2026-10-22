@@ -16,6 +16,7 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.memory.MemoryCache
 import com.github.mikephil.charting.utils.Utils
+import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ml.MlModelFactory
 
 class MainApplication :
@@ -62,6 +63,7 @@ class MainApplication :
 
     override fun onCreate() {
         super.onCreate()
+        CrashDiagnosticsManager.install(this)
 
         // --- MIGRATION: Manually load the native SQLCipher library ---
         try {

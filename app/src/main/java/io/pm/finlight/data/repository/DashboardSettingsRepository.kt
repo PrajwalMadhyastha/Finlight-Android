@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class DashboardSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -43,33 +41,33 @@ class DashboardSettingsRepository(
 
     override fun getDashboardCardOrder(): Flow<List<DashboardCardType>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    loadCardOrder(preferences[KEY_DASHBOARD_CARD_ORDER])
+                } catch (_: Exception) {
+                    loadCardOrder(null)
                 }
             }
-            .map { preferences ->
-                loadCardOrder(preferences[KEY_DASHBOARD_CARD_ORDER])
+            .catch {
+                emit(loadCardOrder(null))
             }
             .distinctUntilChanged()
     }
 
     override fun getDashboardVisibleCards(): Flow<Set<DashboardCardType>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    loadVisibleCards(
+                        visibleJson = preferences[KEY_DASHBOARD_VISIBLE_CARDS],
+                        orderJson = preferences[KEY_DASHBOARD_CARD_ORDER],
+                    )
+                } catch (_: Exception) {
+                    loadVisibleCards(null, null)
                 }
             }
-            .map { preferences ->
-                loadVisibleCards(
-                    visibleJson = preferences[KEY_DASHBOARD_VISIBLE_CARDS],
-                    orderJson = preferences[KEY_DASHBOARD_CARD_ORDER],
-                )
+            .catch {
+                emit(loadVisibleCards(null, null))
             }
             .distinctUntilChanged()
     }

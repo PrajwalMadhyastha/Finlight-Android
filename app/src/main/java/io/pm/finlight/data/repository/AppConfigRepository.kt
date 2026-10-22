@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.ui.theme.AppTheme
@@ -12,7 +11,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class AppConfigRepository(
     private val dataStore: DataStore<Preferences>,
@@ -36,15 +34,15 @@ class AppConfigRepository(
 
     override fun getUserName(): Flow<String> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_USER_NAME] ?: "User"
+                } catch (_: ClassCastException) {
+                    "User"
                 }
             }
-            .map { preferences ->
-                preferences[KEY_USER_NAME] ?: "User"
+            .catch {
+                emit("User")
             }
             .distinctUntilChanged()
     }
@@ -61,15 +59,15 @@ class AppConfigRepository(
 
     override fun getProfilePictureUri(): Flow<String?> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_PROFILE_PICTURE_URI]
+                } catch (_: ClassCastException) {
+                    null
                 }
             }
-            .map { preferences ->
-                preferences[KEY_PROFILE_PICTURE_URI]
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }
@@ -82,16 +80,17 @@ class AppConfigRepository(
 
     override fun getSelectedTheme(): Flow<AppTheme> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
-                val themeKey = preferences[KEY_SELECTED_THEME] ?: AppTheme.SYSTEM_DEFAULT.key
+                val themeKey =
+                    try {
+                        preferences[KEY_SELECTED_THEME] ?: AppTheme.SYSTEM_DEFAULT.key
+                    } catch (_: ClassCastException) {
+                        AppTheme.SYSTEM_DEFAULT.key
+                    }
                 AppTheme.fromKey(themeKey)
+            }
+            .catch {
+                emit(AppTheme.SYSTEM_DEFAULT)
             }
             .distinctUntilChanged()
     }
@@ -104,15 +103,15 @@ class AppConfigRepository(
 
     override fun getHomeCurrency(): Flow<String> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_HOME_CURRENCY] ?: "INR"
+                } catch (_: ClassCastException) {
+                    "INR"
                 }
             }
-            .map { preferences ->
-                preferences[KEY_HOME_CURRENCY] ?: "INR"
+            .catch {
+                emit("INR")
             }
             .distinctUntilChanged()
     }

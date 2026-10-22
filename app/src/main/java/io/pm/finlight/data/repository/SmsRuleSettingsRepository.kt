@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -37,20 +36,20 @@ class SmsRuleSettingsRepository(
     }
 
     override fun getSmsScanStartDate(): Flow<Long> {
+        val thirtyDaysAgo =
+            Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -30)
+            }.timeInMillis
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_SMS_SCAN_START_DATE] ?: thirtyDaysAgo
+                } catch (_: ClassCastException) {
+                    thirtyDaysAgo
                 }
             }
-            .map { preferences ->
-                val thirtyDaysAgo =
-                    Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -30)
-                    }.timeInMillis
-                preferences[KEY_SMS_SCAN_START_DATE] ?: thirtyDaysAgo
+            .catch {
+                emit(thirtyDaysAgo)
             }
             .distinctUntilChanged()
     }
@@ -63,7 +62,12 @@ class SmsRuleSettingsRepository(
 
     override suspend fun getIgnoreRulesChecksum(): Int {
         return try {
-            dataStore.data.first()[KEY_IGNORE_RULES_CHECKSUM] ?: 0
+            val preferences = dataStore.data.first()
+            try {
+                preferences[KEY_IGNORE_RULES_CHECKSUM] ?: 0
+            } catch (_: ClassCastException) {
+                0
+            }
         } catch (e: IOException) {
             0
         }
@@ -71,15 +75,15 @@ class SmsRuleSettingsRepository(
 
     override fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_DISMISSED_MERGES] ?: emptySet()
+                } catch (_: Exception) {
+                    emptySet()
                 }
             }
-            .map { preferences ->
-                preferences[KEY_DISMISSED_MERGES] ?: emptySet()
+            .catch {
+                emit(emptySet())
             }
             .distinctUntilChanged()
     }

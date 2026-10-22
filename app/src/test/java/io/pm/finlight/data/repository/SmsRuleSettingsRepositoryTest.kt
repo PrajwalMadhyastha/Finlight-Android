@@ -97,8 +97,8 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = SmsRuleSettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getSmsScanStartDate().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDismissedMergeSuggestions().first() }
+            kotlin.test.assertTrue(repo.getSmsScanStartDate().first() > 0L)
+            assertEquals(emptySet<String>(), repo.getDismissedMergeSuggestions().first())
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getIgnoreRulesChecksum() }
         }
 

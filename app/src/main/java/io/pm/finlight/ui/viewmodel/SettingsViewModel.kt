@@ -1107,4 +1107,65 @@ class SettingsViewModel(
             }
         }
     }
+
+    private val _isCheckingHealth = MutableStateFlow(false)
+    val isCheckingHealth: StateFlow<Boolean> = _isCheckingHealth.asStateFlow()
+
+    private val _isRepairingDb = MutableStateFlow(false)
+    val isRepairingDb: StateFlow<Boolean> = _isRepairingDb.asStateFlow()
+
+    private val _healthCheckResult = MutableStateFlow<io.pm.finlight.data.health.HealthCheckResult?>(null)
+    val healthCheckResult: StateFlow<io.pm.finlight.data.health.HealthCheckResult?> = _healthCheckResult.asStateFlow()
+
+    private val _repairResultMessage = MutableStateFlow<String?>(null)
+    val repairResultMessage: StateFlow<String?> = _repairResultMessage.asStateFlow()
+
+    fun runDatabaseHealthCheck() {
+        if (_isCheckingHealth.value || _isRepairingDb.value) return
+        viewModelScope.launch(dispatchers.io) {
+            _isCheckingHealth.value = true
+            try {
+                val result = io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(db, context)
+                _healthCheckResult.value = result
+            } finally {
+                _isCheckingHealth.value = false
+            }
+        }
+    }
+
+    fun repairDatabase() {
+        if (_isRepairingDb.value) return
+        viewModelScope.launch(dispatchers.io) {
+            _isRepairingDb.value = true
+            try {
+                val repairOutcome = io.pm.finlight.data.health.DatabaseHealthChecker.repair(db, context)
+                _healthCheckResult.value = null
+                val total =
+                    repairOutcome.repairedAccountsCount +
+                        repairOutcome.relinkedTransactionsCount +
+                        repairOutcome.repairedPreferencesCount
+                val msg =
+                    if (repairOutcome.success) {
+                        if (total > 0) {
+                            "Database repaired: $total issues fixed."
+                        } else {
+                            "Database verified and clean."
+                        }
+                    } else {
+                        "Database self-repair failed: ${repairOutcome.message}"
+                    }
+                _repairResultMessage.value = msg
+            } finally {
+                _isRepairingDb.value = false
+            }
+        }
+    }
+
+    fun dismissHealthCheckResult() {
+        _healthCheckResult.value = null
+    }
+
+    fun clearRepairResultMessage() {
+        _repairResultMessage.value = null
+    }
 }

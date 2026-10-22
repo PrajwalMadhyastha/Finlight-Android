@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class TravelSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -45,22 +44,32 @@ class TravelSettingsRepository(
      */
     override fun getTravelModeSettings(): Flow<TravelModeSettings?> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
-                val json = preferences[KEY_TRAVEL_MODE_SETTINGS]
-                val settings = if (json == null) null else gson.fromJson(json, TravelModeSettings::class.java)
+                val json =
+                    try {
+                        preferences[KEY_TRAVEL_MODE_SETTINGS]
+                    } catch (_: ClassCastException) {
+                        null
+                    }
+                val settings =
+                    if (json == null) {
+                        null
+                    } else {
+                        try {
+                            gson.fromJson(json, TravelModeSettings::class.java)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    }
 
                 if (settings != null && System.currentTimeMillis() > settings.endDate) {
                     null
                 } else {
                     settings
                 }
+            }
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }
@@ -74,10 +83,20 @@ class TravelSettingsRepository(
         val preferences =
             try {
                 dataStore.data.first()
-            } catch (e: IOException) {
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 emptyPreferences()
             }
-        val json = preferences[KEY_TRAVEL_MODE_SETTINGS] ?: return null
-        return gson.fromJson(json, TravelModeSettings::class.java)
+        val json =
+            try {
+                preferences[KEY_TRAVEL_MODE_SETTINGS]
+            } catch (_: ClassCastException) {
+                null
+            } ?: return null
+        return try {
+            gson.fromJson(json, TravelModeSettings::class.java)
+        } catch (_: Exception) {
+            null
+        }
     }
 }

@@ -5,14 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.longPreferencesKey
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class BackupSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -36,15 +34,15 @@ class BackupSettingsRepository(
 
     override fun getBackupEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_BACKUP_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_BACKUP_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -57,15 +55,15 @@ class BackupSettingsRepository(
 
     override fun getAutoBackupEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_AUTO_BACKUP_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_AUTO_BACKUP_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -78,15 +76,15 @@ class BackupSettingsRepository(
 
     override fun getAutoBackupNotificationEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+                } catch (_: ClassCastException) {
+                    false
                 }
             }
-            .map { preferences ->
-                preferences[KEY_AUTO_BACKUP_NOTIFICATION_ENABLED] ?: false
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
@@ -99,15 +97,15 @@ class BackupSettingsRepository(
 
     override fun getLastBackupTimestamp(): Flow<Long> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_LAST_BACKUP_TIMESTAMP] ?: 0L
+                } catch (_: ClassCastException) {
+                    0L
                 }
             }
-            .map { preferences ->
-                preferences[KEY_LAST_BACKUP_TIMESTAMP] ?: 0L
+            .catch {
+                emit(0L)
             }
             .distinctUntilChanged()
     }

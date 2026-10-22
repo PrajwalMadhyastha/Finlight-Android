@@ -5,14 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.data.internalSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class FirstLaunchSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -30,15 +28,15 @@ class FirstLaunchSettingsRepository(
 
     override fun getHasSeenOnboarding(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_HAS_SEEN_ONBOARDING] ?: false
+                } catch (_: ClassCastException) {
+                    false
                 }
             }
-            .map { preferences ->
-                preferences[KEY_HAS_SEEN_ONBOARDING] ?: false
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
@@ -51,15 +49,15 @@ class FirstLaunchSettingsRepository(
 
     override fun getIsFirstLaunchComplete(): Flow<Boolean> {
         return internalDataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_IS_FIRST_LAUNCH_COMPLETE] ?: false
+                } catch (_: ClassCastException) {
+                    false
                 }
             }
-            .map { preferences ->
-                preferences[KEY_IS_FIRST_LAUNCH_COMPLETE] ?: false
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
