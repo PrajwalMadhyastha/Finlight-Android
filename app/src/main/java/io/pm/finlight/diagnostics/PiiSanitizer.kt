@@ -56,9 +56,12 @@ object PiiSanitizer {
         return sanitize(throwable.stackTraceToString())
     }
 
+    private val STACK_FRAME_REGEX =
+        Regex("""^\s*at\s+[\w$.<>]+(?:\.[\w$.<>]+)+\(.*\)$""")
+
     private fun isStackTraceFrameLine(line: String): Boolean {
         val trimmed = line.trimStart()
-        return trimmed.startsWith("at ") || (trimmed.startsWith("... ") && trimmed.endsWith(" more"))
+        return STACK_FRAME_REGEX.matches(line) || (trimmed.startsWith("... ") && trimmed.endsWith(" more"))
     }
 
     private fun sanitizeLine(line: String): String {

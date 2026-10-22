@@ -218,8 +218,9 @@ fun DiagnosticReportPreviewSheet(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = "Share Report", modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
+                    Text("Share")
                 }
             }
 

@@ -262,4 +262,35 @@ class DatabaseHealthCheckerTest {
             assertEquals(0, checkAfter.duplicateAccountsCount)
             assertTrue(checkAfter.isHealthy)
         }
+
+    @Test
+    fun repair_relinksOrphanTransactionsToCashSpendsEvenWhenLowerAccountIdExists() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+
+            // Clear existing accounts and create Credit Card with ID 2 and Cash Spends with ID 5
+            db.execSQL("DELETE FROM accounts")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (2, 'Axis Credit Card', 'Credit Card')")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (5, 'Cash Spends', 'Cash')")
+
+            // Temporarily disable foreign keys and insert orphan transaction
+            db.execSQL("PRAGMA foreign_keys = OFF")
+            db.execSQL(
+                """
+                INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, status, mergeDismissed)
+                VALUES (500, 'Grocery Shopping', 350.0, 1234567, 999, 'EXPENSE', 'Manual Entry', 0, 0, 0, 'CONFIRMED', 0)
+                """.trimIndent(),
+            )
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+            assertEquals(1, repairResult.relinkedTransactionsCount)
+
+            // Verify transaction 500 was relinked to Cash Spends (id 5), NOT the lower id 2
+            val cursor = db.query("SELECT accountId FROM transactions WHERE id = 500")
+            cursor.use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(5, c.getInt(0))
+            }
+        }
 }

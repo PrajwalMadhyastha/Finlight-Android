@@ -131,7 +131,7 @@ object DatabaseHealthChecker {
         context: Context? = null,
     ): HealthCheckResult =
         withContext(Dispatchers.IO) {
-            val db = database.openHelper.writableDatabase
+            val db = database.openHelper.readableDatabase
 
             var integrityPassed = true
             try {
@@ -357,19 +357,29 @@ object DatabaseHealthChecker {
 
                 if (orphans > 0) {
                     var defaultAccountId = 1
-                    val accCursor = db.query("SELECT id FROM accounts ORDER BY id ASC LIMIT 1")
-                    val hasAccount =
-                        accCursor.use {
-                            if (it.moveToFirst()) {
-                                defaultAccountId = it.getInt(0)
-                                true
-                            } else {
-                                false
-                            }
+                    var found = false
+                    val cashCursor = db.query("SELECT id FROM accounts WHERE name = 'Cash Spends' COLLATE NOCASE LIMIT 1")
+                    cashCursor.use {
+                        if (it.moveToFirst()) {
+                            defaultAccountId = it.getInt(0)
+                            found = true
                         }
-                    if (!hasAccount) {
-                        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Cash Spends', 'Cash')")
-                        defaultAccountId = 1
+                    }
+                    if (!found) {
+                        val accCursor = db.query("SELECT id FROM accounts ORDER BY id ASC LIMIT 1")
+                        val hasAccount =
+                            accCursor.use {
+                                if (it.moveToFirst()) {
+                                    defaultAccountId = it.getInt(0)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                        if (!hasAccount) {
+                            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Cash Spends', 'Cash')")
+                            defaultAccountId = 1
+                        }
                     }
                     db.execSQL(
                         "UPDATE transactions SET accountId = ? WHERE accountId NOT IN (SELECT id FROM accounts)",

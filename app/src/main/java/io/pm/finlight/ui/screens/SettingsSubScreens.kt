@@ -816,7 +816,10 @@ fun DataSettingsScreen(
                 Text(if (result.isHealthy) "Database Healthy" else "Issues Detected")
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(
+                    modifier = Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     if (result.isHealthy) {
                         Text("SQLite integrity check passed with 0 errors. All account, transaction, and preference relations are valid.")
                     } else {

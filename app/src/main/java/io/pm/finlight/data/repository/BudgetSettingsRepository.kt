@@ -62,8 +62,11 @@ class BudgetSettingsRepository(
             }
         for (month in 1..12) {
             val prefKey = floatPreferencesKey(getBudgetKey(year, month))
-            if (preferences.contains(prefKey)) {
-                preferences[prefKey]?.let { budgets[month] = it }
+            try {
+                if (preferences.contains(prefKey)) {
+                    preferences[prefKey]?.let { budgets[month] = it }
+                }
+            } catch (_: ClassCastException) {
             }
         }
         return budgets

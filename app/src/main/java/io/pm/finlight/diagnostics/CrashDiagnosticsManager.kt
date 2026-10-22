@@ -123,8 +123,7 @@ object CrashDiagnosticsManager {
     }
 
     fun hasRecordedCrash(context: Context): Boolean {
-        val file = File(context.filesDir, CRASH_REPORT_FILE_NAME)
-        return file.exists() && file.length() > 0
+        return getRecordedCrash(context) != null
     }
 
     fun getRecordedCrash(context: Context): CrashReport? {

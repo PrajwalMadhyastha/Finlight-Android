@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class TravelSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -45,13 +44,6 @@ class TravelSettingsRepository(
      */
     override fun getTravelModeSettings(): Flow<TravelModeSettings?> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 val json =
                     try {
@@ -75,6 +67,9 @@ class TravelSettingsRepository(
                 } else {
                     settings
                 }
+            }
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }

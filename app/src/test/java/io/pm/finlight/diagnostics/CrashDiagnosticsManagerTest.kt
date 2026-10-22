@@ -70,11 +70,11 @@ class CrashDiagnosticsManagerTest {
     }
 
     @Test
-    fun getRecordedCrash_whenFileCorrupted_returnsNullGracefully() {
+    fun getRecordedCrash_and_hasRecordedCrash_whenFileCorrupted_returnsFalseAndNull() {
         val file = File(context.filesDir, CrashDiagnosticsManager.CRASH_REPORT_FILE_NAME)
         file.writeText("invalid-non-json-content")
 
-        assertTrue(CrashDiagnosticsManager.hasRecordedCrash(context))
+        assertFalse(CrashDiagnosticsManager.hasRecordedCrash(context))
         val report = CrashDiagnosticsManager.getRecordedCrash(context)
         assertNull(report)
     }

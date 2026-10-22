@@ -121,4 +121,34 @@ class PiiSanitizerTest {
         val output = PiiSanitizer.sanitize(input)
         assertEquals("A/c [REDACTED_NUM] debited. Card ending in [REDACTED_NUM] charged. [REDACTED_NUM] active. Details for [REDACTED_NUM] and [REDACTED_NUM].", output)
     }
+
+    @Test
+    fun sanitize_redactsLinesStartingWithAtWhenNotAValidStackFrame() {
+        val input =
+            """
+            at 4111222233334444 card declined
+            	at 123456789012 transfer failed for $5,000
+            at user@example.com payment of ₹ 1,500.50 was received
+            """.trimIndent()
+        val output = PiiSanitizer.sanitize(input)
+        val lines = output.lines()
+        assertEquals("at [REDACTED_NUM] card declined", lines[0])
+        assertEquals("\tat [REDACTED_NUM] transfer failed for [REDACTED_AMOUNT]", lines[1])
+        assertEquals("at [REDACTED_EMAIL] payment of [REDACTED_AMOUNT] was received", lines[2])
+    }
+
+    @Test
+    fun sanitize_preservesConstructorAndNativeStackFrames() {
+        val input =
+            """
+            at io.pm.finlight.data.MyClass.<init>(MyClass.kt:15)
+            	at io.pm.finlight.MainActivity${'$'}onCreate${'$'}1.invokeSuspend(MainActivity.kt:730)
+            	at android.os.MessageQueue.nativePollOnce(Native Method)
+            """.trimIndent()
+        val output = PiiSanitizer.sanitize(input)
+        val lines = output.lines()
+        assertEquals("at io.pm.finlight.data.MyClass.<init>(MyClass.kt:15)", lines[0])
+        assertEquals("\tat io.pm.finlight.MainActivity${'$'}onCreate${'$'}1.invokeSuspend(MainActivity.kt:730)", lines[1])
+        assertEquals("\tat android.os.MessageQueue.nativePollOnce(Native Method)", lines[2])
+    }
 }

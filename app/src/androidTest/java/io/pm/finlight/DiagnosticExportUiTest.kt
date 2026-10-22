@@ -83,7 +83,11 @@ class DiagnosticExportUiTest {
         composeTestRule.onNodeWithText("Device OS").assertIsDisplayed()
         composeTestRule.onNodeWithText("Health Metrics").assertIsDisplayed()
 
-        // Verify Copy button is displayed and clickable
+        // Verify Copy and Share buttons are displayed and clickable
+        composeTestRule.onNodeWithText("Share")
+            .performScrollTo()
+            .assertIsDisplayed()
+
         composeTestRule.onNodeWithText("Copy")
             .performScrollTo()
             .assertIsDisplayed()

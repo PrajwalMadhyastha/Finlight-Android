@@ -181,4 +181,19 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
             kotlin.test.assertTrue(job.isCancelled)
             kotlin.test.assertTrue(caughtException is kotlinx.coroutines.CancellationException)
         }
+
+    @Test
+    fun `getOverallBudgetsForYear safely ignores corrupted preference types without throwing ClassCastException`() =
+        runTest {
+            val invalidPrefKey = androidx.datastore.preferences.core.stringPreferencesKey("overall_budget_2026_03")
+            context.financeSettingsDataStore.edit {
+                it[invalidPrefKey] = "corrupted_string_instead_of_float"
+            }
+            repository.saveOverallBudgetForMonth(2026, 5, 15000f)
+
+            val budgets = repository.getOverallBudgetsForYear(2026)
+            assertEquals(1, budgets.size)
+            assertEquals(15000f, budgets[5])
+            assertNull(budgets[3])
+        }
 }

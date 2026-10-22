@@ -706,11 +706,14 @@ fun MainAppScreen(shortcutAction: String? = null) {
         if (showCrashRecoveryDialog) {
             val isThemeDark = MaterialTheme.colorScheme.background.isDark()
             val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+            var isRepairing by remember { mutableStateOf(false) }
 
             AlertDialog(
                 onDismissRequest = {
-                    CrashDiagnosticsManager.clearCrash(context)
-                    showCrashRecoveryDialog = false
+                    if (!isRepairing) {
+                        CrashDiagnosticsManager.clearCrash(context)
+                        showCrashRecoveryDialog = false
+                    }
                 },
                 icon = {
                     Icon(
@@ -727,39 +730,47 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 },
                 confirmButton = {
                     Button(
+                        enabled = !isRepairing,
                         onClick = {
+                            if (isRepairing) return@Button
+                            isRepairing = true
                             coroutineScope.launch {
-                                val db = AppDatabase.getInstance(context)
-                                val result =
-                                    withContext(Dispatchers.IO) {
-                                        DatabaseHealthChecker.repair(db, context)
-                                    }
-                                CrashDiagnosticsManager.clearCrash(context)
-                                showCrashRecoveryDialog = false
-                                val msg =
-                                    if (result.success) {
-                                        val totalFixed =
-                                            result.repairedAccountsCount +
-                                                result.relinkedTransactionsCount +
-                                                result.repairedPreferencesCount
-                                        if (totalFixed > 0) {
-                                            "Database repaired: $totalFixed issues resolved."
-                                        } else {
-                                            "Database verified and healthy."
+                                try {
+                                    val db = AppDatabase.getInstance(context)
+                                    val result =
+                                        withContext(Dispatchers.IO) {
+                                            DatabaseHealthChecker.repair(db, context)
                                         }
-                                    } else {
-                                        "Database repair completed with warnings."
-                                    }
-                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                    CrashDiagnosticsManager.clearCrash(context)
+                                    showCrashRecoveryDialog = false
+                                    val msg =
+                                        if (result.success) {
+                                            val totalFixed =
+                                                result.repairedAccountsCount +
+                                                    result.relinkedTransactionsCount +
+                                                    result.repairedPreferencesCount
+                                            if (totalFixed > 0) {
+                                                "Database repaired: $totalFixed issues resolved."
+                                            } else {
+                                                "Database verified and healthy."
+                                            }
+                                        } else {
+                                            "Database repair completed with warnings."
+                                        }
+                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                                } finally {
+                                    isRepairing = false
+                                }
                             }
                         },
                     ) {
-                        Text("Self-Repair")
+                        Text(if (isRepairing) "Repairing..." else "Self-Repair")
                     }
                 },
                 dismissButton = {
                     Row {
                         TextButton(
+                            enabled = !isRepairing,
                             onClick = {
                                 showCrashRecoveryDialog = false
                                 showDiagnosticPreviewSheet = true
@@ -769,6 +780,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                         }
                         Spacer(Modifier.width(4.dp))
                         TextButton(
+                            enabled = !isRepairing,
                             onClick = {
                                 CrashDiagnosticsManager.clearCrash(context)
                                 showCrashRecoveryDialog = false
