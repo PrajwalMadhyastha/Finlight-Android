@@ -10,21 +10,22 @@ object PiiSanitizer {
     private const val REDACTED_EMAIL = "[REDACTED_EMAIL]"
     private const val REDACTED_PHONE = "[REDACTED_PHONE]"
 
-    // Email pattern
+    // Email pattern (supports standard emails and UPI VPAs e.g. user@okhdfcbank, merchant@upi, user@ybl)
     private val EMAIL_REGEX =
-        Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}""")
+        Regex("""(?i)[a-zA-Z0-9._%+-]+@(?:[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}|[a-zA-Z0-9._-]{3,})\b""")
 
-    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00, Rs. 1500, ₹ -500, -$50.00)
+    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00, Rs. 1500)
+    // or postfix amounts followed by currency (e.g., 500.00 INR, 250.00 Rs, 150.00 USD, 500 Rs.)
     private val CURRENCY_AMOUNT_REGEX =
-        Regex("""(?i)(?:-\s*)?(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)\s*-?\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b""")
+        Regex("""(?i)(?:(?:-\s*)?(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)\s*-?\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b|(?:-\s*)?\b(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\s*(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)(?!\w))""")
 
     // Phone numbers: international with +, bracketed area codes, or 3-3-4 / 5-5 separated digits
     private val PHONE_REGEX =
         Regex("""(?:\+\d{1,3}[-.\s]?(?:\d{5}[-.\s]?\d{5}|\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\d{10})|\(\d{3}\)[-.\s]?\d{3}[-.\s]?\d{4}|\b\d{3}[-.\s]\d{3}[-.\s]\d{4}\b|\b\d{5}[-.\s]\d{5}\b)""")
 
-    // Numeric strings of 4 to 19 digits (bank accounts, credit/debit card numbers, PINs)
+    // Numeric strings of 4 to 19 digits (bank accounts, card numbers) and masked account patterns (XX1234, *1234, etc.)
     private val ACCOUNT_OR_CARD_REGEX =
-        Regex("""\b\d{4,19}\b""")
+        Regex("""(?i)(?:\b\d{4,19}\b|(?<!\w)(?:[Xx*]{1,6}|acct?)-?\d{3,6}\b)""")
 
     // ISO-8601 date / datetime pattern to preserve timestamps and prevent redacting 4-digit years
     private val ISO_DATE_REGEX =

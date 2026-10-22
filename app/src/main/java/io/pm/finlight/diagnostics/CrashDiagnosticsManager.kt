@@ -45,15 +45,15 @@ object CrashDiagnosticsManager {
 
     fun install(context: Context) {
         if (!isInstalled.compareAndSet(false, true)) return
+        val appContext = context.applicationContext ?: context
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
-                recordCrash(context, thread, throwable)
+                recordCrash(appContext, thread, throwable)
             } catch (_: Throwable) {
                 // Fail-safe: never throw inside the uncaught exception handler
-            } finally {
-                defaultHandler?.uncaughtException(thread, throwable)
             }
+            defaultHandler?.uncaughtException(thread, throwable)
         }
     }
 

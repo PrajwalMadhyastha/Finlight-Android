@@ -272,4 +272,83 @@ class CrashDiagnosticsManagerTest {
         assertNotNull(report)
         assertEquals("Custom localized error message", report?.exceptionMessage)
     }
+
+    @Test
+    fun recordCrash_whenPackageInfoHasNullVersionName_fallsBackToUnknownVersion() {
+        val mockContext = io.mockk.mockk<Context>()
+        val mockPm = io.mockk.mockk<android.content.pm.PackageManager>()
+        val packageInfo =
+            android.content.pm.PackageInfo().apply {
+                versionName = null
+            }
+        io.mockk.every { mockContext.packageName } returns "io.pm.finlight"
+        io.mockk.every { mockContext.packageManager } returns mockPm
+        io.mockk.every { mockContext.filesDir } returns context.filesDir
+        io.mockk.every {
+            mockPm.getPackageInfo(
+                "io.pm.finlight",
+                any<android.content.pm.PackageManager.PackageInfoFlags>(),
+            )
+        } returns packageInfo
+        io.mockk.every {
+            @Suppress("DEPRECATION")
+            mockPm.getPackageInfo("io.pm.finlight", any<Int>())
+        } returns packageInfo
+
+        val thread = Thread.currentThread()
+        CrashDiagnosticsManager.recordCrash(mockContext, thread, RuntimeException("Test crash with null versionName"))
+        val report = CrashDiagnosticsManager.getRecordedCrash(context)
+        assertNotNull(report)
+        assertEquals("unknown", report?.appVersionName)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun recordCrash_whenPackageInfoHasNullVersionName_onPreTiramisu_fallsBackToUnknownVersion() {
+        val mockContext = io.mockk.mockk<Context>()
+        val mockPm = io.mockk.mockk<android.content.pm.PackageManager>()
+        val packageInfo =
+            android.content.pm.PackageInfo().apply {
+                versionName = null
+            }
+        io.mockk.every { mockContext.packageName } returns "io.pm.finlight"
+        io.mockk.every { mockContext.packageManager } returns mockPm
+        io.mockk.every { mockContext.filesDir } returns context.filesDir
+        io.mockk.every {
+            @Suppress("DEPRECATION")
+            mockPm.getPackageInfo("io.pm.finlight", any<Int>())
+        } returns packageInfo
+
+        val thread = Thread.currentThread()
+        CrashDiagnosticsManager.recordCrash(mockContext, thread, RuntimeException("Test crash with null versionName on PreTiramisu"))
+        val report = CrashDiagnosticsManager.getRecordedCrash(context)
+        assertNotNull(report)
+        assertEquals("unknown", report?.appVersionName)
+    }
+
+    @Test
+    fun recordCrash_whenDiskWriteFails_doesNotThrow() {
+        val throwingContext =
+            object : android.content.ContextWrapper(context) {
+                override fun getFilesDir(): File {
+                    throw RuntimeException("Simulated disk error")
+                }
+            }
+        CrashDiagnosticsManager.recordCrash(throwingContext, Thread.currentThread(), RuntimeException("Disk error crash"))
+    }
+
+    @Test
+    fun install_withNullApplicationContext_fallsBackToPassedContext() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        try {
+            val nullAppContextWrapper =
+                object : android.content.ContextWrapper(context) {
+                    override fun getApplicationContext(): Context? = null
+                }
+            CrashDiagnosticsManager.install(nullAppContextWrapper)
+            assertNotNull(Thread.getDefaultUncaughtExceptionHandler())
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
 }

@@ -42,7 +42,10 @@ object DiagnosticsExportService {
         if (database == null) return AggregateMetrics()
 
         val dbFile = context.getDatabasePath("finance_database")
-        val dbSizeKb = if (dbFile.exists()) dbFile.length() / 1024 else 0L
+        val walFile = context.getDatabasePath("finance_database-wal")
+        val shmFile = context.getDatabasePath("finance_database-shm")
+        val totalBytes = listOf(dbFile, walFile, shmFile).filter { it.exists() }.sumOf { it.length() }
+        val dbSizeKb = totalBytes / 1024
 
         var accounts = 0L
         var txs = 0L

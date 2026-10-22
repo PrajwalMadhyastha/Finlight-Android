@@ -162,7 +162,7 @@ object DatabaseHealthChecker {
             try {
                 val cursor =
                     db.query(
-                        "SELECT COUNT(*) FROM (SELECT LOWER(name) FROM accounts GROUP BY LOWER(name) HAVING COUNT(*) > 1)",
+                        "SELECT COUNT(*) FROM (SELECT LOWER(TRIM(name)) FROM accounts GROUP BY LOWER(TRIM(name)) HAVING COUNT(*) > 1)",
                     )
                 cursor.use {
                     if (it.moveToFirst()) duplicateAccounts = it.getInt(0)
@@ -267,23 +267,52 @@ object DatabaseHealthChecker {
             db.beginTransaction()
             try {
                 // 1. Repair Corrupted Accounts (Preserving legitimate names if only type is corrupted)
-                val cursor =
-                    db.query("SELECT id FROM accounts WHERE name IS NULL OR type IS NULL OR trim(name) = '' OR trim(type) = ''")
-                val corruptedIds = mutableListOf<Int>()
-                cursor.use {
+                val allNamesCursor = db.query("SELECT name FROM accounts WHERE name IS NOT NULL AND trim(name) != ''")
+                val existingNames = mutableSetOf<String>()
+                allNamesCursor.use {
                     while (it.moveToNext()) {
-                        corruptedIds.add(it.getInt(0))
+                        existingNames.add(it.getString(0).lowercase().trim())
                     }
                 }
-                for (id in corruptedIds) {
+
+                val cursor =
+                    db.query("SELECT id, name, type FROM accounts WHERE name IS NULL OR type IS NULL OR trim(name) = '' OR trim(type) = ''")
+                val corruptedAccountsList = mutableListOf<Triple<Int, String?, String?>>()
+                cursor.use {
+                    while (it.moveToNext()) {
+                        corruptedAccountsList.add(
+                            Triple(
+                                it.getInt(0),
+                                it.getString(1),
+                                it.getString(2),
+                            ),
+                        )
+                    }
+                }
+                for ((id, currentName, currentType) in corruptedAccountsList) {
+                    val finalName =
+                        if (currentName == null || currentName.trim().isEmpty()) {
+                            var candidate = "Restored Account $id"
+                            var counter = 1
+                            while (existingNames.contains(candidate.lowercase().trim())) {
+                                candidate = "Restored Account $id ($counter)"
+                                counter++
+                            }
+                            existingNames.add(candidate.lowercase().trim())
+                            candidate
+                        } else {
+                            currentName
+                        }
+                    val finalType =
+                        if (currentType == null || currentType.trim().isEmpty()) {
+                            "General"
+                        } else {
+                            currentType
+                        }
+
                     db.execSQL(
-                        """
-                        UPDATE accounts 
-                        SET name = CASE WHEN name IS NULL OR trim(name) = '' THEN 'Restored Account ' || id ELSE name END,
-                            type = CASE WHEN type IS NULL OR trim(type) = '' THEN 'General' ELSE type END 
-                        WHERE id = ?
-                        """.trimIndent(),
-                        arrayOf(id),
+                        "UPDATE accounts SET name = ?, type = ? WHERE id = ?",
+                        arrayOf<Any>(finalName, finalType, id),
                     )
                     repairedAccounts++
                 }
@@ -296,15 +325,17 @@ object DatabaseHealthChecker {
                         allAccounts.add(it.getInt(0) to (it.getString(1) ?: ""))
                     }
                 }
-                val existingNames = allAccounts.map { it.second.lowercase().trim() }.toMutableSet()
+                existingNames.clear()
+                existingNames.addAll(allAccounts.map { it.second.lowercase().trim() })
                 val seenNames = mutableSetOf<String>()
                 for ((id, name) in allAccounts) {
                     val lowerName = name.lowercase().trim()
                     if (seenNames.contains(lowerName)) {
-                        var candidate = "$name ($id)"
+                        val baseName = name.trim()
+                        var candidate = "$baseName ($id)"
                         var counter = 1
                         while (existingNames.contains(candidate.lowercase().trim())) {
-                            candidate = "$name ($id-$counter)"
+                            candidate = "$baseName ($id-$counter)"
                             counter++
                         }
                         db.execSQL("UPDATE accounts SET name = ? WHERE id = ?", arrayOf<Any>(candidate, id))

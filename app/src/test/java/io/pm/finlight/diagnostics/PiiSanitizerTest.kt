@@ -96,4 +96,29 @@ class PiiSanitizerTest {
         val output = PiiSanitizer.sanitize(input)
         assertEquals("Crash occurred on 2026-10-22 at 2026-10-22T08:32:01Z for account [REDACTED_NUM]", output)
     }
+
+    @Test
+    fun sanitize_redactsUpiHandles() {
+        val input = "Transferred via UPI to user@okhdfcbank, merchant@upi, store@paytm, and alice@ybl"
+        val output = PiiSanitizer.sanitize(input)
+        assertEquals("Transferred via UPI to [REDACTED_EMAIL], [REDACTED_EMAIL], [REDACTED_EMAIL], and [REDACTED_EMAIL]", output)
+    }
+
+    @Test
+    fun sanitize_redactsPostfixCurrencies() {
+        val input1 = "Debited 500.00 INR, paid 250.00 Rs, transferred 150.00 USD and spent 500 Rs."
+        val output1 = PiiSanitizer.sanitize(input1)
+        assertEquals("Debited [REDACTED_AMOUNT], paid [REDACTED_AMOUNT], transferred [REDACTED_AMOUNT] and spent [REDACTED_AMOUNT]", output1)
+
+        val input2 = "Refund of -500.00 INR and 99.99 EUR received"
+        val output2 = PiiSanitizer.sanitize(input2)
+        assertEquals("Refund of [REDACTED_AMOUNT] and [REDACTED_AMOUNT] received", output2)
+    }
+
+    @Test
+    fun sanitize_redactsMaskedAccountNumbers() {
+        val input = "A/c XX1234 debited. Card ending in X5678 charged. Acct1234 active. Details for ****9876 and *4321."
+        val output = PiiSanitizer.sanitize(input)
+        assertEquals("A/c [REDACTED_NUM] debited. Card ending in [REDACTED_NUM] charged. [REDACTED_NUM] active. Details for [REDACTED_NUM] and [REDACTED_NUM].", output)
+    }
 }

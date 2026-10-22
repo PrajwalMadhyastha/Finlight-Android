@@ -213,4 +213,53 @@ class DatabaseHealthCheckerTest {
             assertEquals(0, checkAfter.corruptedPreferencesCount)
             assertTrue(checkAfter.isHealthy)
         }
+
+    @Test
+    fun repair_corruptedAccounts_avoidsCollisionWhenRestoredAccountNameAlreadyExists() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+            // Pre-existing account that already has the name "Restored Account 10"
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (5, 'Restored Account 10', 'Bank')")
+            // Corrupted account with ID 10 and blank name
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (10, '', 'General')")
+
+            val checkBefore = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertFalse(checkBefore.isHealthy)
+            assertEquals(1, checkBefore.corruptedAccountsCount)
+
+            // Repair should avoid SQLiteConstraintException on unique index
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+            assertTrue(repairResult.repairedAccountsCount >= 1)
+
+            val account10 = dbRule.db.accountDao().getAccountByIdSync(10)
+            assertEquals("Restored Account 10 (1)", account10?.name)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertEquals(0, checkAfter.corruptedAccountsCount)
+            assertTrue(checkAfter.isHealthy)
+        }
+
+    @Test
+    fun checkHealth_and_repair_detectsDuplicatesWithTrailingWhitespace() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+            db.execSQL("DROP INDEX IF EXISTS index_accounts_name_nocase")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (40, 'Axis Bank', 'Bank')")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (41, 'Axis Bank ', 'Bank')")
+
+            val checkBefore = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertFalse(checkBefore.isHealthy)
+            assertEquals(1, checkBefore.duplicateAccountsCount)
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+
+            val account41 = dbRule.db.accountDao().getAccountByIdSync(41)
+            assertEquals("Axis Bank (41)", account41?.name)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertEquals(0, checkAfter.duplicateAccountsCount)
+            assertTrue(checkAfter.isHealthy)
+        }
 }
