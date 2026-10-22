@@ -30,8 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.IgnoreRule
-import io.pm.finlight.ManageIgnoreRulesViewModel
 import io.pm.finlight.RuleType
+import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModel
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
 

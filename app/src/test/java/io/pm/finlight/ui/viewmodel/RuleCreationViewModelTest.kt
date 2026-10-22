@@ -1,32 +1,21 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/ui/viewmodel/RuleCreationViewModelTest.kt
-// REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
-// inheriting all common setup logic and removing boilerplate for rules,
-// dispatchers, and Mockito initialization.
-// FIX (Testing) - Re-enabled all tests by removing the @Ignore annotations, as
-// the root cause of the previous test failures has been resolved in other files.
-// FIX (Testing) - Replaced ArgumentCaptor with argThat to resolve a
-// "capture() must not be null" NullPointerException when verifying mocks with
-// non-nullable Kotlin parameters.
-// FIX (Testing) - Replaced `argThat` with `ArgumentCaptor` and a custom
-// `capture()` helper function. This is the definitive fix for the `NullPointerException`
-// when verifying suspend functions with non-nullable parameters.
-//
-// REASON: MODIFIED - Added new tests for the `transactionType` feature:
-// - `onTransactionTypeChanged updates uiState`
-// - `loadRuleForEditing correctly populates transactionType`
-// - `saveRule correctly saves transactionType`
-// - `saveRule preserves existing regex fields on edit` (BUGFIX TEST)
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.*
+import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.CustomSmsRule
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.PotentialAccount
+import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.TestApplication
+import io.pm.finlight.TransactionType
+import io.pm.finlight.capture
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.test.*
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -36,7 +25,10 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
-import org.mockito.Mockito.*
+import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
@@ -44,17 +36,19 @@ import org.robolectric.annotation.Config
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RuleCreationViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var customSmsRuleDao: CustomSmsRuleDao
+    private lateinit var customSmsRuleRepository: ICustomSmsRuleRepository
 
     @Captor
     private lateinit var ruleCaptor: ArgumentCaptor<CustomSmsRule>
 
     private lateinit var viewModel: RuleCreationViewModel
+    private lateinit var testDispatcherProvider: TestDispatcherProvider
 
     @Before
     override fun setup() {
         super.setup()
-        viewModel = RuleCreationViewModel(customSmsRuleDao)
+        testDispatcherProvider = TestDispatcherProvider(testDispatcher)
+        viewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider)
     }
 
     @Test
@@ -82,6 +76,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 assertEquals("Test Merchant", state.merchantSelection.selectedText)
                 assertEquals("xx9876", state.accountSelection.selectedText)
                 assertEquals(TransactionType.EXPENSE, state.transactionType)
+                assertEquals("Paid 123.45 to Test Merchant with HDFC Card xx9876.", state.sourceSmsBody)
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -104,7 +99,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                     priority = 10,
                     sourceSmsBody = "some body",
                 )
-            `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
 
             // Act
             viewModel.loadRuleForEditing(ruleId)
@@ -118,8 +113,28 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 assertEquals("Amazon", state.merchantSelection.selectedText)
                 assertEquals("500.00", state.amountSelection.selectedText)
                 assertEquals("xx1234", state.accountSelection.selectedText)
+                assertEquals("some body", state.sourceSmsBody)
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `loadRuleForEditing sets errorMessage on repository exception`() =
+        runTest {
+            // Arrange
+            val ruleId = 99
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(
+                kotlinx.coroutines.flow.flow { throw RuntimeException("Database read error") },
+            )
+
+            // Act
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Database read error", viewModel.uiState.value.errorMessage)
+            viewModel.clearError()
+            assertNull(viewModel.uiState.value.errorMessage)
         }
 
     @Test
@@ -138,13 +153,48 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            verify(customSmsRuleDao).insert(capture(ruleCaptor))
+            verify(customSmsRuleRepository).insert(capture(ruleCaptor))
             val capturedRule = ruleCaptor.value
             assertEquals(0, capturedRule.id)
             assertEquals(triggerSelection.selectedText, capturedRule.triggerPhrase)
             assertEquals(merchantSelection.selectedText, capturedRule.merchantNameExample)
             assertNotNull(capturedRule.merchantRegex)
             assertEquals(true, onCompleteCalled)
+        }
+
+    @Test
+    fun `saveRule does not insert and completes when trigger phrase is blank`() =
+        runTest {
+            // Arrange
+            var onCompleteCalled = false
+            val smsBody = "Transaction of 100 at Merchant X"
+
+            // Act (no trigger selection set)
+            viewModel.saveRule(smsBody) { onCompleteCalled = true }
+            advanceUntilIdle()
+
+            // Assert
+            verify(customSmsRuleRepository, never()).insert(io.pm.finlight.anyObject())
+            verify(customSmsRuleRepository, never()).update(io.pm.finlight.anyObject())
+            assertEquals(true, onCompleteCalled)
+        }
+
+    @Test
+    fun `saveRule sets errorMessage when insert throws exception`() =
+        runTest {
+            // Arrange
+            val smsBody = "Transaction of 100 at Merchant X"
+            val triggerSelection = RuleSelection("Transaction of", 0, 14)
+            viewModel.onMarkAsTrigger(triggerSelection)
+
+            doThrow(RuntimeException("Write error")).`when`(customSmsRuleRepository).insert(io.pm.finlight.anyObject())
+
+            // Act
+            viewModel.saveRule(smsBody) {}
+            advanceUntilIdle()
+
+            // Assert
+            assertEquals("Write error", viewModel.uiState.value.errorMessage)
         }
 
     @Test
@@ -158,7 +208,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             val merchantSelection = RuleSelection("Merchant Y", 20, 30) // Updated merchant
 
             val existingRule = CustomSmsRule(ruleId, "old trigger", null, null, null, null, null, null, 10, smsBody)
-            `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
             viewModel.loadRuleForEditing(ruleId)
             viewModel.uiState.test { awaitItem() } // consume initial load
             advanceUntilIdle()
@@ -170,7 +220,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            verify(customSmsRuleDao).update(capture(ruleCaptor))
+            verify(customSmsRuleRepository).update(capture(ruleCaptor))
             val capturedRule = ruleCaptor.value
             assertEquals(ruleId, capturedRule.id)
             assertEquals(triggerSelection.selectedText, capturedRule.triggerPhrase)
@@ -246,8 +296,6 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             }
         }
 
-    // --- NEW TESTS FOR TRANSACTION TYPE ---
-
     @Test
     fun `onTransactionTypeChanged updates transactionType in uiState`() =
         runTest {
@@ -277,7 +325,6 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 CustomSmsRule(
                     id = ruleId,
                     triggerPhrase = "test",
-                    // <-- Test this
                     transactionType = "income",
                     priority = 10,
                     sourceSmsBody = "some body",
@@ -288,7 +335,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                     amountExample = null,
                     accountNameExample = null,
                 )
-            `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
 
             // Act
             viewModel.loadRuleForEditing(ruleId)
@@ -298,7 +345,6 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             viewModel.uiState.test {
                 val state = awaitItem()
                 assertEquals(TransactionType.INCOME, state.transactionType)
-                // --- Also assert regex fields are loaded ---
                 assertEquals("regex1", state.merchantRegex)
                 assertEquals("regex2", state.amountRegex)
                 assertEquals("regex3", state.accountRegex)
@@ -318,12 +364,12 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             // Act
             viewModel.onMarkAsTrigger(triggerSelection)
             viewModel.onMarkAsMerchant(merchantSelection)
-            viewModel.onTransactionTypeChanged(TransactionType.INCOME) // <-- Set the new type
+            viewModel.onTransactionTypeChanged(TransactionType.INCOME)
             viewModel.saveRule(smsBody) { onCompleteCalled = true }
             advanceUntilIdle()
 
             // Assert
-            verify(customSmsRuleDao).insert(capture(ruleCaptor))
+            verify(customSmsRuleRepository).insert(capture(ruleCaptor))
             val capturedRule = ruleCaptor.value
             assertEquals("income", capturedRule.transactionType)
             assertEquals(true, onCompleteCalled)
@@ -348,10 +394,9 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                     accountNameExample = "xx1234",
                     priority = 10,
                     sourceSmsBody = smsBody,
-                    // Start as "Auto-Detect"
                     transactionType = null,
                 )
-            `when`(customSmsRuleDao.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
 
             // 1. Load the existing rule
             viewModel.loadRuleForEditing(ruleId)
@@ -368,23 +413,15 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // ASSERT
-            // Verify we are calling update, not insert
-            verify(customSmsRuleDao).update(capture(ruleCaptor))
+            verify(customSmsRuleRepository).update(capture(ruleCaptor))
             val updatedRule = ruleCaptor.value
 
-            // Check that the rule ID and new type are correct
             assertEquals(ruleId, updatedRule.id)
             assertEquals("income", updatedRule.transactionType)
-
-            // *** THE BUGFIX ASSERTION ***
-            // Verify that the original regex fields were preserved
             assertEquals("old-merchant-regex", updatedRule.merchantRegex)
             assertEquals("old-amount-regex", updatedRule.amountRegex)
             assertEquals("old-account-regex", updatedRule.accountRegex)
-
-            // Verify example text is also preserved
             assertEquals("Old Merchant", updatedRule.merchantNameExample)
-
             assertEquals(true, onCompleteCalled)
         }
 }

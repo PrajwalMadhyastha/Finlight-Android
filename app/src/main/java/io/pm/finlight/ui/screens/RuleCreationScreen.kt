@@ -38,10 +38,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
+import io.pm.finlight.ui.viewmodel.RuleSelection
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -65,7 +67,7 @@ fun RuleCreationScreen(
     LaunchedEffect(key1 = ruleId, key2 = potentialTransactionJson) {
         if (isEditMode) {
             viewModel.loadRuleForEditing(ruleId!!)
-            val rule = AppDatabase.getInstance(context).customSmsRuleDao().getRuleById(ruleId).firstOrNull()
+            val rule = ServiceLocator.provideCustomSmsRuleRepository(context).getRuleById(ruleId).firstOrNull()
             if (rule != null) {
                 textFieldValue = TextFieldValue(rule.sourceSmsBody)
             }
