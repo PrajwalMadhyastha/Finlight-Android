@@ -80,19 +80,15 @@ class SmsRuleSettingsRepository(
 
     override fun getDismissedMergeSuggestions(): Flow<Set<String>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_DISMISSED_MERGES] ?: emptySet()
-                } catch (_: ClassCastException) {
+                } catch (_: Exception) {
                     emptySet()
                 }
+            }
+            .catch {
+                emit(emptySet())
             }
             .distinctUntilChanged()
     }

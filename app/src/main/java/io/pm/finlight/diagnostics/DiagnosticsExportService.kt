@@ -134,7 +134,13 @@ object DiagnosticsExportService {
             sb.append("[1. DEVICE & OS ENVIRONMENT]\n")
             sb.append("App Version Name:      ").append(versionName).append("\n")
             sb.append("App Version Code:      ").append(versionCode).append("\n")
-            sb.append("Database Schema Ver:   58\n")
+            val schemaVersion =
+                try {
+                    database?.openHelper?.readableDatabase?.version ?: 58
+                } catch (_: Exception) {
+                    58
+                }
+            sb.append("Database Schema Ver:   ").append(schemaVersion).append("\n")
             sb.append("Android OS Version:    ").append(Build.VERSION.RELEASE).append("\n")
             sb.append("Android API Level:     ").append(Build.VERSION.SDK_INT).append("\n")
             sb.append("Device Manufacturer:   ").append(Build.MANUFACTURER).append("\n")

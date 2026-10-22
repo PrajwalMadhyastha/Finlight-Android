@@ -732,7 +732,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                 val db = AppDatabase.getInstance(context)
                                 val result =
                                     withContext(Dispatchers.IO) {
-                                        DatabaseHealthChecker.repair(db)
+                                        DatabaseHealthChecker.repair(db, context)
                                     }
                                 CrashDiagnosticsManager.clearCrash(context)
                                 showCrashRecoveryDialog = false
@@ -740,7 +740,8 @@ fun MainAppScreen(shortcutAction: String? = null) {
                                     if (result.success) {
                                         val totalFixed =
                                             result.repairedAccountsCount +
-                                                result.relinkedTransactionsCount
+                                                result.relinkedTransactionsCount +
+                                                result.repairedPreferencesCount
                                         if (totalFixed > 0) {
                                             "Database repaired: $totalFixed issues resolved."
                                         } else {
@@ -760,6 +761,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                     Row {
                         TextButton(
                             onClick = {
+                                showCrashRecoveryDialog = false
                                 showDiagnosticPreviewSheet = true
                             },
                         ) {

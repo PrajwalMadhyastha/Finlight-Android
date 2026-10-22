@@ -75,4 +75,18 @@ class PiiSanitizerTest {
         assertTrue(sanitized.contains("[REDACTED_EMAIL]"))
         assertTrue(sanitized.contains("at io.pm.finlight.diagnostics.PiiSanitizerTest"))
     }
+
+    @Test
+    fun sanitize_redactsIndianRupeeVariations() {
+        val input = "Paid Rs. 1,500.50, transferred Rs 250 and RS.50"
+        val output = PiiSanitizer.sanitize(input)
+        assertEquals("Paid [REDACTED_AMOUNT], transferred [REDACTED_AMOUNT] and [REDACTED_AMOUNT]", output)
+    }
+
+    @Test
+    fun sanitize_preservesIsoDates() {
+        val input = "Crash occurred on 2026-10-22 at 2026-10-22T08:32:01Z for account 123456789"
+        val output = PiiSanitizer.sanitize(input)
+        assertEquals("Crash occurred on 2026-10-22 at 2026-10-22T08:32:01Z for account [REDACTED_NUM]", output)
+    }
 }

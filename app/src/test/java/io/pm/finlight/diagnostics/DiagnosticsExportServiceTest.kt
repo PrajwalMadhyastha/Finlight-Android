@@ -5,11 +5,13 @@ import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.TestApplication
+import io.pm.finlight.util.DatabaseTestRule
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
@@ -18,6 +20,9 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DiagnosticsExportServiceTest {
+    @get:Rule
+    val dbRule = DatabaseTestRule()
+
     private lateinit var context: Context
 
     @Before
@@ -99,5 +104,39 @@ class DiagnosticsExportServiceTest {
     @Test
     fun copyToClipboard_succeedsWithoutException() {
         DiagnosticsExportService.copyToClipboard(context, "Test clipboard content")
+    }
+
+    @Test
+    fun fetchAggregates_withActiveDatabase_returnsAccurateCounts() {
+        val db = dbRule.db.openHelper.writableDatabase
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'Cash Account', 'Cash')")
+        db.execSQL(
+            """
+            INSERT INTO transactions (id, description, amount, date, accountId, transactionType, source, isExcluded, isSplit, needsReview, status, mergeDismissed)
+            VALUES (10, 'Groceries', 50.0, 1000, 1, 'EXPENSE', 'Manual', 0, 0, 0, 'CONFIRMED', 0)
+            """.trimIndent(),
+        )
+        db.execSQL("INSERT INTO categories (id, name, iconKey, colorKey) VALUES (1, 'Food', 'ic_food', 'red')")
+        db.execSQL(
+            """
+            INSERT INTO recurring_patterns (smsSignature, description, amount, transactionType, accountId, categoryId, occurrences, firstSeen, lastSeen, isDismissed)
+            VALUES ('sig1', 'Netflix', 15.0, 'EXPENSE', 1, NULL, 1, 1000, 2000, 0)
+            """.trimIndent(),
+        )
+
+        val aggregates = DiagnosticsExportService.fetchAggregates(context, dbRule.db)
+        assertEquals(1L, aggregates.accountsCount)
+        assertEquals(1L, aggregates.transactionsCount)
+        assertEquals(1L, aggregates.categoriesCount)
+        assertEquals(1L, aggregates.recurringPatternsCount)
+        assertTrue(aggregates.sqliteVersion.isNotEmpty())
+        assertTrue(aggregates.sqliteVersion != "Unknown")
+
+        val report = DiagnosticsExportService.generateReport(context, dbRule.db)
+        assertTrue(report.contains("Total Accounts:        1"))
+        assertTrue(report.contains("Total Transactions:    1"))
+        assertTrue(report.contains("Total Categories:      1"))
+        assertTrue(report.contains("Total Recurring Rules: 1"))
+        assertTrue(report.contains("Database Schema Ver:   ${dbRule.db.openHelper.readableDatabase.version}"))
     }
 }

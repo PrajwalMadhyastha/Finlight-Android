@@ -2155,4 +2155,20 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val extractedNer = vm.nerExtractorProvider()
         assertEquals(nerExtractor, extractedNer)
     }
+
+    @Test
+    fun `dismissHealthCheckResult clears healthCheckResult state`() =
+        runTest {
+            initializeViewModel()
+            viewModel.dismissHealthCheckResult()
+            org.junit.Assert.assertNull(viewModel.healthCheckResult.value)
+        }
+
+    @Test
+    fun `clearRepairResultMessage clears repairResultMessage state`() =
+        runTest {
+            initializeViewModel()
+            viewModel.clearRepairResultMessage()
+            org.junit.Assert.assertNull(viewModel.repairResultMessage.value)
+        }
 }

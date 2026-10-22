@@ -95,4 +95,63 @@ class DatabaseHealthCheckerTest {
             assertEquals(0, checkAfter.corruptedAccountsCount)
             assertEquals(0, checkAfter.orphanTransactionsCount)
         }
+
+    @Test
+    fun repair_preservesLegitimateAccountName_whenOnlyTypeIsCorrupted() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (20, 'HDFC Salary', '')")
+
+            val checkBefore = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertFalse(checkBefore.isHealthy)
+            assertEquals(1, checkBefore.corruptedAccountsCount)
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+
+            val account = dbRule.db.accountDao().getAccountByIdSync(20)
+            assertEquals("HDFC Salary", account?.name)
+            assertEquals("General", account?.type)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertTrue(checkAfter.isHealthy)
+            assertEquals(0, checkAfter.corruptedAccountsCount)
+        }
+
+    @Test
+    fun repair_disambiguatesDuplicateAccounts_andLeavesDatabaseHealthy() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+            // Temporarily disable unique index to simulate legacy database corruption with duplicates
+            db.execSQL("DROP INDEX IF EXISTS index_accounts_name_nocase")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (30, 'Duplicate Bank', 'Bank')")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (31, 'duplicate bank', 'Bank')")
+
+            val checkBefore = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertFalse(checkBefore.isHealthy)
+            assertTrue(checkBefore.duplicateAccountsCount >= 1)
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+
+            val account31 = dbRule.db.accountDao().getAccountByIdSync(31)
+            assertEquals("duplicate bank (31)", account31?.name)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertEquals(0, checkAfter.duplicateAccountsCount)
+            assertTrue(checkAfter.isHealthy)
+        }
+
+    @Test
+    fun checkHealth_withValidDataStoreContext_reportsHealthyPreferences() =
+        runTest {
+            val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+            val result = DatabaseHealthChecker.checkHealth(dbRule.db, context)
+            assertTrue(result.isHealthy)
+            assertEquals(0, result.corruptedPreferencesCount)
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db, context)
+            assertTrue(repairResult.success)
+            assertEquals(0, repairResult.repairedPreferencesCount)
+        }
 }

@@ -14,9 +14,9 @@ object PiiSanitizer {
     private val EMAIL_REGEX =
         Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}""")
 
-    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00)
+    // Currency symbols followed by amounts (e.g., ₹ 1,500.50, $250, EUR 99.00, Rs. 1500)
     private val CURRENCY_AMOUNT_REGEX =
-        Regex("""(?i)(?:₹|INR|USD|\$|EUR|€|GBP|£)\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b""")
+        Regex("""(?i)(?:₹|INR|RS\.?|USD|\$|EUR|€|GBP|£)\s*(?:\d{1,3}(?:,\d{2,3})*(?:\.\d{1,2})?|\d+(?:\.\d{1,2})?)\b""")
 
     // Phone numbers: international with +, bracketed area codes, or 3-3-4 / 5-5 separated digits
     private val PHONE_REGEX =
@@ -25,6 +25,10 @@ object PiiSanitizer {
     // Numeric strings of 4 to 19 digits (bank accounts, credit/debit card numbers, PINs)
     private val ACCOUNT_OR_CARD_REGEX =
         Regex("""\b\d{4,19}\b""")
+
+    // ISO-8601 date / datetime pattern to preserve timestamps and prevent redacting 4-digit years
+    private val ISO_DATE_REGEX =
+        Regex("""\b\d{4}-\d{2}-\d{2}(?:[T\s]\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?)?\b""")
 
     /**
      * Sanitizes a given text string, line by line.
@@ -57,10 +61,22 @@ object PiiSanitizer {
     }
 
     private fun sanitizeLine(line: String): String {
-        var result = EMAIL_REGEX.replace(line, REDACTED_EMAIL)
+        val dateTokens = mutableListOf<String>()
+        val textWithDatesPreserved =
+            ISO_DATE_REGEX.replace(line) { match ->
+                dateTokens.add(match.value)
+                "__FINLIGHT_DATE_TOKEN_${dateTokens.size - 1}__"
+            }
+
+        var result = EMAIL_REGEX.replace(textWithDatesPreserved, REDACTED_EMAIL)
         result = CURRENCY_AMOUNT_REGEX.replace(result, REDACTED_AMOUNT)
         result = PHONE_REGEX.replace(result, REDACTED_PHONE)
         result = ACCOUNT_OR_CARD_REGEX.replace(result, REDACTED_NUM)
+
+        dateTokens.forEachIndexed { index, dateStr ->
+            result = result.replace("__FINLIGHT_DATE_TOKEN_${index}__", dateStr)
+        }
+
         return result
     }
 }

@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,9 +50,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.health.DatabaseHealthChecker
-import io.pm.finlight.data.health.HealthCheckResult
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.GlassPanel
@@ -63,10 +61,8 @@ import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.FormatUtils
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.util.*
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -470,9 +466,10 @@ fun DataSettingsScreen(
     var showRestoreSnapshotDialog by remember { mutableStateOf(false) }
     var showCsvInfoDialog by remember { mutableStateOf(false) }
     var showDiagnosticPreviewSheet by remember { mutableStateOf(false) }
-    var healthCheckResult by remember { mutableStateOf<HealthCheckResult?>(null) }
-    var isCheckingHealth by remember { mutableStateOf(false) }
-    var isRepairingDb by remember { mutableStateOf(false) }
+    val healthCheckResult by settingsViewModel.healthCheckResult.collectAsState()
+    val isCheckingHealth by settingsViewModel.isCheckingHealth.collectAsState()
+    val isRepairingDb by settingsViewModel.isRepairingDb.collectAsState()
+    val repairResultMessage by settingsViewModel.repairResultMessage.collectAsState()
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
@@ -489,6 +486,13 @@ fun DataSettingsScreen(
     LaunchedEffect(Unit) {
         settingsViewModel.uiEvent.collectLatest { message ->
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    LaunchedEffect(repairResultMessage) {
+        repairResultMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            settingsViewModel.clearRepairResultMessage()
         }
     }
 
@@ -592,7 +596,7 @@ fun DataSettingsScreen(
         )
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().testTag("data_settings_lazy_column"),
         contentPadding = PaddingValues(16.dp),
     ) {
         item {
@@ -716,18 +720,7 @@ fun DataSettingsScreen(
                         subtitle = if (isCheckingHealth) "Analyzing database integrity..." else "Verify integrity and repair corrupted records",
                         icon = Icons.Default.HealthAndSafety,
                         onClick = {
-                            if (!isCheckingHealth && !isRepairingDb) {
-                                isCheckingHealth = true
-                                scope.launch {
-                                    val db = AppDatabase.getInstance(context)
-                                    val result =
-                                        withContext(Dispatchers.IO) {
-                                            DatabaseHealthChecker.checkHealth(db)
-                                        }
-                                    isCheckingHealth = false
-                                    healthCheckResult = result
-                                }
-                            }
+                            settingsViewModel.runDatabaseHealthCheck()
                         },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
@@ -808,7 +801,7 @@ fun DataSettingsScreen(
     healthCheckResult?.let { result ->
         AlertDialog(
             onDismissRequest = {
-                if (!isRepairingDb) healthCheckResult = null
+                if (!isRepairingDb) settingsViewModel.dismissHealthCheckResult()
             },
             containerColor = popupContainerColor,
             icon = {
@@ -825,7 +818,7 @@ fun DataSettingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (result.isHealthy) {
-                        Text("SQLite integrity check passed with 0 errors. All account and transaction relations are valid.")
+                        Text("SQLite integrity check passed with 0 errors. All account, transaction, and preference relations are valid.")
                     } else {
                         Text("The database self-health check detected the following issues:")
                         for (issue in result.issuesDescription) {
@@ -839,30 +832,7 @@ fun DataSettingsScreen(
                     Button(
                         enabled = !isRepairingDb,
                         onClick = {
-                            scope.launch {
-                                isRepairingDb = true
-                                val db = AppDatabase.getInstance(context)
-                                val repairOutcome =
-                                    withContext(Dispatchers.IO) {
-                                        DatabaseHealthChecker.repair(db)
-                                    }
-                                isRepairingDb = false
-                                healthCheckResult = null
-                                val msg =
-                                    if (repairOutcome.success) {
-                                        val total =
-                                            repairOutcome.repairedAccountsCount +
-                                                repairOutcome.relinkedTransactionsCount
-                                        if (total > 0) {
-                                            "Database repaired: $total issues fixed."
-                                        } else {
-                                            "Database verified and clean."
-                                        }
-                                    } else {
-                                        "Database repair encountered an error: ${repairOutcome.message ?: "Unknown"}"
-                                    }
-                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                            }
+                            settingsViewModel.repairDatabase()
                         },
                     ) {
                         if (isRepairingDb) {
@@ -878,7 +848,7 @@ fun DataSettingsScreen(
                         }
                     }
                 } else {
-                    Button(onClick = { healthCheckResult = null }) {
+                    Button(onClick = { settingsViewModel.dismissHealthCheckResult() }) {
                         Text("OK")
                     }
                 }
@@ -887,7 +857,7 @@ fun DataSettingsScreen(
                 if (!result.isHealthy) {
                     TextButton(
                         enabled = !isRepairingDb,
-                        onClick = { healthCheckResult = null },
+                        onClick = { settingsViewModel.dismissHealthCheckResult() },
                     ) {
                         Text("Close")
                     }

@@ -98,7 +98,7 @@ class SmsRuleSettingsRepositoryTest : BaseViewModelTest() {
             val repo = SmsRuleSettingsRepository(mockDataStore)
 
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getSmsScanStartDate().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getDismissedMergeSuggestions().first() }
+            assertEquals(emptySet<String>(), repo.getDismissedMergeSuggestions().first())
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getIgnoreRulesChecksum() }
         }
 

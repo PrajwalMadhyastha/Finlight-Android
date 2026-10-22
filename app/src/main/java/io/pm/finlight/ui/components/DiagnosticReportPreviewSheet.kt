@@ -70,15 +70,20 @@ fun DiagnosticReportPreviewSheet(
         isLoading = false
     }
 
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
+        sheetState = sheetState,
         containerColor = sheetContainerColor,
         dragHandle = { BottomSheetDefaults.DragHandle() },
     ) {
+        val sheetScrollState = rememberScrollState()
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .verticalScroll(sheetScrollState)
                     .padding(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -155,7 +160,7 @@ fun DiagnosticReportPreviewSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(280.dp)
+                        .height(200.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(8.dp),
