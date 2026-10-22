@@ -785,7 +785,6 @@ fun MainAppScreen(shortcutAction: String? = null) {
         if (showDiagnosticPreviewSheet) {
             DiagnosticReportPreviewSheet(
                 onDismissRequest = {
-                    CrashDiagnosticsManager.clearCrash(context)
                     showDiagnosticPreviewSheet = false
                 },
             )

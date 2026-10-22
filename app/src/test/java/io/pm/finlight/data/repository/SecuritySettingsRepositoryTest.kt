@@ -93,14 +93,14 @@ class SecuritySettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getters rethrow non-IOException exceptions`() =
+    fun `getters handle non-IOException exceptions by emitting defaults`() =
         runTest {
             val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = SecuritySettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAppLockEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getPrivacyModeEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getSimulatorPrivacyModeEnabled().first() }
+            assertEquals(false, repo.getAppLockEnabled().first())
+            assertEquals(false, repo.getPrivacyModeEnabled().first())
+            assertEquals(false, repo.getSimulatorPrivacyModeEnabled().first())
         }
 }

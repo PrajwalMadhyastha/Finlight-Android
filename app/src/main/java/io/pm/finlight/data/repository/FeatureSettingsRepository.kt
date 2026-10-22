@@ -5,7 +5,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import io.pm.finlight.data.financeSettingsDataStore
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class FeatureSettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -38,19 +36,15 @@ class FeatureSettingsRepository(
 
     override fun getRecurringTransactionsEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_RECURRING_TRANSACTIONS_ENABLED] ?: false
                 } catch (_: ClassCastException) {
                     false
                 }
+            }
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
@@ -63,19 +57,15 @@ class FeatureSettingsRepository(
 
     override fun getGoalIncomeThreshold(): Flow<Int> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_GOAL_INCOME_THRESHOLD] ?: 5000
                 } catch (_: ClassCastException) {
                     5000
                 }
+            }
+            .catch {
+                emit(5000)
             }
             .distinctUntilChanged()
     }
@@ -88,19 +78,15 @@ class FeatureSettingsRepository(
 
     override fun getGoalNudgesEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_GOAL_NUDGES_ENABLED] ?: true
                 } catch (_: ClassCastException) {
                     true
                 }
+            }
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -119,19 +105,15 @@ class FeatureSettingsRepository(
 
     private fun getSetFlow(key: Preferences.Key<Set<String>>): Flow<Set<String>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[key] ?: emptySet()
                 } catch (_: ClassCastException) {
                     emptySet()
                 }
+            }
+            .catch {
+                emit(emptySet())
             }
             .distinctUntilChanged()
     }

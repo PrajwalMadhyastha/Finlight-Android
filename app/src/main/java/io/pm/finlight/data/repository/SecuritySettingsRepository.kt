@@ -5,13 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 
 class SecuritySettingsRepository(
     private val dataStore: DataStore<Preferences>,
@@ -34,19 +32,15 @@ class SecuritySettingsRepository(
 
     override fun getAppLockEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_APP_LOCK_ENABLED] ?: false
                 } catch (_: ClassCastException) {
                     false
                 }
+            }
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
@@ -59,19 +53,15 @@ class SecuritySettingsRepository(
 
     override fun getPrivacyModeEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_PRIVACY_MODE_ENABLED] ?: false
                 } catch (_: ClassCastException) {
                     false
                 }
+            }
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }
@@ -84,19 +74,15 @@ class SecuritySettingsRepository(
 
     override fun getSimulatorPrivacyModeEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
-                }
-            }
             .map { preferences ->
                 try {
                     preferences[KEY_SIMULATOR_PRIVACY_MODE_ENABLED] ?: false
                 } catch (_: ClassCastException) {
                     false
                 }
+            }
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }

@@ -107,4 +107,169 @@ class CrashDiagnosticsManagerTest {
             Thread.setDefaultUncaughtExceptionHandler(previousHandler)
         }
     }
+
+    @Test
+    fun install_whenUncaughtExceptionOccurs_recordsCrashAndDelegatesToPreviousHandler() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        var delegatedThread: Thread? = null
+        var delegatedThrowable: Throwable? = null
+        val mockHandler =
+            Thread.UncaughtExceptionHandler { thread, throwable ->
+                delegatedThread = thread
+                delegatedThrowable = throwable
+            }
+        Thread.setDefaultUncaughtExceptionHandler(mockHandler)
+        try {
+            CrashDiagnosticsManager.install(context)
+            val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
+            assertNotNull(currentHandler)
+
+            val testThread = Thread("bg-test-thread")
+            val testException = IllegalStateException("Uncaught test crash")
+            currentHandler?.uncaughtException(testThread, testException)
+
+            assertTrue(CrashDiagnosticsManager.hasRecordedCrash(context))
+            val report = CrashDiagnosticsManager.getRecordedCrash(context)
+            assertNotNull(report)
+            assertEquals("bg-test-thread", report?.threadName)
+            assertEquals("Uncaught test crash", report?.exceptionMessage)
+
+            assertEquals(testThread, delegatedThread)
+            assertEquals(testException, delegatedThrowable)
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun install_whenUncaughtExceptionOccurs_andNoPreviousHandler_recordsCrashCleanly() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler(null)
+        try {
+            CrashDiagnosticsManager.install(context)
+            val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
+            assertNotNull(currentHandler)
+
+            val testThread = Thread("null-handler-thread")
+            val testException = RuntimeException("Crash with no default handler")
+            currentHandler?.uncaughtException(testThread, testException)
+
+            assertTrue(CrashDiagnosticsManager.hasRecordedCrash(context))
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun install_whenRecordingCrashFails_doesNotThrowAndStillDelegates() {
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        var delegated = false
+        val mockHandler =
+            Thread.UncaughtExceptionHandler { _, _ ->
+                delegated = true
+            }
+        Thread.setDefaultUncaughtExceptionHandler(mockHandler)
+        try {
+            val throwingContext =
+                object : android.content.ContextWrapper(context) {
+                    override fun getFilesDir(): File {
+                        throw RuntimeException("Simulated I/O failure")
+                    }
+                }
+            CrashDiagnosticsManager.install(throwingContext)
+            val currentHandler = Thread.getDefaultUncaughtExceptionHandler()
+
+            val testThread = Thread("fail-safe-thread")
+            val testException = RuntimeException("Crash during failure")
+            currentHandler?.uncaughtException(testThread, testException)
+
+            assertTrue(delegated)
+        } finally {
+            Thread.setDefaultUncaughtExceptionHandler(previousHandler)
+        }
+    }
+
+    @Test
+    fun recordCrash_withNullMessage_recordsEmptyStringMessage() {
+        val thread = Thread.currentThread()
+        val error = RuntimeException()
+
+        CrashDiagnosticsManager.recordCrash(context, thread, error)
+
+        val report = CrashDiagnosticsManager.getRecordedCrash(context)
+        assertNotNull(report)
+        assertEquals("", report?.exceptionMessage)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun recordCrash_onPreTiramisuSdk_recordsSuccessfully() {
+        val thread = Thread.currentThread()
+        CrashDiagnosticsManager.recordCrash(context, thread, RuntimeException("Pre-Tiramisu crash"))
+        val report = CrashDiagnosticsManager.getRecordedCrash(context)
+        assertNotNull(report)
+        assertEquals(Build.VERSION_CODES.S, report?.androidApi)
+    }
+
+    @Test
+    fun hasRecordedCrash_whenFileExistsButZeroLength_returnsFalse() {
+        val file = File(context.filesDir, CrashDiagnosticsManager.CRASH_REPORT_FILE_NAME)
+        file.createNewFile()
+        assertTrue(file.exists())
+        assertEquals(0L, file.length())
+
+        assertFalse(CrashDiagnosticsManager.hasRecordedCrash(context))
+        assertNull(CrashDiagnosticsManager.getRecordedCrash(context))
+    }
+
+    @Test
+    fun clearCrash_whenFileDoesNotExist_returnsTrue() {
+        val file = File(context.filesDir, CrashDiagnosticsManager.CRASH_REPORT_FILE_NAME)
+        if (file.exists()) file.delete()
+        assertTrue(CrashDiagnosticsManager.clearCrash(context))
+    }
+
+    @Test
+    fun recordCrash_whenPackageInfoFails_fallsBackToUnknownVersion() {
+        val badPackageContext =
+            object : android.content.ContextWrapper(context) {
+                override fun getPackageName(): String = "non.existent.package.finlight"
+            }
+        val thread = Thread.currentThread()
+        CrashDiagnosticsManager.recordCrash(badPackageContext, thread, RuntimeException("Test crash"))
+        val report = CrashDiagnosticsManager.getRecordedCrash(badPackageContext)
+        assertNotNull(report)
+        assertEquals("unknown", report?.appVersionName)
+        assertEquals(0L, report?.appVersionCode)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun recordCrash_whenPackageInfoFails_onPreTiramisuSdk_fallsBackToUnknownVersion() {
+        val badPackageContext =
+            object : android.content.ContextWrapper(context) {
+                override fun getPackageName(): String = "non.existent.package.finlight"
+            }
+        val thread = Thread.currentThread()
+        CrashDiagnosticsManager.recordCrash(badPackageContext, thread, RuntimeException("Test crash"))
+        val report = CrashDiagnosticsManager.getRecordedCrash(badPackageContext)
+        assertNotNull(report)
+        assertEquals("unknown", report?.appVersionName)
+        assertEquals(0L, report?.appVersionCode)
+    }
+
+    @Test
+    fun recordCrash_withNullMessageAndNonNullLocalizedMessage_recordsLocalizedMessage() {
+        val thread = Thread.currentThread()
+        val customError =
+            object : Throwable() {
+                override val message: String? = null
+
+                override fun getLocalizedMessage(): String = "Custom localized error message"
+            }
+        CrashDiagnosticsManager.recordCrash(context, thread, customError)
+        val report = CrashDiagnosticsManager.getRecordedCrash(context)
+        assertNotNull(report)
+        assertEquals("Custom localized error message", report?.exceptionMessage)
+    }
 }

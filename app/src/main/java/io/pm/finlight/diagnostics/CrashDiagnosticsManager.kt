@@ -111,10 +111,10 @@ object CrashDiagnosticsManager {
 
             val file = File(context.filesDir, CRASH_REPORT_FILE_NAME)
             FileOutputStream(file).use { fos ->
-                OutputStreamWriter(fos, Charsets.UTF_8).use { writer ->
-                    Gson().toJson(report, writer)
-                    writer.flush()
-                }
+                val writer = OutputStreamWriter(fos, Charsets.UTF_8)
+                Gson().toJson(report, writer)
+                writer.flush()
+                fos.flush()
                 fos.fd.sync()
             }
         } catch (_: Throwable) {

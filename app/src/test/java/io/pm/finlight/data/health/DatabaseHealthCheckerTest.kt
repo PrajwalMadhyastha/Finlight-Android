@@ -148,6 +148,27 @@ class DatabaseHealthCheckerTest {
         }
 
     @Test
+    fun repair_disambiguatesDuplicateAccounts_avoidsCollisionWhenDisambiguatedNameAlreadyExists() =
+        runTest {
+            val db = dbRule.db.openHelper.writableDatabase
+            db.execSQL("DROP INDEX IF EXISTS index_accounts_name_nocase")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (30, 'Collision Bank', 'Bank')")
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (31, 'Collision Bank', 'Bank')")
+            // Pre-existing account that has the exact name "Collision Bank (31)"
+            db.execSQL("INSERT INTO accounts (id, name, type) VALUES (32, 'Collision Bank (31)', 'Bank')")
+
+            val repairResult = DatabaseHealthChecker.repair(dbRule.db)
+            assertTrue(repairResult.success)
+
+            val account31 = dbRule.db.accountDao().getAccountByIdSync(31)
+            assertEquals("Collision Bank (31-1)", account31?.name)
+
+            val checkAfter = DatabaseHealthChecker.checkHealth(dbRule.db)
+            assertEquals(0, checkAfter.duplicateAccountsCount)
+            assertTrue(checkAfter.isHealthy)
+        }
+
+    @Test
     fun checkHealth_withValidDataStoreContext_reportsHealthyPreferences() =
         runTest {
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()

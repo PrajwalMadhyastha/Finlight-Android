@@ -290,20 +290,29 @@ object DatabaseHealthChecker {
 
                 // 2. Disambiguate Duplicate Accounts so database leaves unhealthy state
                 val dupCursor = db.query("SELECT id, name FROM accounts ORDER BY id ASC")
-                val seenNames = mutableSetOf<String>()
+                val allAccounts = mutableListOf<Pair<Int, String>>()
                 dupCursor.use {
                     while (it.moveToNext()) {
-                        val id = it.getInt(0)
-                        val name = it.getString(1) ?: ""
-                        val lowerName = name.lowercase().trim()
-                        if (seenNames.contains(lowerName)) {
-                            val newName = "$name ($id)"
-                            db.execSQL("UPDATE accounts SET name = ? WHERE id = ?", arrayOf<Any>(newName, id))
-                            repairedAccounts++
-                            seenNames.add(newName.lowercase().trim())
-                        } else {
-                            seenNames.add(lowerName)
+                        allAccounts.add(it.getInt(0) to (it.getString(1) ?: ""))
+                    }
+                }
+                val existingNames = allAccounts.map { it.second.lowercase().trim() }.toMutableSet()
+                val seenNames = mutableSetOf<String>()
+                for ((id, name) in allAccounts) {
+                    val lowerName = name.lowercase().trim()
+                    if (seenNames.contains(lowerName)) {
+                        var candidate = "$name ($id)"
+                        var counter = 1
+                        while (existingNames.contains(candidate.lowercase().trim())) {
+                            candidate = "$name ($id-$counter)"
+                            counter++
                         }
+                        db.execSQL("UPDATE accounts SET name = ? WHERE id = ?", arrayOf<Any>(candidate, id))
+                        repairedAccounts++
+                        existingNames.add(candidate.lowercase().trim())
+                        seenNames.add(candidate.lowercase().trim())
+                    } else {
+                        seenNames.add(lowerName)
                     }
                 }
 
@@ -350,6 +359,8 @@ object DatabaseHealthChecker {
             } finally {
                 db.endTransaction()
             }
+
+            database.invalidationTracker.refreshVersionsAsync()
 
             // 4. Reset Corrupted DataStore Keys
             if (context != null) {

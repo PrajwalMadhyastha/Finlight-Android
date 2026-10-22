@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.util.DatabaseTestRule
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -148,5 +149,50 @@ class DiagnosticsExportServiceTest {
         assertTrue(report.contains("Total Recurring Rules: 1"))
         assertTrue(report.contains("Database Size:         ${aggregates.databaseSizeKb} KB"))
         assertTrue(report.contains("Database Schema Ver:   ${dbRule.db.openHelper.readableDatabase.version}"))
+    }
+
+    @Test
+    fun fetchAggregates_whenDbFileDoesNotExist_returnsZeroSize() {
+        val dbFile = context.getDatabasePath("finance_database")
+        if (dbFile.exists()) {
+            dbFile.delete()
+        }
+        val aggregates = DiagnosticsExportService.fetchAggregates(context, dbRule.db)
+        assertEquals(0L, aggregates.databaseSizeKb)
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.S])
+    fun generateReport_onPreTiramisuSdk_generatesSuccessfully() {
+        val report = DiagnosticsExportService.generateReport(context, null)
+        assertTrue(report.contains("Android API Level:     31"))
+    }
+
+    @Test
+    fun generateReport_whenPackageInfoFails_fallsBackToDefaultVersion() {
+        val badPackageContext =
+            object : android.content.ContextWrapper(context) {
+                override fun getPackageName(): String = "non.existent.package.finlight"
+            }
+        val report = DiagnosticsExportService.generateReport(badPackageContext, null)
+        assertTrue(report.contains("App Version Name:      1.12.0"))
+        assertTrue(report.contains("App Version Code:      0"))
+    }
+
+    @Test
+    fun exportReportToFile_whenDirAlreadyExists_overwritesCleanly() {
+        val file1 = DiagnosticsExportService.exportReportToFile(context, "First")
+        assertTrue(file1.exists())
+        val file2 = DiagnosticsExportService.exportReportToFile(context, "Second")
+        assertTrue(file2.exists())
+        assertEquals("Second", file2.readText())
+    }
+
+    @Test
+    fun generateReport_whenDatabaseReadableThrows_fallsBackToDefaultSchemaVersion() {
+        val mockDb = io.mockk.mockk<AppDatabase>()
+        io.mockk.every { mockDb.openHelper } throws RuntimeException("DB access error")
+        val report = DiagnosticsExportService.generateReport(context, mockDb)
+        assertTrue(report.contains("Database Schema Ver:   58"))
     }
 }

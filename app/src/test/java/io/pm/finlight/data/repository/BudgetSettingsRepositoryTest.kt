@@ -136,7 +136,7 @@ class BudgetSettingsRepositoryTest : BaseViewModelTest() {
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = BudgetSettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetForMonth(2026, 1).first() }
+            assertNull(repo.getOverallBudgetForMonth(2026, 1).first())
             kotlin.test.assertFailsWith<IllegalStateException> { repo.getOverallBudgetsForYear(2026) }
         }
 

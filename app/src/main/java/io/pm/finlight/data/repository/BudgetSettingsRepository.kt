@@ -74,15 +74,15 @@ class BudgetSettingsRepository(
         month: Int,
     ): Flow<Float?> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    findCarriedOverBudget(preferences, year, month)
+                } catch (_: Exception) {
+                    null
                 }
             }
-            .map { preferences ->
-                findCarriedOverBudget(preferences, year, month)
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }

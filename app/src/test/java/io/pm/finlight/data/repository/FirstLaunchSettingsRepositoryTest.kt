@@ -83,13 +83,13 @@ class FirstLaunchSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getters rethrow non-IOException exceptions`() =
+    fun `getters handle non-IOException exceptions by emitting defaults`() =
         runTest {
             val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = FirstLaunchSettingsRepository(mockDataStore, mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getHasSeenOnboarding().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getIsFirstLaunchComplete().first() }
+            assertFalse(repo.getHasSeenOnboarding().first())
+            assertFalse(repo.getIsFirstLaunchComplete().first())
         }
 }
