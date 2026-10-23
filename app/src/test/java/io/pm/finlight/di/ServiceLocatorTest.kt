@@ -10,10 +10,16 @@ import io.mockk.mockk
 import io.mockk.verify
 import io.pm.finlight.BudgetDao
 import io.pm.finlight.BudgetRepository
+import io.pm.finlight.CustomSmsRuleDao
+import io.pm.finlight.CustomSmsRuleRepository
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IgnoreRuleDao
+import io.pm.finlight.IgnoreRuleRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.IRecurringTransactionRepository
@@ -225,6 +231,26 @@ class ServiceLocatorTest {
         assertTrue(repo1 is MerchantCategoryMappingRepository)
     }
 
+    @Test
+    fun provideCustomSmsRuleRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideCustomSmsRuleRepository(application)
+        val repo2 = ServiceLocator.provideCustomSmsRuleRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+        assertTrue(repo1 is CustomSmsRuleRepository)
+    }
+
+    @Test
+    fun provideIgnoreRuleRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideIgnoreRuleRepository(application)
+        val repo2 = ServiceLocator.provideIgnoreRuleRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+        assertTrue(repo1 is IgnoreRuleRepository)
+    }
+
     // --- Resolved Database Parameter Branching Tests ---
 
     @Test
@@ -309,6 +335,34 @@ class ServiceLocatorTest {
         assertNotNull(repo)
         verify(exactly = 1) { customDb.merchantCategoryMappingDao() }
         assertSame(repo, ServiceLocator.provideMerchantCategoryMappingRepository(application))
+    }
+
+    @Test
+    fun provideCustomSmsRuleRepository_withResolvedDb_usesSuppliedDatabase() {
+        val customDao: CustomSmsRuleDao = mockk(relaxed = true)
+        val customDb: AppDatabase =
+            mockk {
+                every { customSmsRuleDao() } returns customDao
+            }
+
+        val repo = ServiceLocator.provideCustomSmsRuleRepository(application, customDb)
+        assertNotNull(repo)
+        verify(exactly = 1) { customDb.customSmsRuleDao() }
+        assertSame(repo, ServiceLocator.provideCustomSmsRuleRepository(application))
+    }
+
+    @Test
+    fun provideIgnoreRuleRepository_withResolvedDb_usesSuppliedDatabase() {
+        val customDao: IgnoreRuleDao = mockk(relaxed = true)
+        val customDb: AppDatabase =
+            mockk {
+                every { ignoreRuleDao() } returns customDao
+            }
+
+        val repo = ServiceLocator.provideIgnoreRuleRepository(application, customDb)
+        assertNotNull(repo)
+        verify(exactly = 1) { customDb.ignoreRuleDao() }
+        assertSame(repo, ServiceLocator.provideIgnoreRuleRepository(application))
     }
 
     // --- VisibleForTesting Overriding Setter Tests ---
@@ -569,6 +623,38 @@ class ServiceLocatorTest {
         assertNotSame(mockRepo2, defaultRepo)
     }
 
+    @Test
+    fun setCustomSmsRuleRepository_overridesInstance() {
+        val mockRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setCustomSmsRuleRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideCustomSmsRuleRepository(application))
+
+        val mockRepo2: ICustomSmsRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setCustomSmsRuleRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideCustomSmsRuleRepository(application))
+
+        ServiceLocator.setCustomSmsRuleRepository(null)
+        val defaultRepo = ServiceLocator.provideCustomSmsRuleRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
+    @Test
+    fun setIgnoreRuleRepository_overridesInstance() {
+        val mockRepo: IIgnoreRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setIgnoreRuleRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideIgnoreRuleRepository(application))
+
+        val mockRepo2: IIgnoreRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setIgnoreRuleRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideIgnoreRuleRepository(application))
+
+        ServiceLocator.setIgnoreRuleRepository(null)
+        val defaultRepo = ServiceLocator.provideIgnoreRuleRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
+    }
+
     // --- Reset Behavior Tests ---
 
     @Test
@@ -589,6 +675,8 @@ class ServiceLocatorTest {
         val mockSplit: ISplitTransactionRepository = mockk(relaxed = true)
         val mockRename: IMerchantRenameRuleRepository = mockk(relaxed = true)
         val mockCategoryMapping: IMerchantCategoryMappingRepository = mockk(relaxed = true)
+        val mockCustomSmsRule: ICustomSmsRuleRepository = mockk(relaxed = true)
+        val mockIgnoreRule: IIgnoreRuleRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxn)
         ServiceLocator.setAccountRepository(mockAccount)
@@ -606,6 +694,8 @@ class ServiceLocatorTest {
         ServiceLocator.setSplitTransactionRepository(mockSplit)
         ServiceLocator.setMerchantRenameRuleRepository(mockRename)
         ServiceLocator.setMerchantCategoryMappingRepository(mockCategoryMapping)
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRule)
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRule)
 
         assertSame(mockTxn, ServiceLocator.provideTransactionRepository(application))
         assertSame(mockAccount, ServiceLocator.provideAccountRepository(application))
@@ -623,6 +713,8 @@ class ServiceLocatorTest {
         assertSame(mockSplit, ServiceLocator.provideSplitTransactionRepository(application))
         assertSame(mockRename, ServiceLocator.provideMerchantRenameRuleRepository(application))
         assertSame(mockCategoryMapping, ServiceLocator.provideMerchantCategoryMappingRepository(application))
+        assertSame(mockCustomSmsRule, ServiceLocator.provideCustomSmsRuleRepository(application))
+        assertSame(mockIgnoreRule, ServiceLocator.provideIgnoreRuleRepository(application))
 
         ServiceLocator.reset()
 
@@ -642,6 +734,8 @@ class ServiceLocatorTest {
         val newSplit = ServiceLocator.provideSplitTransactionRepository(application)
         val newRename = ServiceLocator.provideMerchantRenameRuleRepository(application)
         val newCategoryMapping = ServiceLocator.provideMerchantCategoryMappingRepository(application)
+        val newCustomSmsRule = ServiceLocator.provideCustomSmsRuleRepository(application)
+        val newIgnoreRule = ServiceLocator.provideIgnoreRuleRepository(application)
 
         assertNotNull(newTxn)
         assertNotSame(mockTxn, newTxn)
@@ -675,6 +769,10 @@ class ServiceLocatorTest {
         assertNotSame(mockRename, newRename)
         assertNotNull(newCategoryMapping)
         assertNotSame(mockCategoryMapping, newCategoryMapping)
+        assertNotNull(newCustomSmsRule)
+        assertNotSame(mockCustomSmsRule, newCustomSmsRule)
+        assertNotNull(newIgnoreRule)
+        assertNotSame(mockIgnoreRule, newIgnoreRule)
     }
 
     // --- Concurrency / Thread-Safety Tests ---
@@ -717,10 +815,26 @@ class ServiceLocatorTest {
                     }
                 }.awaitAll()
 
+            val customSmsRuleInstances =
+                (1..10).map {
+                    async(Dispatchers.Default) {
+                        ServiceLocator.provideCustomSmsRuleRepository(application)
+                    }
+                }.awaitAll()
+
+            val ignoreRuleInstances =
+                (1..10).map {
+                    async(Dispatchers.Default) {
+                        ServiceLocator.provideIgnoreRuleRepository(application)
+                    }
+                }.awaitAll()
+
             budgetInstances.forEach { assertSame(budgetInstances.first(), it) }
             recurringInstances.forEach { assertSame(recurringInstances.first(), it) }
             splitInstances.forEach { assertSame(splitInstances.first(), it) }
             renameInstances.forEach { assertSame(renameInstances.first(), it) }
             categoryMappingInstances.forEach { assertSame(categoryMappingInstances.first(), it) }
+            customSmsRuleInstances.forEach { assertSame(customSmsRuleInstances.first(), it) }
+            ignoreRuleInstances.forEach { assertSame(ignoreRuleInstances.first(), it) }
         }
 }
