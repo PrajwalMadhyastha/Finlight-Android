@@ -1,22 +1,26 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/RuleCreationViewModelFactory.kt
-// REASON: NEW FILE - This factory provides the CustomSmsRuleDao dependency to the
-// RuleCreationViewModel, enabling constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.RuleCreationViewModel
-import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DispatcherProvider
 
-class RuleCreationViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
+class RuleCreationViewModelFactory(
+    private val application: Application,
+    private val customSmsRuleRepository: ICustomSmsRuleRepository? = null,
+    private val dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(RuleCreationViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
+            val repository = customSmsRuleRepository ?: ServiceLocator.provideCustomSmsRuleRepository(application)
+            val dispatchers = dispatcherProvider ?: ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
-            return RuleCreationViewModel(db.customSmsRuleDao()) as T
+            return RuleCreationViewModel(
+                customSmsRuleRepository = repository,
+                dispatcherProvider = dispatchers,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

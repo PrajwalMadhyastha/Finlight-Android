@@ -16,10 +16,13 @@ import io.pm.finlight.IAppConfigRepository
 import io.pm.finlight.IBackupSettingsRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.IBudgetSettingsRepository
+import io.pm.finlight.CustomSmsRuleRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
+import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
@@ -33,6 +36,7 @@ import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.IgnoreRuleRepository
 import io.pm.finlight.MerchantCategoryMappingRepository
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRuleRepository
@@ -146,6 +150,12 @@ object ServiceLocator {
 
     @Volatile
     private var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository? = null
+
+    @Volatile
+    private var customSmsRuleRepository: ICustomSmsRuleRepository? = null
+
+    @Volatile
+    private var ignoreRuleRepository: IIgnoreRuleRepository? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -613,6 +623,58 @@ object ServiceLocator {
         }
     }
 
+    /**
+     * Resolves the singleton [ICustomSmsRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideCustomSmsRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ICustomSmsRuleRepository {
+        return customSmsRuleRepository ?: synchronized(this) {
+            customSmsRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                CustomSmsRuleRepository(
+                    dao = db.customSmsRuleDao(),
+                ).also {
+                    customSmsRuleRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IIgnoreRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideIgnoreRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IIgnoreRuleRepository {
+        return ignoreRuleRepository ?: synchronized(this) {
+            ignoreRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                IgnoreRuleRepository(
+                    dao = db.ignoreRuleDao(),
+                ).also {
+                    ignoreRuleRepository = it
+                }
+            }
+        }
+    }
+
     @VisibleForTesting
     fun setSettingsRepository(repository: ISettingsRepository?) {
         settingsRepository = repository
@@ -754,6 +816,16 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setCustomSmsRuleRepository(repository: ICustomSmsRuleRepository?) {
+        customSmsRuleRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setIgnoreRuleRepository(repository: IIgnoreRuleRepository?) {
+        ignoreRuleRepository = repository
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -783,5 +855,7 @@ object ServiceLocator {
         splitTransactionRepository = null
         merchantRenameRuleRepository = null
         merchantCategoryMappingRepository = null
+        customSmsRuleRepository = null
+        ignoreRuleRepository = null
     }
 }

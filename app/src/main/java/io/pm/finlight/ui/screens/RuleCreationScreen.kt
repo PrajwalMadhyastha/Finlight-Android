@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,12 +39,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
+import io.pm.finlight.ui.viewmodel.RuleSelection
 import kotlin.math.max
 import kotlin.math.min
 
@@ -53,26 +53,38 @@ fun RuleCreationScreen(
     navController: NavController,
     potentialTransactionJson: String?,
     ruleId: Int?,
+    viewModel: RuleCreationViewModel =
+        viewModel(
+            factory = RuleCreationViewModelFactory(LocalContext.current.applicationContext as Application),
+        ),
 ) {
-    val context = LocalContext.current.applicationContext as Application
-    val viewModel: RuleCreationViewModel = viewModel(factory = RuleCreationViewModelFactory(context))
-
     val uiState by viewModel.uiState.collectAsState()
-    var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
-    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(""))
+    }
     val isEditMode = ruleId != null
 
     LaunchedEffect(key1 = ruleId, key2 = potentialTransactionJson) {
         if (isEditMode) {
             viewModel.loadRuleForEditing(ruleId!!)
-            val rule = AppDatabase.getInstance(context).customSmsRuleDao().getRuleById(ruleId).firstOrNull()
-            if (rule != null) {
-                textFieldValue = TextFieldValue(rule.sourceSmsBody)
-            }
         } else if (potentialTransactionJson != null) {
             val potentialTxn = Gson().fromJson(potentialTransactionJson, PotentialTransaction::class.java)
             viewModel.initializeStateForCreation(potentialTxn)
-            textFieldValue = TextFieldValue(potentialTxn.originalMessage)
+        }
+    }
+
+    LaunchedEffect(uiState.sourceSmsBody) {
+        val body = uiState.sourceSmsBody
+        if (!body.isNullOrEmpty() && textFieldValue.text.isEmpty() && (isEditMode || potentialTransactionJson != null)) {
+            textFieldValue = TextFieldValue(body)
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
         }
     }
 
@@ -91,6 +103,7 @@ fun RuleCreationScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent,
     ) { innerPadding ->
         Column(
@@ -237,7 +250,8 @@ fun RuleCreationScreen(
                     RuleSummaryItem(
                         icon = Icons.Default.Paid,
                         label = "Amount",
-                        value = uiState.amountSelection.selectedText.ifBlank { "Not set" },
+                        value = uiState.amountSelection.selectedText.ifBlank { "Not set (Required)" },
+                        isError = uiState.amountSelection.selectedText.isBlank(),
                     )
                     RuleSummaryItem(
                         icon = Icons.Default.AccountBalanceWallet,
@@ -296,22 +310,20 @@ fun RuleCreationScreen(
                 }
                 val isSaveEnabled =
                     uiState.triggerSelection.selectedText.isNotBlank() &&
-                        (uiState.merchantSelection.selectedText.isNotBlank() || uiState.amountSelection.selectedText.isNotBlank() || uiState.accountSelection.selectedText.isNotBlank())
+                        uiState.amountSelection.selectedText.isNotBlank()
 
                 Button(
                     onClick = {
-                        scope.launch {
-                            viewModel.saveRule(textFieldValue.text) {
-                                // This flag is for the TransactionDetailScreen
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("reparse_needed", true)
-                                // This new flag is for the SmsDebugScreen
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("auto_import_after_rule_creation", true)
-                                navController.popBackStack()
-                            }
+                        viewModel.saveRule(textFieldValue.text) {
+                            // This flag is for the TransactionDetailScreen
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("reparse_needed", true)
+                            // This new flag is for the SmsDebugScreen
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("auto_import_after_rule_creation", true)
+                            navController.popBackStack()
                         }
                     },
                     enabled = isSaveEnabled,
