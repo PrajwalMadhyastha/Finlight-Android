@@ -49,18 +49,6 @@ class IgnoreRuleRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getAll alias returns flow from dao`() =
-        runTest {
-            val rules = listOf(IgnoreRule(id = 1, type = RuleType.SENDER, pattern = "SPAM"))
-            `when`(ignoreRuleDao.getAll()).thenReturn(flowOf(rules))
-
-            repository.getAll().test {
-                assertEquals(rules, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
-
-    @Test
     fun `getAllRulesList returns list from dao`() =
         runTest {
             val rules = listOf(IgnoreRule(id = 1, type = RuleType.SENDER, pattern = "SPAM"))

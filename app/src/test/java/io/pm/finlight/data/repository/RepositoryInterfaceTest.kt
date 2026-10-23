@@ -133,11 +133,11 @@ class RepositoryInterfaceTest {
         val mockTripRepo = mockk<TripRepository>(relaxed = true)
         assertTrue(mockTripRepo is ITripRepository)
 
-        val mockCustomSmsRuleRepo = mockk<CustomSmsRuleRepository>(relaxed = true)
-        assertTrue(mockCustomSmsRuleRepo is ICustomSmsRuleRepository)
+        val realCustomSmsRuleRepo = CustomSmsRuleRepository(mockk(relaxed = true))
+        assertTrue(realCustomSmsRuleRepo is ICustomSmsRuleRepository)
 
-        val mockIgnoreRuleRepo = mockk<IgnoreRuleRepository>(relaxed = true)
-        assertTrue(mockIgnoreRuleRepo is IIgnoreRuleRepository)
+        val realIgnoreRuleRepo = IgnoreRuleRepository(mockk(relaxed = true))
+        assertTrue(realIgnoreRuleRepo is IIgnoreRuleRepository)
     }
 
     @Test

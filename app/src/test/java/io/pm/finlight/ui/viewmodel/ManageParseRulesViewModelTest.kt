@@ -94,4 +94,18 @@ class ManageParseRulesViewModelTest : BaseViewModelTest() {
             viewModel.clearError()
             assertNull(viewModel.errorMessage.value)
         }
+
+    @Test
+    fun `deleteRule rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            val ruleToDelete = CustomSmsRule(1, "trigger1", null, null, null, null, null, null, 10, "")
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            doThrow(kotlinx.coroutines.CancellationException("Cancelled")).`when`(customSmsRuleRepository).delete(ruleToDelete)
+            viewModel = ManageParseRulesViewModel(customSmsRuleRepository, testDispatcherProvider)
+
+            viewModel.deleteRule(ruleToDelete)
+            advanceUntilIdle()
+
+            assertNull(viewModel.errorMessage.value)
+        }
 }

@@ -38,13 +38,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
-import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
 import io.pm.finlight.ui.viewmodel.RuleSelection
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
@@ -60,6 +58,7 @@ fun RuleCreationScreen(
     val viewModel: RuleCreationViewModel = viewModel(factory = RuleCreationViewModelFactory(context))
 
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     val scope = rememberCoroutineScope()
     val isEditMode = ruleId != null
@@ -67,14 +66,23 @@ fun RuleCreationScreen(
     LaunchedEffect(key1 = ruleId, key2 = potentialTransactionJson) {
         if (isEditMode) {
             viewModel.loadRuleForEditing(ruleId!!)
-            val rule = ServiceLocator.provideCustomSmsRuleRepository(context).getRuleById(ruleId).firstOrNull()
-            if (rule != null) {
-                textFieldValue = TextFieldValue(rule.sourceSmsBody)
-            }
         } else if (potentialTransactionJson != null) {
             val potentialTxn = Gson().fromJson(potentialTransactionJson, PotentialTransaction::class.java)
             viewModel.initializeStateForCreation(potentialTxn)
-            textFieldValue = TextFieldValue(potentialTxn.originalMessage)
+        }
+    }
+
+    LaunchedEffect(uiState.sourceSmsBody) {
+        val body = uiState.sourceSmsBody
+        if (!body.isNullOrEmpty() && (isEditMode || potentialTransactionJson != null)) {
+            textFieldValue = TextFieldValue(body)
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { error ->
+            snackbarHostState.showSnackbar(error)
+            viewModel.clearError()
         }
     }
 
@@ -93,6 +101,7 @@ fun RuleCreationScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = Color.Transparent,
     ) { innerPadding ->
         Column(

@@ -8,8 +8,6 @@ import kotlinx.coroutines.flow.Flow
 interface IIgnoreRuleRepository {
     fun getAllRules(): Flow<List<IgnoreRule>>
 
-    fun getAll(): Flow<List<IgnoreRule>> = getAllRules()
-
     suspend fun getAllRulesList(): List<IgnoreRule>
 
     suspend fun getEnabledRules(): List<IgnoreRule>

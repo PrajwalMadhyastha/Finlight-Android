@@ -8,6 +8,7 @@ import io.pm.finlight.IgnoreRule
 import io.pm.finlight.RuleType
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,6 +52,8 @@ class ManageIgnoreRulesViewModel(
                 try {
                     // User-added rules are not default rules
                     ignoreRuleRepository.insert(IgnoreRule(pattern = pattern.trim(), type = type, isDefault = false))
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("ManageIgnoreRulesVM", "Failed to insert ignore rule for pattern: $pattern", e)
                     _errorMessage.value = e.message ?: "Failed to add ignore rule"
@@ -67,6 +70,8 @@ class ManageIgnoreRulesViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 ignoreRuleRepository.update(rule)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("ManageIgnoreRulesVM", "Failed to update ignore rule ${rule.id}", e)
                 _errorMessage.value = e.message ?: "Failed to update ignore rule"
@@ -85,6 +90,8 @@ class ManageIgnoreRulesViewModel(
             viewModelScope.launch(dispatcherProvider.io) {
                 try {
                     ignoreRuleRepository.delete(rule)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     Log.e("ManageIgnoreRulesVM", "Failed to delete ignore rule ${rule.id}", e)
                     _errorMessage.value = e.message ?: "Failed to delete ignore rule"

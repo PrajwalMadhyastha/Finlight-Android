@@ -188,4 +188,42 @@ class ManageIgnoreRulesViewModelTest : BaseViewModelTest() {
             // Assert
             verify(ignoreRuleRepository, never()).delete(defaultRule)
         }
+
+    @Test
+    fun `addIgnoreRule rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            doThrow(kotlinx.coroutines.CancellationException("Cancelled"))
+                .`when`(ignoreRuleRepository).insert(anyObject())
+
+            viewModel.addIgnoreRule("pattern", RuleType.SENDER)
+            advanceUntilIdle()
+
+            assertNull(viewModel.errorMessage.value)
+        }
+
+    @Test
+    fun `updateIgnoreRule rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            val rule = IgnoreRule(1, RuleType.BODY_PHRASE, "test", isEnabled = false)
+            doThrow(kotlinx.coroutines.CancellationException("Cancelled"))
+                .`when`(ignoreRuleRepository).update(rule)
+
+            viewModel.updateIgnoreRule(rule)
+            advanceUntilIdle()
+
+            assertNull(viewModel.errorMessage.value)
+        }
+
+    @Test
+    fun `deleteIgnoreRule rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            val rule = IgnoreRule(1, RuleType.SENDER, "custom", isDefault = false)
+            doThrow(kotlinx.coroutines.CancellationException("Cancelled"))
+                .`when`(ignoreRuleRepository).delete(rule)
+
+            viewModel.deleteIgnoreRule(rule)
+            advanceUntilIdle()
+
+            assertNull(viewModel.errorMessage.value)
+        }
 }

@@ -138,6 +138,22 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `loadRuleForEditing rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            val ruleId = 1
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenAnswer {
+                kotlinx.coroutines.flow.flow<CustomSmsRule> {
+                    throw kotlinx.coroutines.CancellationException("Cancelled")
+                }
+            }
+
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
     fun `saveRule calls insert for new rule`() =
         runTest {
             // Arrange
@@ -195,6 +211,22 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
 
             // Assert
             assertEquals("Write error", viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `saveRule rethrows CancellationException without setting errorMessage`() =
+        runTest {
+            val smsBody = "Transaction of 100 at Merchant X"
+            val triggerSelection = RuleSelection("Transaction of", 0, 14)
+            viewModel.onMarkAsTrigger(triggerSelection)
+
+            doThrow(kotlinx.coroutines.CancellationException("Cancelled"))
+                .`when`(customSmsRuleRepository).insert(io.pm.finlight.anyObject())
+
+            viewModel.saveRule(smsBody) {}
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.errorMessage)
         }
 
     @Test

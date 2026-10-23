@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
@@ -47,49 +46,70 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun ManageParseRulesScreen(
     navController: NavController,
-    viewModel: ManageParseRulesViewModel = viewModel(),
+    viewModel: ManageParseRulesViewModel,
 ) {
     val rules by viewModel.allRules.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
     var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
 
-    if (rules.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            EmptyStateMessage(
-                message = "No custom parsing rules have been created yet.",
-                icon = Icons.Default.Info,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = { navController.navigate("rule_creation_screen") }) {
-                Text("Add New Rule")
-            }
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearError()
         }
-    } else {
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Transparent,
+    ) { innerPadding ->
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
         ) {
-            items(rules, key = { it.id }) { rule ->
-                RuleItemCard(
-                    modifier = Modifier.animateItemPlacement(),
-                    rule = rule,
-                    onEditClick = {
-                        navController.navigate("rule_creation_screen?ruleId=${rule.id}")
-                    },
-                    onDeleteClick = { ruleToDelete = rule },
-                )
-            }
-            item {
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = { navController.navigate("rule_creation_screen") },
-                    modifier = Modifier.fillMaxWidth()
+            if (rules.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Add New Rule")
+                    EmptyStateMessage(
+                        message = "No custom parsing rules have been created yet.",
+                        icon = Icons.Default.Info,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { navController.navigate("rule_creation_screen") }) {
+                        Text("Add New Rule")
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(rules, key = { it.id }) { rule ->
+                        RuleItemCard(
+                            modifier = Modifier.animateItemPlacement(),
+                            rule = rule,
+                            onEditClick = {
+                                navController.navigate("rule_creation_screen?ruleId=${rule.id}")
+                            },
+                            onDeleteClick = { ruleToDelete = rule },
+                        )
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { navController.navigate("rule_creation_screen") },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Add New Rule")
+                        }
+                    }
                 }
             }
         }

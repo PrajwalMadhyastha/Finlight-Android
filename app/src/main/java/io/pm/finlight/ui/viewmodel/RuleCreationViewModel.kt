@@ -9,6 +9,7 @@ import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TransactionType
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -110,6 +111,8 @@ class RuleCreationViewModel(
                         sourceSmsBody = rule.sourceSmsBody,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("RuleCreation", "Failed to load rule $ruleId for editing", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to load rule") }
@@ -200,6 +203,8 @@ class RuleCreationViewModel(
                 withContext(dispatcherProvider.main) {
                     onComplete()
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("RuleCreation", "Failed to save rule", e)
                 _uiState.update { it.copy(errorMessage = e.message ?: "Failed to save rule") }

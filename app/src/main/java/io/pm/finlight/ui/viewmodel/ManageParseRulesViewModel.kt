@@ -7,6 +7,7 @@ import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,8 @@ class ManageParseRulesViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 customSmsRuleRepository.delete(rule)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("ManageParseRulesVM", "Failed to delete custom SMS rule ${rule.id}", e)
                 _errorMessage.value = e.message ?: "Failed to delete custom SMS rule"
