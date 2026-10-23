@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import io.pm.finlight.IgnoreRule
 import io.pm.finlight.RuleType
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
@@ -50,7 +49,11 @@ fun ManageIgnoreRulesScreen(
     var newPattern by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(""))
     }
-    var ruleToDelete by remember { mutableStateOf<IgnoreRule?>(null) }
+    var ruleIdToDelete by rememberSaveable { mutableStateOf<Int?>(null) }
+    val ruleToDelete =
+        remember(ruleIdToDelete, rules) {
+            rules.find { it.id == ruleIdToDelete }
+        }
     var selectedRuleType by rememberSaveable { mutableStateOf(RuleType.BODY_PHRASE) }
 
     LaunchedEffect(errorMessage) {
@@ -169,7 +172,7 @@ fun ManageIgnoreRulesScreen(
                                 )
                             },
                             trailingContent = {
-                                IconButton(onClick = { ruleToDelete = rule }) {
+                                IconButton(onClick = { ruleIdToDelete = rule.id }) {
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "Delete rule",
@@ -222,13 +225,13 @@ fun ManageIgnoreRulesScreen(
     if (ruleToDelete != null) {
         ConfirmationDialog(
             title = "Delete Ignore Rule?",
-            text = "Are you sure you want to delete the rule for \"${ruleToDelete!!.pattern}\"?",
+            text = "Are you sure you want to delete the rule for \"${ruleToDelete.pattern}\"?",
             confirmButtonText = "Delete",
             isDestructive = true,
-            onDismiss = { ruleToDelete = null },
+            onDismiss = { ruleIdToDelete = null },
             onConfirm = {
-                viewModel.deleteIgnoreRule(ruleToDelete!!)
-                ruleToDelete = null
+                viewModel.deleteIgnoreRule(ruleToDelete)
+                ruleIdToDelete = null
             },
         )
     }

@@ -76,7 +76,7 @@ fun RuleCreationScreen(
 
     LaunchedEffect(uiState.sourceSmsBody) {
         val body = uiState.sourceSmsBody
-        if (!body.isNullOrEmpty() && (isEditMode || potentialTransactionJson != null)) {
+        if (!body.isNullOrEmpty() && textFieldValue.text.isEmpty() && (isEditMode || potentialTransactionJson != null)) {
             textFieldValue = TextFieldValue(body)
         }
     }
@@ -250,7 +250,8 @@ fun RuleCreationScreen(
                     RuleSummaryItem(
                         icon = Icons.Default.Paid,
                         label = "Amount",
-                        value = uiState.amountSelection.selectedText.ifBlank { "Not set" },
+                        value = uiState.amountSelection.selectedText.ifBlank { "Not set (Required)" },
+                        isError = uiState.amountSelection.selectedText.isBlank(),
                     )
                     RuleSummaryItem(
                         icon = Icons.Default.AccountBalanceWallet,
@@ -309,7 +310,7 @@ fun RuleCreationScreen(
                 }
                 val isSaveEnabled =
                     uiState.triggerSelection.selectedText.isNotBlank() &&
-                        (uiState.merchantSelection.selectedText.isNotBlank() || uiState.amountSelection.selectedText.isNotBlank() || uiState.accountSelection.selectedText.isNotBlank())
+                        uiState.amountSelection.selectedText.isNotBlank()
 
                 Button(
                     onClick = {

@@ -16,6 +16,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -77,6 +78,87 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
                 assertEquals("xx9876", state.accountSelection.selectedText)
                 assertEquals(TransactionType.EXPENSE, state.transactionType)
                 assertEquals("Paid 123.45 to Test Merchant with HDFC Card xx9876.", state.sourceSmsBody)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `initializeStateForCreation correctly matches dot amount even when default locale uses comma separator`() =
+        runTest {
+            val originalLocale = Locale.getDefault()
+            try {
+                Locale.setDefault(Locale.GERMANY)
+                val potentialTxn =
+                    PotentialTransaction(
+                        sourceSmsId = 1L,
+                        smsSender = "Test",
+                        amount = 123.45,
+                        transactionType = "expense",
+                        merchantName = "Test Merchant",
+                        originalMessage = "Paid 123.45 to Test Merchant.",
+                        potentialAccount = null,
+                    )
+
+                viewModel.initializeStateForCreation(potentialTxn)
+
+                viewModel.uiState.test {
+                    val state = awaitItem()
+                    assertEquals("123.45", state.amountSelection.selectedText)
+                    assertEquals(5, state.amountSelection.startIndex)
+                    assertEquals(11, state.amountSelection.endIndex)
+                    cancelAndIgnoreRemainingEvents()
+                }
+            } finally {
+                Locale.setDefault(originalLocale)
+            }
+        }
+
+    @Test
+    fun `initializeStateForCreation correctly matches comma amount when SMS contains comma decimal`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Test",
+                    amount = 123.45,
+                    transactionType = "expense",
+                    merchantName = "Test Merchant",
+                    originalMessage = "Paid 123,45 to Test Merchant.",
+                    potentialAccount = null,
+                )
+
+            viewModel.initializeStateForCreation(potentialTxn)
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals("123,45", state.amountSelection.selectedText)
+                assertEquals(5, state.amountSelection.startIndex)
+                assertEquals(11, state.amountSelection.endIndex)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `initializeStateForCreation handles amount not found in SMS message`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Test",
+                    amount = 999.99,
+                    transactionType = "expense",
+                    merchantName = "Test Merchant",
+                    originalMessage = "Paid some amount to Test Merchant.",
+                    potentialAccount = null,
+                )
+
+            viewModel.initializeStateForCreation(potentialTxn)
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals("", state.amountSelection.selectedText)
+                assertEquals(-1, state.amountSelection.startIndex)
+                assertEquals(-1, state.amountSelection.endIndex)
                 cancelAndIgnoreRemainingEvents()
             }
         }

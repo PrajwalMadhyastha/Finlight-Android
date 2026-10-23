@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.regex.Pattern
 
 /**
@@ -57,8 +58,17 @@ class RuleCreationViewModel(
     val uiState = _uiState.asStateFlow()
 
     fun initializeStateForCreation(potentialTxn: PotentialTransaction) {
-        val amountStr = String.format("%.2f", potentialTxn.amount)
-        val amountIndex = potentialTxn.originalMessage.indexOf(amountStr)
+        val dotAmountStr = String.format(Locale.ROOT, "%.2f", potentialTxn.amount)
+        val commaAmountStr = String.format(Locale.GERMANY, "%.2f", potentialTxn.amount)
+        val dotIndex = potentialTxn.originalMessage.indexOf(dotAmountStr)
+        val commaIndex = potentialTxn.originalMessage.indexOf(commaAmountStr)
+
+        val (amountStr, amountIndex) =
+            when {
+                dotIndex != -1 -> dotAmountStr to dotIndex
+                commaIndex != -1 -> commaAmountStr to commaIndex
+                else -> dotAmountStr to -1
+            }
 
         val amountSelection =
             if (amountIndex != -1) {

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,7 +53,11 @@ fun ManageParseRulesScreen(
     val rules by viewModel.allRules.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
+    var ruleIdToDelete by rememberSaveable { mutableStateOf<Int?>(null) }
+    val ruleToDelete =
+        remember(ruleIdToDelete, rules) {
+            rules.find { it.id == ruleIdToDelete }
+        }
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let { msg ->
@@ -99,7 +104,7 @@ fun ManageParseRulesScreen(
                             onEditClick = {
                                 navController.navigate("rule_creation_screen?ruleId=${rule.id}")
                             },
-                            onDeleteClick = { ruleToDelete = rule },
+                            onDeleteClick = { ruleIdToDelete = rule.id },
                         )
                     }
                     item {
@@ -122,10 +127,10 @@ fun ManageParseRulesScreen(
             text = "Are you sure you want to delete this parsing rule? This action cannot be undone.",
             confirmButtonText = "Delete",
             isDestructive = true,
-            onDismiss = { ruleToDelete = null },
+            onDismiss = { ruleIdToDelete = null },
             onConfirm = {
-                viewModel.deleteRule(ruleToDelete!!)
-                ruleToDelete = null
+                viewModel.deleteRule(ruleToDelete)
+                ruleIdToDelete = null
             },
         )
     }
