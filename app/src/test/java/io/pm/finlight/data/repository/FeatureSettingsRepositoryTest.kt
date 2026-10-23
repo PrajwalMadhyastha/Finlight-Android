@@ -119,16 +119,16 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getters rethrow non-IOException exceptions`() =
+    fun `getters handle non-IOException exceptions by emitting defaults`() =
         runTest {
             val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = FeatureSettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getRecurringTransactionsEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getGoalIncomeThreshold().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getGoalNudgesEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getExcludedIncomeMonths().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getExcludedExpenseMonths().first() }
+            assertFalse(repo.getRecurringTransactionsEnabled().first())
+            assertEquals(5000, repo.getGoalIncomeThreshold().first())
+            assertTrue(repo.getGoalNudgesEnabled().first())
+            assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
+            assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
         }
 }

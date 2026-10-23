@@ -90,6 +90,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
 
+    @Mock protected lateinit var merchantMappingDao: MerchantMappingDao
+
     protected lateinit var viewModel: TransactionViewModel
 
     @Before
@@ -112,6 +114,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
         whenever(db.splitTransactionDao()).thenReturn(splitTransactionDao)
         whenever(db.accountAliasDao()).thenReturn(accountAliasDao)
         whenever(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
+        whenever(db.merchantMappingDao()).thenReturn(merchantMappingDao)
 
         // Setup default mock behaviors for ViewModel initialization
         setupDefaultMocks()
@@ -151,11 +154,71 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
             whenever(transactionQueryDao.existsBySmsHash(anyString())).thenReturn(false)
             whenever(deletedSmsHashDao.existsByHash(anyString())).thenReturn(false)
             whenever(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            whenever(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
+            whenever(transactionRepository.existsBySmsHash(anyString())).thenAnswer { invocation ->
+                kotlinx.coroutines.runBlocking { transactionQueryDao.existsBySmsHash(invocation.getArgument(0)) }
+            }
+            whenever(transactionRepository.updateSmsHashByLegacy(anyString(), anyString())).thenAnswer { invocation ->
+                kotlinx.coroutines.runBlocking { transactionWriteDao.updateSmsHashByLegacy(invocation.getArgument(0), invocation.getArgument(1)) }
+            }
+            whenever(transactionRepository.existsDeletedSmsHash(anyString())).thenAnswer { invocation ->
+                kotlinx.coroutines.runBlocking { deletedSmsHashDao.existsByHash(invocation.getArgument(0)) }
+            }
+            whenever(transactionRepository.insertDeletedSmsHash(anyString())).thenAnswer { invocation ->
+                kotlinx.coroutines.runBlocking { deletedSmsHashDao.insert(io.pm.finlight.data.db.entity.DeletedSmsHash(invocation.getArgument(0))) }
+            }
+            whenever(accountRepository.findOrCreateByName(anyString(), anyString())).thenAnswer { invocation ->
+                val name = invocation.getArgument<String>(0)
+                val type = invocation.getArgument<String>(1)
+                kotlinx.coroutines.runBlocking {
+                    val alias = accountAliasDao.findByAlias(name)
+                    if (alias != null) {
+                        val aliasedAccount = accountDao.getAccountByIdSync(alias.destinationAccountId)
+                        if (aliasedAccount != null) return@runBlocking aliasedAccount
+                        return@runBlocking io.pm.finlight.Account(id = alias.destinationAccountId, name = name, type = type)
+                    }
+                    val existing = accountDao.findByName(name)
+                    if (existing != null) return@runBlocking existing
+                    val newId = accountRepository.insert(io.pm.finlight.Account(name = name, type = type))
+                    if (newId != -1L) {
+                        accountRepository.getAccountByIdSync(newId.toInt()) ?: io.pm.finlight.Account(id = newId.toInt(), name = name, type = type)
+                    } else {
+                        accountDao.findByName(name) ?: io.pm.finlight.Account(name = name, type = type)
+                    }
+                }
+            }
+            whenever(accountRepository.findOrCreateByName(anyString(), any<AccountType>())).thenAnswer { invocation ->
+                val name = invocation.getArgument<String>(0)
+                val type = invocation.getArgument<AccountType>(1)
+                kotlinx.coroutines.runBlocking {
+                    accountRepository.findOrCreateByName(name, type.typeName)
+                }
+            }
         }
     }
 
     protected fun initializeViewModel() {
         val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepository)
+        val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
+        val autoSaveUseCase =
+            io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase(
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                travelSettingsRepository =
+                    object : io.pm.finlight.ITravelSettingsRepository {
+                        override suspend fun getCurrentTravelModeSettings(): io.pm.finlight.TravelModeSettings? =
+                            settingsRepository.getCurrentTravelModeSettings()
+
+                        override fun getTravelModeSettings(): kotlinx.coroutines.flow.Flow<io.pm.finlight.TravelModeSettings?> =
+                            settingsRepository.getTravelModeSettings()
+
+                        override suspend fun saveTravelModeSettings(settings: io.pm.finlight.TravelModeSettings?) =
+                            settingsRepository.saveTravelModeSettings(settings)
+                    },
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                dispatcherProvider = testDispatcherProvider,
+            )
         viewModel =
             TransactionViewModel(
                 application = applicationContext,
@@ -174,7 +237,8 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 manageReimbursementUseCase = manageReimbursementUseCase,
-                dispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher),
+                dispatcherProvider = testDispatcherProvider,
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
             )
     }
 }

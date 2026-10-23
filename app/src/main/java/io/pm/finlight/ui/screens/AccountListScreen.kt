@@ -123,7 +123,10 @@ fun AccountListScreen(
                 }
             }
 
-            items(accounts, key = { it.account.id }) { accountWithBalance ->
+            items(
+                items = accounts.distinctBy { it.account.id },
+                key = { "acc_${it.account.id}" },
+            ) { accountWithBalance ->
                 AccountListItem(
                     modifier = Modifier.animateItemPlacement(),
                     accountWithBalance = accountWithBalance,

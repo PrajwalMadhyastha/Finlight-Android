@@ -32,6 +32,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModelFactory
 import io.pm.finlight.ui.viewmodel.RecurringTransactionViewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -167,7 +169,7 @@ private fun RecurringTransactionItem(
 @Composable
 fun ConfirmPendingBottomSheet(
     transaction: Transaction,
-    rule: RecurringTransaction,
+    rule: RecurringTransaction? = null,
     onDismiss: () -> Unit,
     pendingViewModel: PendingTransactionsViewModel,
 ) {
@@ -178,7 +180,10 @@ fun ConfirmPendingBottomSheet(
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     var editedAmount by remember { mutableStateOf(transaction.amount.toString()) }
-    val showAmountField = rule.isVariableBill
+    val showAmountField = rule?.isVariableBill == true
+    val parsedAmount = editedAmount.toDoubleOrNull()
+    val isAmountValid = parsedAmount != null && parsedAmount > 0.0 && !parsedAmount.isNaN() && !parsedAmount.isInfinite()
+    val isConfirmEnabled = !showAmountField || isAmountValid
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -205,29 +210,44 @@ fun ConfirmPendingBottomSheet(
             GlassPanel(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        text = rule.description,
+                        text = rule?.description ?: transaction.description,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     Text(
-                        text = "Expected: ${currencyFormat.format(rule.amount)}",
+                        text =
+                            if (rule != null) {
+                                "Expected: ${currencyFormat.format(rule.amount)}"
+                            } else {
+                                "Amount: ${currencyFormat.format(transaction.amount)}"
+                            },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        text = "Repeats ${rule.recurrenceInterval}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    if (rule != null) {
+                        Text(
+                            text = "Repeats ${rule.recurrenceInterval}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
             if (showAmountField) {
+                val isError = !isAmountValid
                 OutlinedTextField(
                     value = editedAmount,
                     onValueChange = { editedAmount = it },
                     label = { Text("Actual Amount") },
+                    isError = isError,
+                    supportingText =
+                        if (isError) {
+                            { Text("Enter a valid amount greater than 0") }
+                        } else {
+                            null
+                        },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -246,10 +266,13 @@ fun ConfirmPendingBottomSheet(
 
             Button(
                 onClick = {
-                    val confirmedAmount = if (showAmountField) editedAmount.toDoubleOrNull() else null
-                    pendingViewModel.confirmPending(transaction.id, rule.id, confirmedAmount)
-                    onDismiss()
+                    val confirmedAmount = if (showAmountField) parsedAmount else null
+                    if (!showAmountField || confirmedAmount != null) {
+                        pendingViewModel.confirmPending(transaction.id, rule?.id, confirmedAmount)
+                        onDismiss()
+                    }
                 },
+                enabled = isConfirmEnabled,
                 modifier = Modifier.fillMaxWidth(),
                 colors =
                     ButtonDefaults.buttonColors(
@@ -262,7 +285,7 @@ fun ConfirmPendingBottomSheet(
 
             OutlinedButton(
                 onClick = {
-                    pendingViewModel.skipPending(transaction.id, rule.id)
+                    pendingViewModel.skipPending(transaction.id, rule?.id)
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -278,14 +301,25 @@ fun ConfirmPendingBottomSheet(
 }
 
 @Composable
-fun UpcomingPaymentsCard(navController: NavController) {
-    val pendingViewModel: PendingTransactionsViewModel = viewModel()
+fun UpcomingPaymentsCard(
+    navController: NavController,
+    pendingViewModel: PendingTransactionsViewModel =
+        viewModel(
+            factory = PendingTransactionsViewModelFactory(LocalContext.current.applicationContext as Application),
+        ),
+) {
     val pending by pendingViewModel.pendingTransactions.collectAsState()
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
 
     var selectedTransaction by remember { mutableStateOf<Transaction?>(null) }
 
     val context = LocalContext.current
+    LaunchedEffect(pendingViewModel) {
+        pendingViewModel.uiEvent.collect { message ->
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val recurringViewModel: RecurringTransactionViewModel =
         viewModel(
             factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
@@ -344,14 +378,12 @@ fun UpcomingPaymentsCard(navController: NavController) {
 
     selectedTransaction?.let { txn ->
         val rule = allRules.find { it.id == txn.recurringRuleId }
-        if (rule != null) {
-            ConfirmPendingBottomSheet(
-                transaction = txn,
-                rule = rule,
-                onDismiss = { selectedTransaction = null },
-                pendingViewModel = pendingViewModel,
-            )
-        }
+        ConfirmPendingBottomSheet(
+            transaction = txn,
+            rule = rule,
+            onDismiss = { selectedTransaction = null },
+            pendingViewModel = pendingViewModel,
+        )
     }
 }
 

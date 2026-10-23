@@ -6,7 +6,7 @@
 // (`generateConsistencyCalendarData`, `generateConsistencyDataForMonth`) have been
 // completely removed.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
@@ -17,6 +17,16 @@ import com.github.mikephil.charting.data.BarEntry
 import com.github.mikephil.charting.data.PieData
 import com.github.mikephil.charting.data.PieDataSet
 import com.github.mikephil.charting.data.PieEntry
+import io.pm.finlight.CalendarDayStatus
+import io.pm.finlight.Category
+import io.pm.finlight.ConsistencyStats
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ReportInsights
+import io.pm.finlight.ReportPeriod
+import io.pm.finlight.ReportScreenData
+import io.pm.finlight.SpendingStatus
+import io.pm.finlight.TransactionType
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -40,7 +50,7 @@ enum class ReportViewType {
 @OptIn(ExperimentalCoroutinesApi::class)
 class ReportsViewModel(
     private val transactionRepository: ITransactionRepository,
-    private val categoryDao: CategoryDao,
+    private val categoryRepository: ICategoryRepository,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
@@ -65,7 +75,7 @@ class ReportsViewModel(
 
     init {
         allCategories =
-            categoryDao.getAllCategories()
+            categoryRepository.allCategories
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5000),
@@ -148,11 +158,12 @@ class ReportsViewModel(
 
                     ReportScreenData(finalPieData, finalTrendData, periodTitle, insights)
                 }
-            }.stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = ReportScreenData(null, null, "This Month", null),
-            )
+            }.flowOn(dispatcherProvider.default)
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = ReportScreenData(null, null, "This Month", null),
+                )
 
         // --- REFACTORED: Use the new "Monthly-First" centralized logic ---
         consistencyCalendarData =
@@ -194,13 +205,13 @@ class ReportsViewModel(
             }.flowOn(dispatcherProvider.default)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-        val today = Calendar.getInstance()
         displayedConsistencyStats =
             combine(
                 reportViewType,
                 consistencyCalendarData,
                 detailedMonthData,
             ) { viewType, yearlyData, monthlyData ->
+                val today = Calendar.getInstance()
                 val dataToProcess =
                     if (viewType == ReportViewType.YEARLY) {
                         yearlyData

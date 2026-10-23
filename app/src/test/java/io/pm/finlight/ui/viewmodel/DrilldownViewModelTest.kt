@@ -10,15 +10,15 @@ import android.os.Build
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
-import io.pm.finlight.DrilldownType
-import io.pm.finlight.DrilldownViewModel
-import io.pm.finlight.PeriodTotal
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.MonthlyTrend
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import java.util.Calendar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -26,10 +26,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
@@ -46,9 +49,10 @@ class DrilldownViewModelTest {
     var instantTaskExecutorRule = InstantTaskExecutorRule()
 
     private val testDispatcher = UnconfinedTestDispatcher()
+    private val testDispatcherProvider = io.pm.finlight.utils.TestDispatcherProvider(testDispatcher)
 
     @Mock
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionRepository: ITransactionRepository
 
     private lateinit var viewModel: DrilldownViewModel
 
@@ -76,29 +80,23 @@ class DrilldownViewModelTest {
             ),
         )
 
-    private val mockPeriodTotals =
-        listOf(
-            PeriodTotal("2025-01", 100.0),
-            PeriodTotal("2025-02", 150.0),
-        )
-
     @Test
-    fun `when dimension is CATEGORY, it calls correct DAO methods`() =
+    fun `when dimension is CATEGORY, it calls correct repository methods`() =
         runTest {
             // Arrange
             val categoryName = "Food"
             val mockMonthlyTrends =
                 listOf(
-                    io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
-                    io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
+                    MonthlyTrend("2025-01", 50.0, 100.0),
+                    MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionAnalyticsDao.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.CATEGORY, categoryName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, categoryName, 1, 2025, testDispatcherProvider)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -108,33 +106,54 @@ class DrilldownViewModelTest {
 
             viewModel.monthlyTrendChartData.test {
                 // Test that the chart data is processed correctly
-                val chartData = awaitItem()
+                val item = awaitItem()
+                val chartData = if (item == null) awaitItem() else item
                 assertEquals(6, chartData?.second?.size) // 6 months of labels
                 assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets (income + expense)
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionAnalyticsDao).getTransactionsForCategoryName(anyString(), anyLong(), anyLong())
-            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+            verify(transactionRepository).getTransactionsForCategoryName(anyString(), startCaptor.capture(), endCaptor.capture())
+            verify(transactionRepository).getMonthlyTrends(anyLong())
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2025, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2025, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, endCal.get(Calendar.MONTH))
+            assertEquals(31, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
         }
 
     @Test
-    fun `when dimension is MERCHANT, it calls correct DAO methods`() =
+    fun `when dimension is MERCHANT, it calls correct repository methods`() =
         runTest {
             // Arrange
             val merchantName = "Amazon"
             val mockMonthlyTrends =
                 listOf(
-                    io.pm.finlight.MonthlyTrend("2025-01", 50.0, 100.0),
-                    io.pm.finlight.MonthlyTrend("2025-02", 75.0, 150.0),
+                    MonthlyTrend("2025-01", 50.0, 100.0),
+                    MonthlyTrend("2025-02", 75.0, 150.0),
                 )
             `when`(
-                transactionAnalyticsDao.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
+                transactionRepository.getTransactionsForMerchantName(anyString(), anyLong(), anyLong()),
             ).thenReturn(flowOf(mockTransactionDetails))
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockMonthlyTrends))
 
             // Act
-            viewModel = DrilldownViewModel(transactionAnalyticsDao, DrilldownType.MERCHANT, merchantName, 1, 2025)
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.MERCHANT, merchantName, 1, 2025, testDispatcherProvider)
 
             // Assert
             viewModel.transactionsForMonth.test {
@@ -143,13 +162,108 @@ class DrilldownViewModelTest {
             }
 
             viewModel.monthlyTrendChartData.test {
-                val chartData = awaitItem()
+                val item = awaitItem()
+                val chartData = if (item == null) awaitItem() else item
                 assertEquals(6, chartData?.second?.size)
                 assertEquals(12, chartData?.first?.entryCount) // 6 months x 2 datasets
                 cancelAndIgnoreRemainingEvents()
             }
 
-            verify(transactionAnalyticsDao).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
-            verify(transactionAnalyticsDao).getMonthlyTrends(anyLong())
+            verify(transactionRepository).getTransactionsForMerchantName(anyString(), anyLong(), anyLong())
+            verify(transactionRepository).getMonthlyTrends(anyLong())
+        }
+
+    @Test
+    fun `when monthly trends are empty, monthlyTrendChartData emits null`() =
+        runTest {
+            // Arrange
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+            ).thenReturn(flowOf(mockTransactionDetails))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+
+            // Act
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, "Food", 1, 2025, testDispatcherProvider)
+
+            // Assert
+            viewModel.monthlyTrendChartData.test {
+                assertNull(awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `monthlyTrendChartData reactively updates when repository flow emits new trends`() =
+        runTest {
+            val trendsFlow = MutableSharedFlow<List<MonthlyTrend>>()
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), anyLong(), anyLong()),
+            ).thenReturn(flowOf(mockTransactionDetails))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(trendsFlow)
+
+            viewModel = DrilldownViewModel(transactionRepository, DrilldownType.CATEGORY, "Food", 1, 2025, testDispatcherProvider)
+
+            viewModel.monthlyTrendChartData.test {
+                // Initial emission before any trends emitted
+                assertNull(awaitItem())
+
+                // First emission: 1 month of trends
+                trendsFlow.emit(listOf(MonthlyTrend("2025-01", 50.0, 100.0)))
+                val firstData = awaitItem()
+                assertNotNull(firstData)
+                assertEquals(6, firstData!!.second.size)
+
+                // Second emission: Updated trends
+                trendsFlow.emit(
+                    listOf(
+                        MonthlyTrend("2025-01", 50.0, 100.0),
+                        MonthlyTrend("2025-02", 75.0, 150.0),
+                    ),
+                )
+                val secondData = awaitItem()
+                assertNotNull(secondData)
+                assertEquals(6, secondData!!.second.size)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `when initialized for February, month boundaries match expected days without rollover`() =
+        runTest {
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+            `when`(
+                transactionRepository.getTransactionsForCategoryName(anyString(), startCaptor.capture(), endCaptor.capture()),
+            ).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+
+            // Act - Feb 2025 (28 days)
+            DrilldownViewModel(
+                transactionRepository = transactionRepository,
+                drilldownType = DrilldownType.CATEGORY,
+                entityName = "Groceries",
+                month = 2,
+                year = 2025,
+                dispatcherProvider = testDispatcherProvider,
+            )
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2025, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.FEBRUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2025, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.FEBRUARY, endCal.get(Calendar.MONTH))
+            assertEquals(28, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
         }
 }

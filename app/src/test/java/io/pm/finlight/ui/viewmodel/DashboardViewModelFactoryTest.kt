@@ -15,6 +15,7 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -80,6 +81,18 @@ class DashboardViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
+
+        val useCase =
+            DashboardViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
+                isAccessible = true
+            }.get(viewModel) as GetMonthlyConsistencyDataUseCase
+        assertNotNull(useCase)
+
+        val useCaseTxnRepo =
+            GetMonthlyConsistencyDataUseCase::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(useCase)
+        assertSame(mockTxnRepo, useCaseTxnRepo)
 
         verify { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) }
         verify { mockAccountRepo.accountsWithBalance }

@@ -1,12 +1,10 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 
 class TimePeriodReportViewModelFactory(
     private val application: Application,
@@ -16,22 +14,13 @@ class TimePeriodReportViewModelFactory(
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            val getMonthlyConsistencyDataUseCase =
-                GetMonthlyConsistencyDataUseCase(
-                    settingsRepository = settingsRepository,
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    dispatcherProvider = dispatcherProvider,
-                )
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val getMonthlyConsistencyDataUseCase = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
 
             @Suppress("UNCHECKED_CAST")
             return TimePeriodReportViewModel(
-                transactionQueryDao = db.transactionQueryDao(),
-                transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionRepository = transactionRepository,
                 settingsRepository = settingsRepository,
                 timePeriod = timePeriod,

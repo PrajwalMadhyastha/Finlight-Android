@@ -38,7 +38,7 @@ fun SmsDebugScreen(
     transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = SmsDebugViewModelFactory(application, transactionViewModel)
+    val factory = SmsDebugViewModelFactory(application)
     val viewModel: SmsDebugViewModel = viewModel(factory = factory)
 
     val uiState by viewModel.uiState.collectAsState()

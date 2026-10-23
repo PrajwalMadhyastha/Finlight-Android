@@ -11,8 +11,7 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
@@ -22,6 +21,8 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -31,12 +32,12 @@ import kotlin.math.min
 import kotlin.math.roundToLong
 
 class AccountViewModel(
-    application: Application,
     private val repository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
     private val mergeAccountsUseCase: MergeAccountsUseCase,
-) : AndroidViewModel(application) {
+    private val computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -52,7 +53,7 @@ class AccountViewModel(
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
     init {
-        viewModelScope.launch {
+        viewModelScope.launch(computationDispatcher) {
             combine(
                 repository.accountsWithBalance,
                 settingsRepository.getDismissedMergeSuggestions(),
@@ -93,15 +94,19 @@ class AccountViewModel(
                 val suggestionKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
                 if (suggestionKey in dismissedKeys) continue
 
-                val normalizedName1 = normalizeAccountName(account1.name)
-                val normalizedName2 = normalizeAccountName(account2.name)
+                runCatching {
+                    val safeName1 = account1.name.take(64)
+                    val safeName2 = account2.name.take(64)
+                    val normalizedName1 = normalizeAccountName(safeName1)
+                    val normalizedName2 = normalizeAccountName(safeName2)
 
-                // Skip comparison if normalization results in an empty string
-                if (normalizedName1.isBlank() || normalizedName2.isBlank()) continue
-
-                val similarity = calculateSimilarity(normalizedName1, normalizedName2)
-                if (similarity > 0.85) { // 85% similarity threshold
-                    suggestions.add(Pair(account1, account2))
+                    // Skip comparison if normalization results in an empty string
+                    if (normalizedName1.isNotBlank() && normalizedName2.isNotBlank()) {
+                        val similarity = calculateSimilarity(normalizedName1, normalizedName2)
+                        if (similarity > 0.85) { // 85% similarity threshold
+                            suggestions.add(Pair(account1, account2))
+                        }
+                    }
                 }
             }
         }
@@ -227,7 +232,7 @@ class AccountViewModel(
         excludeAccountId: Int? = null,
     ): AccountMatch {
         val accounts = repository.getAllAccountsSnapshot()
-        val normalizedInput = normalizeAccountName(name)
+        val normalizedInput = normalizeAccountName(name.take(64))
 
         val exactMatch = accounts.find { it.name.equals(name, ignoreCase = true) && it.id != excludeAccountId }
         if (exactMatch != null) return AccountMatch(exactMatch, MatchType.EXACT)
@@ -235,7 +240,7 @@ class AccountViewModel(
         if (normalizedInput.isNotBlank()) {
             for (account in accounts) {
                 if (account.id == excludeAccountId) continue
-                val normalizedExisting = normalizeAccountName(account.name)
+                val normalizedExisting = normalizeAccountName(account.name.take(64))
                 if (normalizedExisting.isBlank()) continue
                 if (calculateSimilarity(normalizedInput, normalizedExisting) > 0.85) {
                     return AccountMatch(account, MatchType.SIMILAR)

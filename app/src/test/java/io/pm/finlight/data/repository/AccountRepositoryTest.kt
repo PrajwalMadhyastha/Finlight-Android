@@ -16,6 +16,9 @@ import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.asExecutor
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -232,5 +235,162 @@ class AccountRepositoryTest : BaseViewModelTest() {
                     repoWithoutUseCase.mergeAccounts(1, listOf(2))
                 }
             assertEquals("MergeAccountsUseCase must be provided to call mergeAccounts on AccountRepository", exception.message)
+        }
+
+    private fun mockWithTransaction() {
+        mockkStatic("androidx.room.RoomDatabaseKt")
+        coEvery { db.withTransaction<Any?>(any()) } coAnswers {
+            writableDb.beginTransaction()
+            try {
+                @Suppress("UNCHECKED_CAST")
+                val block = it.invocation.args[1] as suspend () -> Any?
+                val result = block()
+                writableDb.setTransactionSuccessful()
+                result
+            } finally {
+                writableDb.endTransaction()
+            }
+        }
+    }
+
+    @Test
+    fun `findOrCreateByName returns existing account when found by exact name`() =
+        runTest {
+            mockWithTransaction()
+            val existing = Account(id = 1, name = "HDFC", type = "Bank Account")
+            `when`(accountAliasDao.findByAlias("HDFC")).thenReturn(null)
+            `when`(accountDao.findByName("HDFC")).thenReturn(existing)
+
+            val result = repository.findOrCreateByName("HDFC", AccountType.BANK)
+
+            assertEquals(existing, result)
+            verify(accountDao, never()).insert(org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `findOrCreateByName resolves via alias when alias exists`() =
+        runTest {
+            mockWithTransaction()
+            val alias = AccountAlias(aliasName = "HDFC-123", destinationAccountId = 2)
+            val destinationAccount = Account(id = 2, name = "HDFC Main", type = "Bank Account")
+            `when`(accountAliasDao.findByAlias("HDFC-123")).thenReturn(alias)
+            `when`(accountDao.getAccountByIdSync(2)).thenReturn(destinationAccount)
+
+            val result = repository.findOrCreateByName("HDFC-123")
+
+            assertEquals(destinationAccount, result)
+            verify(accountDao, never()).findByName(org.mockito.kotlin.any())
+            verify(accountDao, never()).insert(org.mockito.kotlin.any())
+        }
+
+    @Test
+    fun `findOrCreateByName falls back to name lookup when alias target account is null`() =
+        runTest {
+            mockWithTransaction()
+            val alias = AccountAlias(aliasName = "OldAlias", destinationAccountId = 99)
+            val created = Account(id = 3, name = "OldAlias", type = "Other")
+            `when`(accountAliasDao.findByAlias("OldAlias")).thenReturn(alias)
+            `when`(accountDao.getAccountByIdSync(99)).thenReturn(null)
+            `when`(accountDao.findByName("OldAlias")).thenReturn(null)
+            `when`(accountDao.insert(Account(name = "OldAlias", type = "Other"))).thenReturn(3L)
+            `when`(accountDao.getAccountByIdSync(3)).thenReturn(created)
+
+            val result = repository.findOrCreateByName("OldAlias")
+
+            assertEquals(created, result)
+            verify(accountDao).insert(Account(name = "OldAlias", type = "Other"))
+        }
+
+    @Test
+    fun `findOrCreateByName creates new account with default AccountType OTHER`() =
+        runTest {
+            mockWithTransaction()
+            val newAccount = Account(id = 5, name = "New Bank", type = "Other")
+            `when`(accountAliasDao.findByAlias("New Bank")).thenReturn(null)
+            `when`(accountDao.findByName("New Bank")).thenReturn(null)
+            `when`(accountDao.insert(Account(name = "New Bank", type = "Other"))).thenReturn(5L)
+            `when`(accountDao.getAccountByIdSync(5)).thenReturn(newAccount)
+
+            val result = repository.findOrCreateByName("New Bank")
+
+            assertEquals(newAccount, result)
+            verify(accountDao).insert(Account(name = "New Bank", type = "Other"))
+        }
+
+    @Test
+    fun `findOrCreateByName creates new account with custom string type`() =
+        runTest {
+            mockWithTransaction()
+            val newAccount = Account(id = 6, name = "Wallet", type = "CustomWallet")
+            `when`(accountAliasDao.findByAlias("Wallet")).thenReturn(null)
+            `when`(accountDao.findByName("Wallet")).thenReturn(null)
+            `when`(accountDao.insert(Account(name = "Wallet", type = "CustomWallet"))).thenReturn(6L)
+            `when`(accountDao.getAccountByIdSync(6)).thenReturn(newAccount)
+
+            val result = repository.findOrCreateByName("Wallet", "CustomWallet")
+
+            assertEquals(newAccount, result)
+            verify(accountDao).insert(Account(name = "Wallet", type = "CustomWallet"))
+        }
+
+    @Test
+    fun `findOrCreateByName handles IGNORE conflict on insert by falling back to findByName`() =
+        runTest {
+            mockWithTransaction()
+            val existing = Account(id = 7, name = "ConcurrentBank", type = "General")
+            `when`(accountAliasDao.findByAlias("ConcurrentBank")).thenReturn(null)
+            `when`(accountDao.findByName("ConcurrentBank"))
+                .thenReturn(null)
+                .thenReturn(existing)
+            `when`(accountDao.insert(Account(name = "ConcurrentBank", type = "General"))).thenReturn(-1L)
+
+            val result = repository.findOrCreateByName("ConcurrentBank", "General")
+
+            assertEquals(existing, result)
+            verify(accountDao, times(2)).findByName("ConcurrentBank")
+        }
+
+    @Test
+    fun `findOrCreateByName throws IllegalStateException when insert conflict cannot find account`() =
+        runTest {
+            mockWithTransaction()
+            `when`(accountAliasDao.findByAlias("GhostBank")).thenReturn(null)
+            `when`(accountDao.findByName("GhostBank")).thenReturn(null)
+            `when`(accountDao.insert(Account(name = "GhostBank", type = "General"))).thenReturn(-1L)
+
+            assertFailsWith<IllegalStateException> {
+                repository.findOrCreateByName("GhostBank", "General")
+            }
+        }
+
+    @Test
+    fun `findOrCreateByName throws IllegalArgumentException when name is blank`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                repository.findOrCreateByName("")
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.findOrCreateByName("   ")
+            }
+        }
+
+    @Test
+    fun `findOrCreateByName handles concurrent requests thread-safely`() =
+        runTest {
+            mockWithTransaction()
+            val existing = Account(id = 10, name = "SharedBank", type = "Other")
+            `when`(accountAliasDao.findByAlias("SharedBank")).thenReturn(null)
+            `when`(accountDao.findByName("SharedBank")).thenReturn(existing)
+
+            val results =
+                coroutineScope {
+                    (1..5).map {
+                        async {
+                            repository.findOrCreateByName("SharedBank")
+                        }
+                    }.awaitAll()
+                }
+
+            results.forEach { assertEquals(existing, it) }
         }
 }

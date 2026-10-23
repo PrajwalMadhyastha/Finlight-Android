@@ -15,9 +15,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
+import kotlin.test.assertEquals
+import kotlin.test.assertNull
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
@@ -111,5 +113,75 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
             repository.delete(rule)
             // Assert
             verify(recurringTransactionDao).delete(rule)
+        }
+
+    @Test
+    fun `getRuleById calls DAO`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val expectedRule =
+                RecurringTransaction(
+                    id = ruleId,
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                )
+            `when`(recurringTransactionDao.getRuleById(ruleId)).thenReturn(expectedRule)
+
+            // Act
+            val result = repository.getRuleById(ruleId)
+
+            // Assert
+            assertEquals(expectedRule, result)
+            verify(recurringTransactionDao).getRuleById(ruleId)
+        }
+
+    @Test
+    fun `getRuleById returns null when DAO returns null`() =
+        runTest {
+            // Arrange
+            val ruleId = 99
+            `when`(recurringTransactionDao.getRuleById(ruleId)).thenReturn(null)
+
+            // Act
+            val result = repository.getRuleById(ruleId)
+
+            // Assert
+            assertNull(result)
+            verify(recurringTransactionDao).getRuleById(ruleId)
+        }
+
+    @Test
+    fun `updateLastRunDate calls DAO`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val lastRunDate = 1700000000000L
+
+            // Act
+            repository.updateLastRunDate(ruleId, lastRunDate)
+
+            // Assert
+            verify(recurringTransactionDao).updateLastRunDate(ruleId, lastRunDate)
+        }
+
+    @Test
+    fun `updateLastRunAndSkipCount calls DAO`() =
+        runTest {
+            // Arrange
+            val ruleId = 5
+            val lastRunDate = 1700000000000L
+            val skipCount = 2
+
+            // Act
+            repository.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+
+            // Assert
+            verify(recurringTransactionDao).updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
         }
 }

@@ -8,11 +8,13 @@ import androidx.room.withTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.TestDispatcherProvider
@@ -34,6 +36,8 @@ import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
 import java.util.*
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -50,6 +54,9 @@ class TransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var manageReimbursementUseCase: ManageReimbursementUseCase
 
+    @Mock
+    private lateinit var deletedSmsHashDao: io.pm.finlight.data.db.dao.DeletedSmsHashDao
+
     private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var repository: TransactionRepository
 
@@ -58,6 +65,7 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         super.setup()
 
         testDispatcherProvider = TestDispatcherProvider(testDispatcher)
+        whenever(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         // Mock withTransaction
         mockkStatic("androidx.room.RoomDatabaseKt")
@@ -122,8 +130,113 @@ class TransactionRepositoryTest : BaseViewModelTest() {
 
             repository.linkTransfer(1, 2)
 
+            coVerify { db.withTransaction<Any?>(any()) }
             verify(transactionDao).updateTransferLinkStatus(1, 2, true)
             verify(transactionDao).updateTransferLinkStatus(2, 1, true)
+        }
+
+    // ── Pending Transactions, Confirmation & Skip Tests ─────────────────────────
+
+    @Test
+    fun `getPendingTransactionsFlow delegates to transactionQueryDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val pendingList =
+                listOf(
+                    Transaction(
+                        id = 1,
+                        description = "Pending Bill",
+                        amount = 100.0,
+                        date = 1000L,
+                        accountId = 1,
+                        categoryId = 1,
+                        notes = null,
+                        status = TransactionStatus.PENDING,
+                    ),
+                )
+            whenever(transactionDao.getPendingTransactions()).thenReturn(flowOf(pendingList))
+
+            repository.getPendingTransactionsFlow().test {
+                val item = awaitItem()
+                assertEquals(pendingList, item)
+                awaitComplete()
+            }
+
+            verify(transactionDao).getPendingTransactions()
+        }
+
+    @Test
+    fun `confirmTransaction without confirmedAmount only calls confirmTransaction atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42)
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount updates amount and confirms atomically`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            val inOrder = inOrder(transactionDao)
+            inOrder.verify(transactionDao).updateAmount(42, 150.0)
+            inOrder.verify(transactionDao).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with confirmedAmount propagates exception when updateAmount fails`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            whenever(transactionDao.updateAmount(eq(42), eq(150.0))).thenThrow(RuntimeException("DB failure"))
+
+            assertFailsWith<RuntimeException> {
+                repository.confirmTransaction(transactionId = 42, confirmedAmount = 150.0)
+            }
+
+            coVerify { db.withTransaction<Any?>(any()) }
+            verify(transactionDao).updateAmount(42, 150.0)
+            verify(transactionDao, never()).confirmTransaction(42)
+        }
+
+    @Test
+    fun `confirmTransaction with invalid confirmedAmount throws IllegalArgumentException without DB interaction`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            val invalidAmounts = listOf(0.0, -10.0, Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY)
+            for (invalidAmount in invalidAmounts) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = 42, confirmedAmount = invalidAmount)
+                }
+            }
+
+            coVerify(exactly = 0) { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).updateAmount(any(), any())
+            verify(transactionDao, never()).confirmTransaction(any())
+        }
+
+    @Test
+    fun `skipTransaction delegates to transactionWriteDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.skipTransaction(transactionId = 42)
+
+            verify(transactionDao).skipTransaction(42)
         }
 
     // ── Reimbursement / Offset Feature Tests ──────────────────────────────────
@@ -457,6 +570,61 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(listOf(1, 2, 3), ids)
         }
 
+    @Test
+    fun `existsBySmsHash delegates to transactionDao existsBySmsHash`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            `when`(transactionDao.existsBySmsHash("test_hash_1")).thenReturn(true)
+            `when`(transactionDao.existsBySmsHash("test_hash_2")).thenReturn(false)
+
+            val exists1 = repository.existsBySmsHash("test_hash_1")
+            val exists2 = repository.existsBySmsHash("test_hash_2")
+
+            assertTrue(exists1)
+            assertFalse(exists2)
+            verify(transactionDao).existsBySmsHash("test_hash_1")
+            verify(transactionDao).existsBySmsHash("test_hash_2")
+        }
+
+    @Test
+    fun `updateSmsHashByLegacy delegates to transactionDao updateSmsHashByLegacy`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.updateSmsHashByLegacy("old_hash", "new_hash")
+
+            verify(transactionDao).updateSmsHashByLegacy("old_hash", "new_hash")
+        }
+
+    @Test
+    fun `existsDeletedSmsHash delegates to deletedSmsHashDao existsByHash`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            `when`(deletedSmsHashDao.existsByHash("del_hash_1")).thenReturn(true)
+            `when`(deletedSmsHashDao.existsByHash("del_hash_2")).thenReturn(false)
+
+            assertTrue(repository.existsDeletedSmsHash("del_hash_1"))
+            assertFalse(repository.existsDeletedSmsHash("del_hash_2"))
+            verify(deletedSmsHashDao).existsByHash("del_hash_1")
+            verify(deletedSmsHashDao).existsByHash("del_hash_2")
+        }
+
+    @Test
+    fun `insertDeletedSmsHash delegates to deletedSmsHashDao insert`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            repository.insertDeletedSmsHash("del_hash_new")
+
+            verify(deletedSmsHashDao).insert(io.pm.finlight.data.db.entity.DeletedSmsHash("del_hash_new"))
+        }
+
     // ── Constructors and Dispatcher Injection Tests ────────────────────────────
 
     @Suppress("DEPRECATION")
@@ -501,5 +669,176 @@ class TransactionRepositoryTest : BaseViewModelTest() {
                 )
             assertNotNull(repo)
             assertEquals(customDispatcher, repo.dispatcherProvider)
+        }
+
+    @Test
+    fun `searchTransactions delegates to transactionQueryDao with filter parameters`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedResults =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 10, description = "Coffee", amount = 4.5, date = 1000L, accountId = 1, categoryId = 2, notes = null),
+                        emptyList(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                    ),
+                )
+            val filter =
+                SearchFilter(
+                    accountId = 1,
+                    categoryId = 2,
+                    tagId = 3,
+                    transactionType = TransactionType.EXPENSE,
+                    startDate = 500L,
+                    endDate = 1500L,
+                )
+            `when`(
+                transactionDao.searchTransactions(
+                    keyword = "Coffee",
+                    accountId = 1,
+                    categoryId = 2,
+                    transactionType = TransactionType.EXPENSE,
+                    startDate = 500L,
+                    endDate = 1500L,
+                    tagId = 3,
+                ),
+            ).thenReturn(flowOf(expectedResults))
+
+            val resultFlow =
+                repository.searchTransactions(
+                    query = "Coffee",
+                    filter = filter,
+                )
+
+            resultFlow.test {
+                val emitted = awaitItem()
+                assertEquals(expectedResults, emitted)
+                awaitComplete()
+            }
+
+            verify(transactionDao).searchTransactions(
+                keyword = "Coffee",
+                accountId = 1,
+                categoryId = 2,
+                transactionType = TransactionType.EXPENSE,
+                startDate = 500L,
+                endDate = 1500L,
+                tagId = 3,
+            )
+        }
+
+    @Test
+    fun `getFinancialSummaryForRange delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedSummary = FinancialSummary(totalIncome = 500.0, totalExpenses = 250.0)
+            `when`(transactionDao.getFinancialSummaryForRange(100L, 200L)).thenReturn(expectedSummary)
+
+            val result = repository.getFinancialSummaryForRange(100L, 200L)
+
+            assertEquals(expectedSummary, result)
+            verify(transactionDao).getFinancialSummaryForRange(100L, 200L)
+        }
+
+    @Test
+    fun `getTopSpendingCategoriesForRange delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedCategories = listOf(CategorySpending("Food", 150.0, "red", "food_icon"))
+            `when`(transactionDao.getTopSpendingCategoriesForRange(100L, 200L)).thenReturn(expectedCategories)
+
+            val result = repository.getTopSpendingCategoriesForRange(100L, 200L)
+
+            assertEquals(expectedCategories, result)
+            verify(transactionDao).getTopSpendingCategoriesForRange(100L, 200L)
+        }
+
+    @Test
+    fun `getDailyTrends delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTrends = listOf(DailyTrend("2026-01-01", 100.0, 50.0))
+            `when`(transactionDao.getDailyTrends(100L, 200L)).thenReturn(flowOf(expectedTrends))
+
+            repository.getDailyTrends(100L, 200L).test {
+                assertEquals(expectedTrends, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getDailyTrends(100L, 200L)
+        }
+
+    @Test
+    fun `getWeeklyTrends delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTrends = listOf(WeeklyTrend("2026-01", 700.0, 350.0))
+            `when`(transactionDao.getWeeklyTrends(100L, 200L)).thenReturn(flowOf(expectedTrends))
+
+            repository.getWeeklyTrends(100L, 200L).test {
+                assertEquals(expectedTrends, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getWeeklyTrends(100L, 200L)
+        }
+
+    @Test
+    fun `getTransactionsForCategoryName delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 1, description = "Lunch", categoryId = 1, amount = 25.0, date = 150L, accountId = 1, notes = null),
+                        emptyList(),
+                        "Account",
+                        "Food",
+                        "icon",
+                        "color",
+                        null,
+                    ),
+                )
+            `when`(transactionDao.getTransactionsForCategoryName("Food", 100L, 200L)).thenReturn(flowOf(expectedTransactions))
+
+            repository.getTransactionsForCategoryName("Food", 100L, 200L).test {
+                assertEquals(expectedTransactions, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTransactionsForCategoryName("Food", 100L, 200L)
+        }
+
+    @Test
+    fun `getTransactionsForMerchantName delegates to transactionAnalyticsDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedTransactions =
+                listOf(
+                    TransactionDetails(
+                        Transaction(id = 2, description = "Amazon", categoryId = 2, amount = 45.0, date = 150L, accountId = 1, notes = null),
+                        emptyList(),
+                        "Account",
+                        "Shopping",
+                        "icon",
+                        "color",
+                        null,
+                    ),
+                )
+            `when`(transactionDao.getTransactionsForMerchantName("Amazon", 100L, 200L)).thenReturn(flowOf(expectedTransactions))
+
+            repository.getTransactionsForMerchantName("Amazon", 100L, 200L).test {
+                assertEquals(expectedTransactions, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTransactionsForMerchantName("Amazon", 100L, 200L)
         }
 }

@@ -4,9 +4,10 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.utils.TestDispatcherProvider
+import java.util.Calendar
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -21,49 +22,60 @@ import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
-import java.util.Calendar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Mock
-    private lateinit var transactionQueryDao: TransactionQueryDao
+    private lateinit var settingsRepository: ISettingsRepository
 
     @Mock
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionRepository: ITransactionRepository
 
     @Mock
-    private lateinit var settingsRepository: SettingsRepository
+    private lateinit var getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase
 
-    @Mock // --- NEW: Add mock for the new dependency ---
-    private lateinit var transactionRepository: TransactionRepository
+    private val testDispatcherProvider by lazy { TestDispatcherProvider(testDispatcher) }
 
-    @Mock
-    private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+    private fun createViewModel(
+        timePeriod: TimePeriod = TimePeriod.MONTHLY,
+        initialDateMillis: Long? = null,
+        showPreviousMonth: Boolean = false,
+        useCase: GetMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+    ): TimePeriodReportViewModel {
+        return TimePeriodReportViewModel(
+            transactionRepository = transactionRepository,
+            settingsRepository = settingsRepository,
+            timePeriod = timePeriod,
+            initialDateMillis = initialDateMillis,
+            showPreviousMonth = showPreviousMonth,
+            dispatcherProvider = testDispatcherProvider,
+            getMonthlyConsistencyDataUseCase = useCase,
+        )
+    }
 
     @Before
     override fun setup() {
         super.setup()
-        // Setup default mocks that apply to most tests in this file
-        `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
 
         runTest {
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
-            `when`(transactionAnalyticsDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
+            `when`(transactionRepository.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
         }
 
-        `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionAnalyticsDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-        `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
+        `when`(transactionRepository.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(0L))
+        `when`(transactionRepository.getDailySpendingForDateRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
 
-        // --- NEW: Mock the new repository/usecase dependency ---
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
-        // --- FIX: Mock settingsRepository flows to avoid null upstream issue ---
         `when`(settingsRepository.getExcludedIncomeMonths()).thenReturn(flowOf(emptySet()))
         `when`(settingsRepository.getExcludedExpenseMonths()).thenReturn(flowOf(emptySet()))
+        `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null))
     }
 
     @Test
@@ -127,15 +139,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                         null,
                     ),
                 )
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // ACT
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY)
             advanceUntilIdle()
 
             // ASSERT
@@ -149,12 +156,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `selectPreviousPeriod updates selectedDate correctly for MONTHLY`() =
         runTest {
             // Arrange
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY)
             val initialMonth = viewModel.selectedDate.first().get(Calendar.MONTH)
 
             // Act
@@ -171,12 +173,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `selectNextPeriod updates selectedDate correctly for YEARLY`() =
         runTest {
             // Arrange
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY)
             val initialYear = viewModel.selectedDate.first().get(Calendar.YEAR)
 
             // Act
@@ -194,15 +191,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 100.0)
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary) // First call for current
                 .thenReturn(previousSummary) // Second call for previous
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.WEEKLY)
             advanceUntilIdle()
 
             // Assert
@@ -219,14 +211,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 0.0)
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(previousSummary)
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.WEEKLY)
             advanceUntilIdle()
 
             // Assert
@@ -242,14 +230,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val currentSummary = FinancialSummary(0.0, 150.0)
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(null)
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.WEEKLY)
             advanceUntilIdle()
 
             // Assert
@@ -269,12 +253,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             val expectedYear = if (today.get(Calendar.MONTH) == Calendar.JANUARY) today.get(Calendar.YEAR) - 1 else today.get(Calendar.YEAR)
 
             // Act
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, true
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY, null, true)
             advanceUntilIdle()
 
             // Assert
@@ -287,19 +266,13 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `consistencyStats are correctly calculated for monthly view`() =
         runTest {
             // Arrange
-            // We MUST use a fixed "today" for a reliable test, as the VM uses Calendar.getInstance()
-            // We can't easily mock Calendar.getInstance(), so we'll run the test *as if* it's running
-            // on a specific date by mocking the relevant data based on that date.
-            // Let's assume today is Oct 9th, 2025 for this test's logic.
             val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
             val year = testCal.get(Calendar.YEAR)
             val month = testCal.get(Calendar.MONTH) + 1 // 10
             val firstDayOfMonth = (testCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1) }.timeInMillis
 
-            // --- NEW: Mock the repository call for consistency data ---
             val mockData = mutableListOf<CalendarDayStatus>()
             val safeToSpend = 100L
-            // We only mock the first 7 days.
             for (i in 1..7) {
                 val date = (testCal.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, i) }.time
                 val (status, amount) =
@@ -313,39 +286,23 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 mockData.add(CalendarDayStatus(date, status, amount, safeToSpend))
             }
             `when`(getMonthlyConsistencyDataUseCase(year, month)).thenReturn(flowOf(mockData))
-            `when`(transactionQueryDao.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth)) // Mock this for legacy code paths
+            `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(firstDayOfMonth))
 
             // Act
-            // --- FIX: Pass transactionRepository and getMonthlyConsistencyDataUseCase ---
             val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao = transactionQueryDao,
-                    transactionAnalyticsDao = transactionAnalyticsDao,
-                    transactionRepository = transactionRepository,
-                    settingsRepository = settingsRepository,
+                createViewModel(
                     timePeriod = TimePeriod.MONTHLY,
                     initialDateMillis = testCal.timeInMillis,
                     showPreviousMonth = false,
-                    getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                    useCase = getMonthlyConsistencyDataUseCase,
                 )
             advanceUntilIdle()
 
             // Assert
             viewModel.consistencyStats.test {
-                // Await the calculated value.
                 val stats = awaitItem()
-
-                // The ViewModel's `consistencyStats` flow uses the *real* `Calendar.getInstance()`
-                // to filter `relevantData`. My system time is Oct 28, 2025.
-                // The mock data is for Oct 1-7, 2025. All 7 days are before Oct 28, so all are relevant.
-                // Stats from the 7 mocked days:
-                // 1 GOOD (Day 3)
-                // 1 BAD (Day 4)
-                // 4 NO_SPEND (Day 2, 5, 6, 7)
-                // 1 NO_DATA (Day 1)
                 assertEquals(1, stats.goodDays)
                 assertEquals(1, stats.badDays)
-                // --- FIX: The assertion was 6 (based on old logic), but the new logic + mock data correctly produces 4.
                 assertEquals(4, stats.noSpendDays)
                 assertEquals(1, stats.noDataDays)
                 cancelAndIgnoreRemainingEvents()
@@ -361,15 +318,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.WeeklyTrend("2025-40", 500.0, 1000.0),
                     io.pm.finlight.WeeklyTrend("2025-41", 750.0, 1500.0),
                 )
-            `when`(transactionAnalyticsDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(weeklyTrends))
+            `when`(transactionRepository.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(weeklyTrends))
 
             // Act
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.WEEKLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.WEEKLY)
             advanceUntilIdle()
 
             // Assert
@@ -391,14 +343,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.DailyTrend("2025-10-08", 100.0, 50.0),
                     io.pm.finlight.DailyTrend("2025-10-09", 200.0, 100.0),
                 )
-            `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(dailyTrends))
+            `when`(transactionRepository.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(dailyTrends))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.DAILY)
             advanceUntilIdle()
 
             // Assert
@@ -420,14 +368,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     io.pm.finlight.MonthlyTrend("2025-09", 1000.0, 500.0),
                     io.pm.finlight.MonthlyTrend("2025-10", 2000.0, 1000.0),
                 )
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(monthlyTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(monthlyTrends))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY)
             advanceUntilIdle()
 
             // Assert
@@ -449,18 +393,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     MonthlyTrend("$currentYear-01", 1000.0, 500.0),
                     MonthlyTrend("$currentYear-02", 1200.0, 600.0),
                 )
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockTrends))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(mockTrends))
 
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.YEARLY,
-                    null,
-                    false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY)
             advanceUntilIdle()
 
             viewModel.chartData.test {
@@ -476,15 +411,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `chartData returns null when DAO returns empty data`() =
         runTest {
             // Arrange
-            `when`(transactionAnalyticsDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.DAILY)
             advanceUntilIdle()
 
             // Assert
@@ -504,17 +434,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 }.timeInMillis
 
             // Act
-            // --- FIX: Pass transactionRepository ---
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    specificDate,
-                    false,
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY, specificDate, false)
             advanceUntilIdle()
 
             // Assert
@@ -532,61 +452,42 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     set(2026, Calendar.JANUARY, 15, 12, 0, 0)
                     set(Calendar.MILLISECOND, 0)
                 }
-            val actualToday = Calendar.getInstance()
-            val todayDayOfMonth = actualToday.get(Calendar.DAY_OF_MONTH)
 
-            // Mock current period: Jan 1 to today
             val currentSummary = FinancialSummary(0.0, 150.0)
-            // Mock previous period: Jan 1 to same day last year
             val previousSummary = FinancialSummary(0.0, 100.0)
 
-            // We need to verify the exact date ranges being queried
             var currentStartCaptured = 0L
             var currentEndCaptured = 0L
             var previousStartCaptured = 0L
             var previousEndCaptured = 0L
 
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
-                // First call is for current period
                 if (currentStartCaptured == 0L) {
                     currentStartCaptured = start
                     currentEndCaptured = end
                     currentSummary
                 } else {
-                    // Second call is for previous period
                     previousStartCaptured = start
                     previousEndCaptured = end
                     previousSummary
                 }
             }
 
-            // Mock getMonthlyTrends for chart data generation
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    testDate.timeInMillis,
-                    false,
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
             viewModel.insights.test {
                 val insights = awaitItem()
 
-                // Verify percentage change calculation
-                assertEquals(50, insights?.percentageChange) // (150 - 100) / 100 * 100 = 50%
+                assertEquals(50, insights?.percentageChange)
 
-                // Determine if the period end (Jan 31, 2026) is in the future relative to "now"
                 val actualNow = Calendar.getInstance()
                 val todayDayOfMonth = actualNow.get(Calendar.DAY_OF_MONTH)
                 val periodEndCal =
@@ -596,7 +497,6 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     }
                 val isFuture = periodEndCal.after(actualNow)
 
-                // Verify current period is Jan 1, 2026
                 val currentStartCal = Calendar.getInstance().apply { timeInMillis = currentStartCaptured }
                 assertEquals(2026, currentStartCal.get(Calendar.YEAR))
                 assertEquals(Calendar.JANUARY, currentStartCal.get(Calendar.MONTH))
@@ -604,16 +504,13 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
                 val currentEndCal = Calendar.getInstance().apply { timeInMillis = currentEndCaptured }
                 if (isFuture) {
-                    // Should clamp to today
                     assertEquals(actualNow.get(Calendar.YEAR), currentEndCal.get(Calendar.YEAR))
                     assertEquals(actualNow.get(Calendar.MONTH), currentEndCal.get(Calendar.MONTH))
                     assertEquals(todayDayOfMonth, currentEndCal.get(Calendar.DAY_OF_MONTH))
                 } else {
-                    // Full month (Jan 31)
                     assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
                 }
 
-                // Verify previous period is Jan 1 to same day last year (2025)
                 val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
                 assertEquals(2025, previousStartCal.get(Calendar.YEAR))
                 assertEquals(Calendar.JANUARY, previousStartCal.get(Calendar.MONTH))
@@ -621,12 +518,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
                 val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
                 if (isFuture) {
-                    // Same relative day of month in 2025
                     assertEquals(2025, previousEndCal.get(Calendar.YEAR))
                     assertEquals(Calendar.JANUARY, previousEndCal.get(Calendar.MONTH))
                     assertEquals(todayDayOfMonth, previousEndCal.get(Calendar.DAY_OF_MONTH))
                 } else {
-                    // Full month (Jan 31, 2025)
                     assertEquals(2025, previousEndCal.get(Calendar.YEAR))
                     assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
                 }
@@ -638,8 +533,6 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `insights uses same-period comparison for yearly reports mid-year`() =
         runTest {
-            // Arrange - Simulate viewing Jan 15, 2024 (Past) vs Jan 15, 2026 (Future)
-            // We use 2024 to test "past period" behavior.
             val testDate =
                 Calendar.getInstance().apply {
                     set(2024, Calendar.JANUARY, 15, 12, 0, 0)
@@ -657,7 +550,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousStartCaptured = 0L
             var previousEndCaptured = 0L
 
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
@@ -672,51 +565,34 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                 }
             }
 
-            // Mock getMonthlyTrends for chart data generation
-            `when`(transactionAnalyticsDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.YEARLY,
-                    testDate.timeInMillis,
-                    false,
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
             viewModel.insights.test {
                 val insights = awaitItem()
 
-                // Verify percentage change
-                assertEquals(25, insights?.percentageChange) // (500 - 400) / 400 * 100 = 25%
+                assertEquals(25, insights?.percentageChange)
 
-                // Determine if 2024 is future
                 val actualNow = Calendar.getInstance()
-                val todayDayOfYear = actualNow.get(Calendar.DAY_OF_YEAR)
                 val isFuture = 2024 > actualNow.get(Calendar.YEAR)
 
-                // Verify current period start is Jan 1, 2024
                 val currentStartCal = Calendar.getInstance().apply { timeInMillis = currentStartCaptured }
                 assertEquals(2024, currentStartCal.get(Calendar.YEAR))
                 assertEquals(1, currentStartCal.get(Calendar.DAY_OF_YEAR))
 
                 val currentEndCal = Calendar.getInstance().apply { timeInMillis = currentEndCaptured }
                 if (isFuture) {
-                    // Clamps to today
                     assertEquals(actualNow.get(Calendar.YEAR), currentEndCal.get(Calendar.YEAR))
                     assertEquals(todayDayOfYear, currentEndCal.get(Calendar.DAY_OF_YEAR))
                 } else {
-                    // Full year (Dec 31)
                     assertEquals(31, currentEndCal.get(Calendar.DAY_OF_MONTH))
                     assertEquals(Calendar.DECEMBER, currentEndCal.get(Calendar.MONTH))
                 }
 
-                // Verify previous period is same range in 2023
                 val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
                 assertEquals(2023, previousStartCal.get(Calendar.YEAR))
                 assertEquals(Calendar.JANUARY, previousStartCal.get(Calendar.MONTH))
@@ -724,11 +600,9 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
 
                 val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
                 if (isFuture) {
-                    // Same relative day in 2025 (or as close as possible)
                     assertEquals(2025, previousEndCal.get(Calendar.YEAR))
                     assertEquals(todayDayOfYear, previousEndCal.get(Calendar.DAY_OF_YEAR))
                 } else {
-                    // Full year 2023
                     assertEquals(2023, previousEndCal.get(Calendar.YEAR))
                     assertEquals(31, previousEndCal.get(Calendar.DAY_OF_MONTH))
                     assertEquals(Calendar.DECEMBER, previousEndCal.get(Calendar.MONTH))
@@ -741,7 +615,6 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `insights uses full period comparison for completed months`() =
         runTest {
-            // Arrange - Simulate viewing December 2025 (completed month)
             val testDate =
                 Calendar.getInstance().apply {
                     set(2025, Calendar.DECEMBER, 31, 23, 59, 59)
@@ -755,7 +628,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousEndCaptured = 0L
             var callCount = 0
 
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val start = invocation.getArgument<Long>(0)
                 val end = invocation.getArgument<Long>(1)
 
@@ -770,26 +643,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             }
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    testDate.timeInMillis,
-                    false,
-                )
+            val viewModel = createViewModel(TimePeriod.MONTHLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
             viewModel.insights.test {
                 val insights = awaitItem()
 
-                // Verify percentage change
-                assertEquals(3, insights?.percentageChange) // (3100 - 3000) / 3000 * 100 ≈ 3%
+                assertEquals(3, insights?.percentageChange)
 
-                // Verify previous period is full December 2024
                 val previousStartCal = Calendar.getInstance().apply { timeInMillis = previousStartCaptured }
                 assertEquals(2024, previousStartCal.get(Calendar.YEAR))
                 assertEquals(Calendar.DECEMBER, previousStartCal.get(Calendar.MONTH))
@@ -809,19 +671,15 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             val currentSummary = FinancialSummary(0.0, 150.0)
             val previousSummary = FinancialSummary(0.0, 100.0)
 
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong()))
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong()))
                 .thenReturn(currentSummary)
                 .thenReturn(previousSummary)
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.DAILY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.DAILY)
             advanceUntilIdle()
 
-            // Assert - Daily reports should still work as before
+            // Assert
             viewModel.insights.test {
                 val insights = awaitItem()
                 assertEquals(50, insights?.percentageChange)
@@ -832,7 +690,6 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     @Test
     fun `insights handles leap year edge case for yearly reports`() =
         runTest {
-            // Arrange - Simulate viewing Feb 29, 2024 (leap year)
             val testDate =
                 Calendar.getInstance().apply {
                     set(2024, Calendar.FEBRUARY, 29, 12, 0, 0)
@@ -845,7 +702,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             var previousEndCaptured = 0L
             var callCount = 0
 
-            `when`(transactionAnalyticsDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
+            `when`(transactionRepository.getFinancialSummaryForRange(anyLong(), anyLong())).thenAnswer { invocation ->
                 val end = invocation.getArgument<Long>(1)
 
                 callCount++
@@ -858,30 +715,17 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             }
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.YEARLY,
-                    testDate.timeInMillis,
-                    false,
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
             viewModel.insights.test {
                 val insights = awaitItem()
 
-                // Verify percentage change
-                assertEquals(11, insights?.percentageChange) // (200 - 180) / 180 * 100 ≈ 11%
+                assertEquals(11, insights?.percentageChange)
 
-                // Verify previous year end is Feb 28, 2023 (not Feb 29, since 2023 is not a leap year)
                 val previousEndCal = Calendar.getInstance().apply { timeInMillis = previousEndCaptured }
                 assertEquals(2023, previousEndCal.get(Calendar.YEAR))
-                // Day 60 in 2024 (leap year) is Feb 29, but day 60 in 2023 (non-leap) is Mar 1
-                // Our logic should cap at the max day of year for 2023
 
                 cancelAndIgnoreRemainingEvents()
             }
@@ -900,14 +744,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 1, amount = 100.0, transactionType = TransactionType.INCOME, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 2, amount = 50.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
@@ -942,14 +782,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 3, amount = 50.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 4, amount = 75.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
@@ -985,14 +821,10 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     TransactionDetails(Transaction(id = 5, amount = 75.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = Calendar.getInstance().apply { set(2025, Calendar.FEBRUARY, 15) }.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null),
                     TransactionDetails(Transaction(id = 6, amount = 150.0, transactionType = TransactionType.EXPENSE, description = "", categoryId = 1, date = testDate.timeInMillis, accountId = 1, notes = null), emptyList(), null, null, null, null, null)
                 )
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(transactions))
 
             // Act
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, testDate.timeInMillis, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY, testDate.timeInMillis, false)
             advanceUntilIdle()
 
             // Assert
@@ -1012,11 +844,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `toggleIncomeExclusion calls repository toggle`() =
         runTest {
             // Arrange
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY)
 
             // Act
             viewModel.toggleIncomeExclusion("2025-05")
@@ -1029,11 +857,7 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
     fun `toggleExpenseExclusion calls repository toggle`() =
         runTest {
             // Arrange
-            val viewModel =
-                TimePeriodReportViewModel(
-                    transactionQueryDao,
-                    transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false
-                )
+            val viewModel = createViewModel(TimePeriod.YEARLY)
 
             // Act
             viewModel.toggleExpenseExclusion("2025-05")
@@ -1070,8 +894,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     ),
                 )
 
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
-            val viewModel = TimePeriodReportViewModel(transactionQueryDao, transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.YEARLY, null, false)
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
+            val viewModel = createViewModel(TimePeriod.YEARLY)
             advanceUntilIdle()
 
             viewModel.yearlyMonthlyBreakdown.test {
@@ -1119,8 +943,8 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
                     ),
                 )
 
-            `when`(transactionQueryDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
-            val viewModel = TimePeriodReportViewModel(transactionQueryDao, transactionAnalyticsDao, transactionRepository, settingsRepository, TimePeriod.MONTHLY, null, false)
+            `when`(transactionRepository.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(txns))
+            val viewModel = createViewModel(TimePeriod.MONTHLY)
             advanceUntilIdle()
 
             viewModel.totalIncome.test {
@@ -1134,28 +958,84 @@ class TimePeriodReportViewModelTest : BaseViewModelTest() {
             }
         }
 
-    @Suppress("DEPRECATION")
     @Test
-    fun `legacy constructor initializes TimePeriodReportViewModel properly`() =
+    fun `monthlyConsistencyData emits data when timePeriod is MONTHLY`() =
         runTest {
-            val legacyDao = mock(TransactionDao::class.java)
-            `when`(legacyDao.getTransactionDetailsForRange(anyLong(), anyLong(), any(), any(), any())).thenReturn(flowOf(emptyList()))
-            `when`(legacyDao.getFinancialSummaryForRange(anyLong(), anyLong())).thenReturn(null)
-            `when`(legacyDao.getTopSpendingCategoriesForRange(anyLong(), anyLong())).thenReturn(emptyList())
-            `when`(legacyDao.getDailyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            `when`(legacyDao.getWeeklyTrends(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            `when`(legacyDao.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
-            `when`(legacyDao.getFirstTransactionDate()).thenReturn(flowOf(0L))
-
-            val vm =
-                TimePeriodReportViewModel(
-                    legacyDao,
-                    transactionRepository,
-                    settingsRepository,
-                    TimePeriod.MONTHLY,
-                    1000L,
-                    false
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val year = testCal.get(Calendar.YEAR)
+            val month = testCal.get(Calendar.MONTH) + 1
+            val mockData =
+                listOf(
+                    CalendarDayStatus(testCal.time, SpendingStatus.WITHIN_LIMIT, 50L, 100L),
+                    CalendarDayStatus(testCal.time, SpendingStatus.OVER_LIMIT, 150L, 100L),
                 )
-            assertNotNull(vm)
+            `when`(getMonthlyConsistencyDataUseCase(year, month)).thenReturn(flowOf(mockData))
+
+            val viewModel = createViewModel(timePeriod = TimePeriod.MONTHLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.monthlyConsistencyData.test {
+                val item = awaitItem()
+                assertEquals(mockData, item)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `monthlyConsistencyData emits emptyList when timePeriod is not MONTHLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val viewModel = createViewModel(timePeriod = TimePeriod.YEARLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.monthlyConsistencyData.test {
+                assertEquals(emptyList<CalendarDayStatus>(), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `yearlyConsistencyData emits flattened data across all 12 months when timePeriod is YEARLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.JUNE, 1) }
+            val year = testCal.get(Calendar.YEAR)
+
+            for (m in 1..12) {
+                val dayStatus = CalendarDayStatus(testCal.time, SpendingStatus.WITHIN_LIMIT, m * 10L, 100L)
+                `when`(getMonthlyConsistencyDataUseCase(year, m)).thenReturn(flowOf(listOf(dayStatus)))
+            }
+
+            val viewModel = createViewModel(timePeriod = TimePeriod.YEARLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.yearlyConsistencyData.test {
+                val items = awaitItem()
+                assertEquals(12, items.size)
+                assertEquals(10L, items[0].amountSpent)
+                assertEquals(120L, items[11].amountSpent)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            viewModel.consistencyStats.test {
+                val stats = awaitItem()
+                assertEquals(12, stats.goodDays)
+                assertEquals(0, stats.badDays)
+                assertEquals(0, stats.noSpendDays)
+                assertEquals(0, stats.noDataDays)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `yearlyConsistencyData emits emptyList when timePeriod is not YEARLY`() =
+        runTest {
+            val testCal = Calendar.getInstance().apply { set(2025, Calendar.OCTOBER, 9) }
+            val viewModel = createViewModel(timePeriod = TimePeriod.MONTHLY, initialDateMillis = testCal.timeInMillis)
+            advanceUntilIdle()
+
+            viewModel.yearlyConsistencyData.test {
+                assertEquals(emptyList<CalendarDayStatus>(), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

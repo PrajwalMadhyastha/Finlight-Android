@@ -104,15 +104,15 @@ class BackupSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getters rethrow non-IOException exceptions`() =
+    fun `getters handle non-IOException exceptions by emitting defaults`() =
         runTest {
             val mockDataStore = io.mockk.mockk<androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences>>()
             io.mockk.every { mockDataStore.data } returns kotlinx.coroutines.flow.flow { throw IllegalStateException("Fatal error") }
             val repo = BackupSettingsRepository(mockDataStore)
 
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getBackupEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAutoBackupEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getAutoBackupNotificationEnabled().first() }
-            kotlin.test.assertFailsWith<IllegalStateException> { repo.getLastBackupTimestamp().first() }
+            assertTrue(repo.getBackupEnabled().first())
+            assertTrue(repo.getAutoBackupEnabled().first())
+            assertFalse(repo.getAutoBackupNotificationEnabled().first())
+            assertEquals(0L, repo.getLastBackupTimestamp().first())
         }
 }

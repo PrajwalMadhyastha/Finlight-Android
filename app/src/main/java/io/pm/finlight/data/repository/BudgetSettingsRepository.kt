@@ -62,8 +62,11 @@ class BudgetSettingsRepository(
             }
         for (month in 1..12) {
             val prefKey = floatPreferencesKey(getBudgetKey(year, month))
-            if (preferences.contains(prefKey)) {
-                preferences[prefKey]?.let { budgets[month] = it }
+            try {
+                if (preferences.contains(prefKey)) {
+                    preferences[prefKey]?.let { budgets[month] = it }
+                }
+            } catch (_: ClassCastException) {
             }
         }
         return budgets
@@ -74,15 +77,15 @@ class BudgetSettingsRepository(
         month: Int,
     ): Flow<Float?> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    findCarriedOverBudget(preferences, year, month)
+                } catch (_: Exception) {
+                    null
                 }
             }
-            .map { preferences ->
-                findCarriedOverBudget(preferences, year, month)
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }
