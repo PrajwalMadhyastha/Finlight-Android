@@ -348,8 +348,15 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val selectedIdsCount by transactionViewModel.selectedTransactionIds.map { it.size }.collectAsState(initial = 0)
     val showDeleteConfirmation by transactionViewModel.showDeleteConfirmation.collectAsState()
 
-    var showCrashRecoveryDialog by remember {
-        mutableStateOf(CrashDiagnosticsManager.hasRecordedCrash(context))
+    var showCrashRecoveryDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val hasCrash =
+            withContext(Dispatchers.IO) {
+                CrashDiagnosticsManager.hasRecordedCrash(context)
+            }
+        if (hasCrash) {
+            showCrashRecoveryDialog = true
+        }
     }
     var showDiagnosticPreviewSheet by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()

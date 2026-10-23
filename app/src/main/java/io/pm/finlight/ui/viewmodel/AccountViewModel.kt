@@ -11,8 +11,7 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
@@ -33,13 +32,12 @@ import kotlin.math.min
 import kotlin.math.roundToLong
 
 class AccountViewModel(
-    application: Application,
     private val repository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
     private val mergeAccountsUseCase: MergeAccountsUseCase,
     private val computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
-) : AndroidViewModel(application) {
+) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
