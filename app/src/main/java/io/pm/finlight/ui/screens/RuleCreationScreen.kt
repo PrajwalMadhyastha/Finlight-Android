@@ -44,7 +44,6 @@ import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
 import io.pm.finlight.ui.viewmodel.RuleSelection
-import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 
@@ -54,16 +53,16 @@ fun RuleCreationScreen(
     navController: NavController,
     potentialTransactionJson: String?,
     ruleId: Int?,
+    viewModel: RuleCreationViewModel =
+        viewModel(
+            factory = RuleCreationViewModelFactory(LocalContext.current.applicationContext as Application),
+        ),
 ) {
-    val context = LocalContext.current.applicationContext as Application
-    val viewModel: RuleCreationViewModel = viewModel(factory = RuleCreationViewModelFactory(context))
-
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var textFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(TextFieldValue(""))
     }
-    val scope = rememberCoroutineScope()
     val isEditMode = ruleId != null
 
     LaunchedEffect(key1 = ruleId, key2 = potentialTransactionJson) {
@@ -314,18 +313,16 @@ fun RuleCreationScreen(
 
                 Button(
                     onClick = {
-                        scope.launch {
-                            viewModel.saveRule(textFieldValue.text) {
-                                // This flag is for the TransactionDetailScreen
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("reparse_needed", true)
-                                // This new flag is for the SmsDebugScreen
-                                navController.previousBackStackEntry
-                                    ?.savedStateHandle
-                                    ?.set("auto_import_after_rule_creation", true)
-                                navController.popBackStack()
-                            }
+                        viewModel.saveRule(textFieldValue.text) {
+                            // This flag is for the TransactionDetailScreen
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("reparse_needed", true)
+                            // This new flag is for the SmsDebugScreen
+                            navController.previousBackStackEntry
+                                ?.savedStateHandle
+                                ?.set("auto_import_after_rule_creation", true)
+                            navController.popBackStack()
                         }
                     },
                     enabled = isSaveEnabled,

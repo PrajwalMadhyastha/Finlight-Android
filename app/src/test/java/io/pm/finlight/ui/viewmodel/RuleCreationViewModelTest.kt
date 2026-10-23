@@ -566,7 +566,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `loadRuleForEditing does not update state when rule is not found`() =
+    fun `loadRuleForEditing sets error message when rule is not found`() =
         runTest {
             val ruleId = 999
             `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(kotlinx.coroutines.flow.emptyFlow())
@@ -575,7 +575,20 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertNull(viewModel.uiState.value.ruleIdToEdit)
-            assertNull(viewModel.uiState.value.errorMessage)
+            assertEquals("Rule not found", viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `loadRuleForEditing sets error message when repository emits null rule`() =
+        runTest {
+            val ruleId = 999
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(kotlinx.coroutines.flow.flowOf(null))
+
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.ruleIdToEdit)
+            assertEquals("Rule not found", viewModel.uiState.value.errorMessage)
         }
 
     @Test
@@ -688,6 +701,10 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
     fun `generateRegex returns null for invalid or blank selection`() {
         assertNull(viewModel.generateRegex("Full text", RuleSelection("", -1, -1)))
         assertNull(viewModel.generateRegex("Full text", RuleSelection("   ", 0, 3)))
+        assertNull(viewModel.generateRegex("Short", RuleSelection("test", 10, 15)))
+        assertNull(viewModel.generateRegex("Short", RuleSelection("test", 2, 10)))
+        assertNull(viewModel.generateRegex("Short", RuleSelection("test", 4, 2)))
+        assertNull(viewModel.generateRegex("Short", RuleSelection("test", -2, 2)))
     }
 
     @Test

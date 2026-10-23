@@ -51,7 +51,7 @@ fun ManageIgnoreRulesScreen(
         mutableStateOf(TextFieldValue(""))
     }
     var ruleToDelete by remember { mutableStateOf<IgnoreRule?>(null) }
-    var selectedRuleType by remember { mutableStateOf(RuleType.BODY_PHRASE) }
+    var selectedRuleType by rememberSaveable { mutableStateOf(RuleType.BODY_PHRASE) }
 
     LaunchedEffect(errorMessage) {
         errorMessage?.let { msg ->

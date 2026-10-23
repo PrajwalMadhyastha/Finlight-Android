@@ -101,7 +101,11 @@ class RuleCreationViewModel(
     fun loadRuleForEditing(ruleId: Int) {
         viewModelScope.launch(dispatcherProvider.io) {
             try {
-                val rule = customSmsRuleRepository.getRuleById(ruleId).firstOrNull() ?: return@launch
+                val rule = customSmsRuleRepository.getRuleById(ruleId).firstOrNull()
+                if (rule == null) {
+                    _uiState.update { it.copy(errorMessage = "Rule not found") }
+                    return@launch
+                }
                 _uiState.update {
                     it.copy(
                         triggerSelection = RuleSelection(selectedText = rule.triggerPhrase),
@@ -222,7 +226,12 @@ class RuleCreationViewModel(
         fullText: String,
         selection: RuleSelection,
     ): String? {
-        if (selection.startIndex == -1 || selection.selectedText.isBlank()) return null
+        if (selection.startIndex !in 0..fullText.length ||
+            selection.endIndex !in selection.startIndex..fullText.length ||
+            selection.selectedText.isBlank()
+        ) {
+            return null
+        }
 
         val textBefore = fullText.substring(0, selection.startIndex)
         val textAfter = fullText.substring(selection.endIndex)
