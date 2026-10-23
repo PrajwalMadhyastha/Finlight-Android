@@ -1,7 +1,6 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
@@ -59,7 +58,6 @@ class AccountViewModelTest : BaseViewModelTest() {
 
         viewModel =
             AccountViewModel(
-                ApplicationProvider.getApplicationContext(),
                 accountRepository,
                 transactionRepository,
                 settingsRepository,
@@ -82,7 +80,6 @@ class AccountViewModelTest : BaseViewModelTest() {
             // ACT
             viewModel =
                 AccountViewModel(
-                    ApplicationProvider.getApplicationContext(),
                     accountRepository,
                     transactionRepository,
                     settingsRepository,
@@ -169,7 +166,6 @@ class AccountViewModelTest : BaseViewModelTest() {
             // ACT - Re-init to trigger the logic in the init block
             viewModel =
                 AccountViewModel(
-                    ApplicationProvider.getApplicationContext(),
                     accountRepository,
                     transactionRepository,
                     settingsRepository,
@@ -719,7 +715,6 @@ class AccountViewModelTest : BaseViewModelTest() {
 
             val vm =
                 AccountViewModel(
-                    ApplicationProvider.getApplicationContext(),
                     accountRepository,
                     transactionRepository,
                     settingsRepository,

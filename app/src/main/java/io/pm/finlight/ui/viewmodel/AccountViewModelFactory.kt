@@ -15,7 +15,6 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
 
             @Suppress("UNCHECKED_CAST")
             return AccountViewModel(
-                application,
                 accountRepository,
                 transactionRepository,
                 settingsRepository,
