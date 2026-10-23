@@ -34,10 +34,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -174,6 +175,14 @@ private fun RuleItemCard(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val txnTypeLabel =
+                    when (TransactionType.fromStringOrNull(rule.transactionType)) {
+                        TransactionType.EXPENSE -> "Expense"
+                        TransactionType.INCOME -> "Income"
+                        TransactionType.TRANSFER -> "Transfer"
+                        null -> "Auto-Detect"
+                    }
+                RuleDetailRow(label = "Transaction Type", value = txnTypeLabel)
                 rule.merchantNameExample?.let {
                     RuleDetailRow(label = "Merchant Name", value = it)
                 }

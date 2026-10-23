@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,7 +47,9 @@ fun ManageIgnoreRulesScreen(
     val rules by viewModel.allRules.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-    var newPattern by remember { mutableStateOf(TextFieldValue("")) }
+    var newPattern by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(""))
+    }
     var ruleToDelete by remember { mutableStateOf<IgnoreRule?>(null) }
     var selectedRuleType by remember { mutableStateOf(RuleType.BODY_PHRASE) }
 

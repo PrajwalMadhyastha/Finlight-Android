@@ -1,6 +1,7 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.CustomSmsRule
@@ -42,6 +43,7 @@ data class RuleCreationUiState(
     val accountRegex: String? = null,
     val errorMessage: String? = null,
     val sourceSmsBody: String? = null,
+    val priority: Int = 10,
 )
 
 /**
@@ -77,9 +79,13 @@ class RuleCreationViewModel(
 
         val accountSelection =
             potentialTxn.potentialAccount?.let {
-                val accountPart = it.formattedName.split(" ").last { part -> part.any { char -> char.isDigit() } }
-                val index = potentialTxn.originalMessage.indexOf(accountPart)
-                if (index != -1) RuleSelection(accountPart, index, index + accountPart.length) else RuleSelection()
+                val accountPart = it.formattedName.split(" ").lastOrNull { part -> part.any { char -> char.isDigit() } }
+                val index = accountPart?.let { part -> potentialTxn.originalMessage.indexOf(part) } ?: -1
+                if (index != -1 && accountPart != null) {
+                    RuleSelection(accountPart, index, index + accountPart.length)
+                } else {
+                    RuleSelection()
+                }
             } ?: RuleSelection()
 
         _uiState.value =
@@ -109,6 +115,7 @@ class RuleCreationViewModel(
                         accountRegex = rule.accountRegex,
                         errorMessage = null,
                         sourceSmsBody = rule.sourceSmsBody,
+                        priority = rule.priority,
                     )
                 }
             } catch (e: CancellationException) {
@@ -153,9 +160,7 @@ class RuleCreationViewModel(
                 val currentState = _uiState.value
                 if (currentState.triggerSelection.selectedText.isBlank()) {
                     Log.e("RuleCreation", "Cannot save rule without a trigger phrase.")
-                    withContext(dispatcherProvider.main) {
-                        onComplete()
-                    }
+                    _uiState.update { it.copy(errorMessage = "Trigger phrase cannot be blank") }
                     return@launch
                 }
 
@@ -190,7 +195,7 @@ class RuleCreationViewModel(
                         merchantNameExample = currentState.merchantSelection.selectedText.takeIf { it.isNotBlank() },
                         amountExample = currentState.amountSelection.selectedText.takeIf { it.isNotBlank() },
                         accountNameExample = currentState.accountSelection.selectedText.takeIf { it.isNotBlank() },
-                        priority = 10,
+                        priority = currentState.priority,
                         sourceSmsBody = fullSmsText,
                         transactionType = currentState.transactionType?.dbValue,
                     )
@@ -212,7 +217,8 @@ class RuleCreationViewModel(
         }
     }
 
-    private fun generateRegex(
+    @VisibleForTesting
+    internal fun generateRegex(
         fullText: String,
         selection: RuleSelection,
     ): String? {

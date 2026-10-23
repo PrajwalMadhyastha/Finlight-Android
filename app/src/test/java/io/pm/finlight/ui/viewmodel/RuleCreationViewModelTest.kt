@@ -179,7 +179,7 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `saveRule does not insert and completes when trigger phrase is blank`() =
+    fun `saveRule does not insert and sets error when trigger phrase is blank`() =
         runTest {
             // Arrange
             var onCompleteCalled = false
@@ -192,7 +192,8 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             // Assert
             verify(customSmsRuleRepository, never()).insert(io.pm.finlight.anyObject())
             verify(customSmsRuleRepository, never()).update(io.pm.finlight.anyObject())
-            assertEquals(true, onCompleteCalled)
+            assertEquals(false, onCompleteCalled)
+            assertEquals("Trigger phrase cannot be blank", viewModel.uiState.value.errorMessage)
         }
 
     @Test
@@ -456,4 +457,272 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
             assertEquals("Old Merchant", updatedRule.merchantNameExample)
             assertEquals(true, onCompleteCalled)
         }
+
+    @Test
+    fun `initializeStateForCreation fallback when amount is not found in message`() =
+        runTest {
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Test",
+                    amount = 99.99,
+                    transactionType = "expense",
+                    merchantName = "Store",
+                    originalMessage = "Paid ninety nine dollars at Store",
+                    potentialAccount = null,
+                )
+
+            viewModel.initializeStateForCreation(potentialTxn)
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertEquals("", state.amountSelection.selectedText)
+                assertEquals(-1, state.amountSelection.startIndex)
+                assertEquals(-1, state.amountSelection.endIndex)
+                assertEquals("Store", state.merchantSelection.selectedText)
+                assertEquals("", state.accountSelection.selectedText)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `initializeStateForCreation fallback when merchant is null or not found in message`() =
+        runTest {
+            val potentialTxnNullMerchant =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Test",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    merchantName = null,
+                    originalMessage = "Paid 50.00 cash",
+                    potentialAccount = null,
+                )
+
+            viewModel.initializeStateForCreation(potentialTxnNullMerchant)
+            assertEquals("", viewModel.uiState.value.merchantSelection.selectedText)
+            assertEquals(-1, viewModel.uiState.value.merchantSelection.startIndex)
+
+            val potentialTxnNotFoundMerchant =
+                PotentialTransaction(
+                    sourceSmsId = 2L,
+                    smsSender = "Test",
+                    amount = 50.0,
+                    transactionType = "expense",
+                    merchantName = "Target",
+                    originalMessage = "Paid 50.00 at Walmart",
+                    potentialAccount = null,
+                )
+
+            viewModel.initializeStateForCreation(potentialTxnNotFoundMerchant)
+            assertEquals("", viewModel.uiState.value.merchantSelection.selectedText)
+            assertEquals(-1, viewModel.uiState.value.merchantSelection.startIndex)
+        }
+
+    @Test
+    fun `initializeStateForCreation fallback when account is null, has no digits, or not found`() =
+        runTest {
+            val txnNullAccount =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Test",
+                    amount = 10.0,
+                    transactionType = "expense",
+                    merchantName = "Store",
+                    originalMessage = "Paid 10.00 at Store",
+                    potentialAccount = null,
+                )
+            viewModel.initializeStateForCreation(txnNullAccount)
+            assertEquals("", viewModel.uiState.value.accountSelection.selectedText)
+            assertEquals(-1, viewModel.uiState.value.accountSelection.startIndex)
+
+            val txnAccountNoDigits =
+                PotentialTransaction(
+                    sourceSmsId = 2L,
+                    smsSender = "Test",
+                    amount = 10.0,
+                    transactionType = "expense",
+                    merchantName = "Store",
+                    originalMessage = "Paid 10.00 at Store via Cash Wallet",
+                    potentialAccount = PotentialAccount("Cash Wallet", "Cash"),
+                )
+            viewModel.initializeStateForCreation(txnAccountNoDigits)
+            assertEquals("", viewModel.uiState.value.accountSelection.selectedText)
+            assertEquals(-1, viewModel.uiState.value.accountSelection.startIndex)
+
+            val txnAccountNotFound =
+                PotentialTransaction(
+                    sourceSmsId = 3L,
+                    smsSender = "Test",
+                    amount = 10.0,
+                    transactionType = "expense",
+                    merchantName = "Store",
+                    originalMessage = "Paid 10.00 at Store",
+                    potentialAccount = PotentialAccount("HDFC Card xx9999", "Card"),
+                )
+            viewModel.initializeStateForCreation(txnAccountNotFound)
+            assertEquals("", viewModel.uiState.value.accountSelection.selectedText)
+            assertEquals(-1, viewModel.uiState.value.accountSelection.startIndex)
+        }
+
+    @Test
+    fun `loadRuleForEditing does not update state when rule is not found`() =
+        runTest {
+            val ruleId = 999
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(kotlinx.coroutines.flow.emptyFlow())
+
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            assertNull(viewModel.uiState.value.ruleIdToEdit)
+            assertNull(viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `loadRuleForEditing sets default message when exception message is null`() =
+        runTest {
+            val ruleId = 99
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(
+                kotlinx.coroutines.flow.flow { throw RuntimeException(null as String?) },
+            )
+
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            assertEquals("Failed to load rule", viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `saveRule generates regexes for amount and account selections`() =
+        runTest {
+            var onCompleteCalled = false
+            val smsBody = "Paid 150.00 at Store from Account 9876"
+            viewModel.onMarkAsTrigger(RuleSelection("Paid", 0, 4))
+            viewModel.onMarkAsAmount(RuleSelection("150.00", 5, 11))
+            viewModel.onMarkAsMerchant(RuleSelection("Store", 15, 20))
+            viewModel.onMarkAsAccount(RuleSelection("9876", 34, 38))
+
+            viewModel.saveRule(smsBody) { onCompleteCalled = true }
+            advanceUntilIdle()
+
+            verify(customSmsRuleRepository).insert(capture(ruleCaptor))
+            val rule = ruleCaptor.value
+            assertNotNull(rule.amountRegex)
+            assertNotNull(rule.accountRegex)
+            assertNotNull(rule.merchantRegex)
+            assertEquals("150.00", rule.amountExample)
+            assertEquals("Store", rule.merchantNameExample)
+            assertEquals("9876", rule.accountNameExample)
+            assertEquals(10, rule.priority)
+            assertEquals(true, onCompleteCalled)
+        }
+
+    @Test
+    fun `saveRule sets example fields to null when selections are blank`() =
+        runTest {
+            var onCompleteCalled = false
+            val smsBody = "Alert triggered"
+            viewModel.onMarkAsTrigger(RuleSelection("Alert", 0, 5))
+            viewModel.onMarkAsAmount(RuleSelection("", -1, -1))
+            viewModel.onMarkAsMerchant(RuleSelection("   ", -1, -1))
+            viewModel.onMarkAsAccount(RuleSelection("", -1, -1))
+
+            viewModel.saveRule(smsBody) { onCompleteCalled = true }
+            advanceUntilIdle()
+
+            verify(customSmsRuleRepository).insert(capture(ruleCaptor))
+            val rule = ruleCaptor.value
+            assertNull(rule.amountExample)
+            assertNull(rule.merchantNameExample)
+            assertNull(rule.accountNameExample)
+            assertEquals(true, onCompleteCalled)
+        }
+
+    @Test
+    fun `saveRule preserves custom priority when editing rule`() =
+        runTest {
+            var onCompleteCalled = false
+            val ruleId = 42
+            val existingRule =
+                CustomSmsRule(
+                    id = ruleId,
+                    triggerPhrase = "Paid",
+                    merchantRegex = null,
+                    amountRegex = null,
+                    accountRegex = null,
+                    merchantNameExample = null,
+                    amountExample = null,
+                    accountNameExample = null,
+                    priority = 25,
+                    sourceSmsBody = "Paid 10 at Shop",
+                )
+            `when`(customSmsRuleRepository.getRuleById(ruleId)).thenReturn(flowOf(existingRule))
+
+            viewModel.loadRuleForEditing(ruleId)
+            advanceUntilIdle()
+
+            viewModel.saveRule("Paid 10 at Shop") { onCompleteCalled = true }
+            advanceUntilIdle()
+
+            verify(customSmsRuleRepository).update(capture(ruleCaptor))
+            val updatedRule = ruleCaptor.value
+            assertEquals(ruleId, updatedRule.id)
+            assertEquals(25, updatedRule.priority)
+            assertEquals(true, onCompleteCalled)
+        }
+
+    @Test
+    fun `saveRule sets default message when write exception has null message`() =
+        runTest {
+            val smsBody = "Paid 10 at Shop"
+            viewModel.onMarkAsTrigger(RuleSelection("Paid", 0, 4))
+            doThrow(RuntimeException(null as String?)).`when`(customSmsRuleRepository).insert(io.pm.finlight.anyObject())
+
+            viewModel.saveRule(smsBody) {}
+            advanceUntilIdle()
+
+            assertEquals("Failed to save rule", viewModel.uiState.value.errorMessage)
+        }
+
+    @Test
+    fun `generateRegex returns null for invalid or blank selection`() {
+        assertNull(viewModel.generateRegex("Full text", RuleSelection("", -1, -1)))
+        assertNull(viewModel.generateRegex("Full text", RuleSelection("   ", 0, 3)))
+    }
+
+    @Test
+    fun `generateRegex returns prefix regex when token is at end of text`() {
+        val text = "Total spent was 100"
+        val selection = RuleSelection("100", 16, 19)
+        val regex = viewModel.generateRegex(text, selection)
+        assertNotNull(regex)
+        assertEquals("\\Qspent was\\E\\s*(.*)", regex)
+    }
+
+    @Test
+    fun `generateRegex returns suffix regex when token is at start of text`() {
+        val text = "100 was debited"
+        val selection = RuleSelection("100", 0, 3)
+        val regex = viewModel.generateRegex(text, selection)
+        assertNotNull(regex)
+        assertEquals("(.*?)\\s*\\Qwas debited\\E", regex)
+    }
+
+    @Test
+    fun `generateRegex returns quoted text when neither prefix nor suffix exists`() {
+        val text = "100"
+        val selection = RuleSelection("100", 0, 3)
+        val regex = viewModel.generateRegex(text, selection)
+        assertNotNull(regex)
+        assertEquals("\\Q100\\E", regex)
+    }
+
+    @Test
+    fun `generateRegex returns middle pattern when both prefix and suffix exist`() {
+        val text = "Paid 100 to Store"
+        val selection = RuleSelection("100", 5, 8)
+        val regex = viewModel.generateRegex(text, selection)
+        assertNotNull(regex)
+        assertEquals("\\QPaid\\E\\s*(.*?)\\s*\\Qto Store\\E", regex)
+    }
 }
