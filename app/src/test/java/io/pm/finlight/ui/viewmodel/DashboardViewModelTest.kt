@@ -43,16 +43,13 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     private lateinit var accountRepository: AccountRepository
 
     @Mock
-    private lateinit var budgetDao: BudgetDao
+    private lateinit var budgetRepository: IBudgetRepository
 
     @Mock
     private lateinit var settingsRepository: SettingsRepository
 
     @Mock
-    private lateinit var recurringTransactionDao: RecurringTransactionDao
-
-    @Mock
-    private lateinit var recurringPatternDao: RecurringPatternDao
+    private lateinit var recurringTransactionRepository: IRecurringTransactionRepository
 
     @Mock
     private lateinit var getMonthlyConsistencyDataUseCase: io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -122,7 +119,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
         `when`(transactionRepository.recentTransactions).thenReturn(flowOf(emptyList()))
         `when`(
-            budgetDao.getBudgetsWithSpendingForMonth(
+            budgetRepository.getBudgetsForMonthWithSpending(
                 Mockito.anyString(),
                 Mockito.anyInt(),
                 Mockito.anyInt(),
@@ -139,8 +136,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         // --- FIX: Add missing mock for the new dependency ---
         `when`(getMonthlyConsistencyDataUseCase(anyInt(), anyInt())).thenReturn(flowOf(emptyList()))
 
-        `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(emptyList()))
-        `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
+        `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(emptyList()))
 
         // Default mock time: Not 1st of month
         val mockNow = Calendar.getInstance().apply { set(Calendar.DAY_OF_MONTH, 15) }
@@ -151,11 +147,10 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             DashboardViewModel(
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
-                budgetDao = budgetDao,
+                budgetRepository = budgetRepository,
                 settingsRepository = settingsRepository,
                 timeProvider = timeProvider,
-                recurringTransactionDao = recurringTransactionDao,
-                recurringPatternDao = recurringPatternDao,
+                recurringTransactionRepository = recurringTransactionRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
@@ -166,11 +161,10 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             DashboardViewModel(
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
-                budgetDao = budgetDao,
+                budgetRepository = budgetRepository,
                 settingsRepository = settingsRepository,
                 timeProvider = timeProvider,
-                recurringTransactionDao = recurringTransactionDao,
-                recurringPatternDao = recurringPatternDao,
+                recurringTransactionRepository = recurringTransactionRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )
@@ -743,14 +737,13 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
-    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
-    fun `upcomingPayments are loaded correctly from dao`() =
+    fun `upcomingPayments are loaded correctly from repository`() =
         runTest {
             // Arrange
             val now = System.currentTimeMillis()
-            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now, 1, 1, null)
-            `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule)))
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
 
             // Act & Assert
@@ -763,7 +756,6 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
-    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
     fun `upcomingPayments filters and sorts correctly`() =
         runTest {
@@ -776,7 +768,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // rule3 is due today + 5 days
             val rule3 = RecurringTransaction(3, "Sub3", 30.0, TransactionType.EXPENSE, "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
 
-            `when`(recurringTransactionDao.getAllRulesFlow()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
             initializeViewModel()
 
             // Act & Assert
@@ -790,20 +782,22 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             }
         }
 
-    @org.junit.Ignore("Temporarily disabled (Issue #105)")
     @Test
-    fun `patternSuggestions flow receives data from dao`() =
+    fun `upcomingPayments emits empty list when recurring transactions are disabled by feature flag`() =
         runTest {
             // Arrange
-            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
-            `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(listOf(pattern)))
+            val now = System.currentTimeMillis()
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
+            `when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
             initializeViewModel()
 
             // Act & Assert
-            viewModel.patternSuggestions.test {
-                val suggestions = awaitItem()
-                assertEquals(1, suggestions.size)
-                assertEquals(pattern, suggestions[0])
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(0, payments.size)
+                cancelAndIgnoreRemainingEvents()
             }
         }
 

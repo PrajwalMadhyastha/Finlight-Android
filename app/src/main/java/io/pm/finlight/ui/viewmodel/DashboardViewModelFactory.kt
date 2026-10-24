@@ -26,16 +26,17 @@ class DashboardViewModelFactory(private val application: Application) : ViewMode
                 )
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
+            val budgetRepository = ServiceLocator.provideBudgetRepository(application, db)
+            val recurringTransactionRepository = ServiceLocator.provideRecurringTransactionRepository(application, db)
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
-                budgetDao = db.budgetDao(),
+                budgetRepository = budgetRepository,
                 settingsRepository = settingsRepository,
                 timeProvider = SystemTimeProvider(),
-                recurringTransactionDao = db.recurringTransactionDao(),
-                recurringPatternDao = db.recurringPatternDao(),
+                recurringTransactionRepository = recurringTransactionRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 dispatcherProvider = dispatcherProvider,

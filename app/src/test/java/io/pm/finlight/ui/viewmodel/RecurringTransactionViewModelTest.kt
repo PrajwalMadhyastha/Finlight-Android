@@ -11,15 +11,11 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
 import android.os.Build
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.Configuration
-import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -31,22 +27,20 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
+import org.mockito.Mockito
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RecurringTransactionViewModelTest : BaseViewModelTest() {
-    private val application: Application = ApplicationProvider.getApplicationContext()
+    @Mock
+    private lateinit var recurringTransactionRepository: IRecurringTransactionRepository
 
     @Mock
-    private lateinit var recurringTransactionRepository: RecurringTransactionRepository
-
-    @Mock
-    private lateinit var recurringPatternDao: RecurringPatternDao
+    private lateinit var scheduleWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase
 
     @Captor
     private lateinit var recurringTransactionCaptor: ArgumentCaptor<RecurringTransaction>
@@ -56,19 +50,12 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
-        // Manually initialize WorkManager for testing to prevent crash.
-        val config =
-            Configuration.Builder()
-                .setMinimumLoggingLevel(android.util.Log.DEBUG)
-                .setExecutor(SynchronousExecutor())
-                .build()
-        WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
     }
 
     private fun initializeViewModel(initialRules: List<RecurringTransaction> = emptyList()) {
         `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(initialRules))
-        `when`(recurringPatternDao.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
-        viewModel = RecurringTransactionViewModel(application, recurringTransactionRepository, recurringPatternDao)
+        `when`(recurringTransactionRepository.getUnacknowledgedPatterns()).thenReturn(flowOf(emptyList()))
+        viewModel = RecurringTransactionViewModel(recurringTransactionRepository, scheduleWorkerUseCase)
     }
 
     @Test
@@ -84,6 +71,22 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             // Assert
             viewModel.allRecurringTransactions.test {
                 assertEquals(rules, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `patternSuggestions flow emits suggestions from repository`() =
+        runTest {
+            // Arrange
+            val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(emptyList()))
+            `when`(recurringTransactionRepository.getUnacknowledgedPatterns()).thenReturn(flowOf(listOf(pattern)))
+            viewModel = RecurringTransactionViewModel(recurringTransactionRepository, scheduleWorkerUseCase)
+
+            // Assert
+            viewModel.patternSuggestions.test {
+                assertEquals(listOf(pattern), awaitItem())
                 cancelAndIgnoreRemainingEvents()
             }
         }
@@ -105,7 +108,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `saveRule with null id calls repository insert`() =
+    fun `saveRule with null id calls repository insert and schedules worker`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -116,6 +119,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(recurringTransactionRepository).insert(capture(recurringTransactionCaptor))
+            verify(scheduleWorkerUseCase).invoke()
             val capturedRule = recurringTransactionCaptor.value
             assertEquals("Spotify", capturedRule.description)
             assertEquals(129.0, capturedRule.amount, 0.0)
@@ -128,7 +132,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `saveRule with existing id calls repository update`() =
+    fun `saveRule with existing id calls repository update without scheduling worker`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -140,6 +144,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(recurringTransactionRepository).update(capture(recurringTransactionCaptor))
+            verify(scheduleWorkerUseCase, Mockito.never()).invoke()
             val capturedRule = recurringTransactionCaptor.value
             assertEquals("Updated Spotify", capturedRule.description)
             assertEquals(199.0, capturedRule.amount, 0.0)
@@ -163,7 +168,7 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `dismissPatternSuggestion calls dao update with isDismissed true`() =
+    fun `dismissPatternSuggestion calls repository dismissPatternSuggestion`() =
         runTest {
             // Arrange
             val pattern = RecurringPattern("NETFLIX", "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 2, System.currentTimeMillis(), System.currentTimeMillis(), false)
@@ -174,7 +179,6 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            val expectedPattern = pattern.copy(isDismissed = true)
-            verify(recurringPatternDao).update(expectedPattern)
+            verify(recurringTransactionRepository).dismissPatternSuggestion(pattern)
         }
 }

@@ -52,11 +52,13 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
+import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 
@@ -132,6 +134,9 @@ object ServiceLocator {
 
     @Volatile
     private var getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase? = null
+
+    @Volatile
+    private var scheduleRecurringTransactionWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase? = null
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
@@ -468,6 +473,21 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [ScheduleRecurringTransactionWorkerUseCase] instance.
+     */
+    fun provideScheduleRecurringTransactionWorkerUseCase(
+        context: Context,
+    ): ScheduleRecurringTransactionWorkerUseCase {
+        return scheduleRecurringTransactionWorkerUseCase ?: synchronized(this) {
+            scheduleRecurringTransactionWorkerUseCase ?: DefaultScheduleRecurringTransactionWorkerUseCase(
+                context.applicationContext,
+            ).also {
+                scheduleRecurringTransactionWorkerUseCase = it
+            }
+        }
+    }
+
+    /**
      * Resolves the singleton [IMerchantMappingRepository] instance.
      *
      * Note: Once initialized, the cached singleton instance is returned on subsequent calls
@@ -538,6 +558,7 @@ object ServiceLocator {
                 val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 RecurringTransactionRepository(
                     recurringTransactionDao = db.recurringTransactionDao(),
+                    recurringPatternDao = db.recurringPatternDao(),
                 ).also {
                     recurringTransactionRepository = it
                 }
@@ -786,6 +807,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setScheduleRecurringTransactionWorkerUseCase(useCase: ScheduleRecurringTransactionWorkerUseCase?) {
+        scheduleRecurringTransactionWorkerUseCase = useCase
+    }
+
+    @VisibleForTesting
     fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
         merchantMappingRepository = repository
     }
@@ -849,6 +875,7 @@ object ServiceLocator {
         mergeTransactionsUseCase = null
         autoSaveSmsTransactionUseCase = null
         getMonthlyConsistencyDataUseCase = null
+        scheduleRecurringTransactionWorkerUseCase = null
         merchantMappingRepository = null
         budgetRepository = null
         recurringTransactionRepository = null

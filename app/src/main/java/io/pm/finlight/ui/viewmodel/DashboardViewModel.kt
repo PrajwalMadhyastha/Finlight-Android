@@ -49,12 +49,11 @@ data class LastMonthSummary(
 class DashboardViewModel(
     private val transactionRepository: ITransactionRepository,
     private val accountRepository: IAccountRepository,
-    private val budgetDao: BudgetDao,
+    private val budgetRepository: IBudgetRepository,
     private val settingsRepository: ISettingsRepository,
     // Added dependency
     private val timeProvider: TimeProvider,
-    private val recurringTransactionDao: RecurringTransactionDao,
-    private val recurringPatternDao: RecurringPatternDao,
+    private val recurringTransactionRepository: IRecurringTransactionRepository,
     private val getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase,
     private val mergeTransactionsUseCase: MergeTransactionsUseCase,
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
@@ -93,7 +92,6 @@ class DashboardViewModel(
 
     // --- NEW (Issue #105): Data for Recurring Cards ---
     val upcomingPayments: StateFlow<List<RecurringTransaction>>
-    val patternSuggestions: StateFlow<List<RecurringPattern>>
 
     val privacyModeEnabled: StateFlow<Boolean>
 
@@ -216,8 +214,13 @@ class DashboardViewModel(
 
         // --- NEW (Issue #105): Initialize flows for recurring cards ---
         upcomingPayments =
-            recurringTransactionDao.getAllRulesFlow()
-                .map { rules ->
+            combine(
+                recurringTransactionRepository.getAll(),
+                isRecurringEnabled,
+            ) { rules, enabled ->
+                if (!enabled) {
+                    emptyList()
+                } else {
                     val now = System.currentTimeMillis()
                     rules.filter { rule ->
                         val nextDue = DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
@@ -227,11 +230,7 @@ class DashboardViewModel(
                         DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
                     }
                 }
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-        patternSuggestions =
-            recurringPatternDao.getUnacknowledgedPatterns()
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         safeToSpendPerDay =
             amountRemaining.map { remaining ->
@@ -384,7 +383,7 @@ class DashboardViewModel(
 
         val yearMonthString = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(calendar.time)
         budgetStatus =
-            budgetDao.getBudgetsWithSpendingForMonth(yearMonthString, currentMonth, currentYear)
+            budgetRepository.getBudgetsForMonthWithSpending(yearMonthString, currentMonth, currentYear)
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
         accountsSummary =
