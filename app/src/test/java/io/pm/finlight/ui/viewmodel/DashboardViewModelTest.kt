@@ -742,7 +742,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val now = timeProvider.now().timeInMillis
-            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
 
@@ -762,11 +762,11 @@ open class DashboardViewModelTest : BaseViewModelTest() {
             // Arrange
             val now = timeProvider.now().timeInMillis
             // rule1 is due today + 10 days
-            val rule1 = RecurringTransaction(1, "Sub1", 10.0, TransactionType.EXPENSE, "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
-            // rule2 is due today + 40 days (should be filtered out)
-            val rule2 = RecurringTransaction(2, "Sub2", 20.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule1 = RecurringTransaction(1, "Sub1", 10.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            // rule2 is due today + 40 days (should be filtered out because > 30 days window)
+            val rule2 = RecurringTransaction(2, "Sub2", 20.0, TransactionType.EXPENSE, "Monthly", now + 40L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule3 is due today + 5 days
-            val rule3 = RecurringTransaction(3, "Sub3", 30.0, TransactionType.EXPENSE, "Monthly", now - 25L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule3 = RecurringTransaction(3, "Sub3", 30.0, TransactionType.EXPENSE, "Monthly", now + 5L * 24 * 60 * 60 * 1000, 1, 1, null)
 
             `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule1, rule2, rule3)))
             initializeViewModel()
@@ -787,7 +787,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val now = timeProvider.now().timeInMillis
-            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
+            val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now + 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
             `when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
             initializeViewModel()
@@ -819,7 +819,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     categoryId = 1,
                     lastRunDate = now - 20L * 24 * 60 * 60 * 1000,
                 )
-            // rule with lastRunDate == null: nextDue is startDate + 1 month = now + 15 days
+            // rule with lastRunDate == null: nextDue is startDate = now + 15 days
             val ruleWithStartDate =
                 RecurringTransaction(
                     id = 2,
@@ -827,7 +827,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     amount = 30.0,
                     transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
-                    startDate = now - 15L * 24 * 60 * 60 * 1000,
+                    startDate = now + 15L * 24 * 60 * 60 * 1000,
                     accountId = 1,
                     categoryId = 1,
                     lastRunDate = null,
@@ -851,7 +851,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val now = timeProvider.now().timeInMillis
-            // Overdue rule: nextDue was in the past (20 days ago: startDate was 50 days ago + 1 month = 20 days ago)
+            // Overdue rule: nextDue was in the past (20 days ago)
             val overdueRule =
                 RecurringTransaction(
                     id = 1,
@@ -859,7 +859,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     amount = 100.0,
                     transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
-                    startDate = now - 50L * 24 * 60 * 60 * 1000,
+                    startDate = now - 20L * 24 * 60 * 60 * 1000,
                     accountId = 1,
                     categoryId = 1,
                     lastRunDate = null,
@@ -872,7 +872,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                     amount = 200.0,
                     transactionType = TransactionType.EXPENSE,
                     recurrenceInterval = "Monthly",
-                    startDate = now - 20L * 24 * 60 * 60 * 1000,
+                    startDate = now + 10L * 24 * 60 * 60 * 1000,
                     accountId = 1,
                     categoryId = 1,
                     lastRunDate = null,
@@ -886,6 +886,99 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 val payments = awaitItem()
                 assertEquals(1, payments.size)
                 assertEquals("Upcoming Bill", payments.first().description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments includes first cycle rule starting in 5 days with null lastRunDate`() =
+        runTest {
+            // Arrange
+            val now = timeProvider.now().timeInMillis
+            val firstCycleRule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Gym Membership",
+                    amount = 50.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now + 5L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = null,
+                )
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(firstCycleRule)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(1, payments.size)
+                assertEquals("Gym Membership", payments.first().description)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments excludes expired rules where endDate has passed or nextDue exceeds endDate`() =
+        runTest {
+            // Arrange
+            val now = timeProvider.now().timeInMillis
+            // Rule 1: endDate has already passed
+            val alreadyExpiredRule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Expired Subscription",
+                    amount = 15.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 60L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = now - 20L * 24 * 60 * 60 * 1000,
+                    endDate = now - 5L * 24 * 60 * 60 * 1000,
+                )
+            // Rule 2: nextDue (in 10 days) falls after endDate (in 7 days)
+            val nextDueAfterEndRule =
+                RecurringTransaction(
+                    id = 2,
+                    description = "Trial Ending Soon",
+                    amount = 20.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 60L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = now - 20L * 24 * 60 * 60 * 1000,
+                    endDate = now + 7L * 24 * 60 * 60 * 1000,
+                )
+            // Rule 3: Valid active rule with endDate in the future after nextDue
+            val activeRule =
+                RecurringTransaction(
+                    id = 3,
+                    description = "Active Rule with End Date",
+                    amount = 30.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 60L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = now - 20L * 24 * 60 * 60 * 1000,
+                    endDate = now + 60L * 24 * 60 * 60 * 1000,
+                )
+
+            `when`(recurringTransactionRepository.getAll()).thenReturn(
+                flowOf(listOf(alreadyExpiredRule, nextDueAfterEndRule, activeRule)),
+            )
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(1, payments.size)
+                assertEquals("Active Rule with End Date", payments.first().description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

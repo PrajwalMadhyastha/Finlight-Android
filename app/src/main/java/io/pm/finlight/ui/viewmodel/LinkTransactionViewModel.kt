@@ -9,9 +9,9 @@ package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
-import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.Transaction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,7 +20,7 @@ import java.util.Calendar
 
 class LinkTransactionViewModel(
     private val transactionRepository: ITransactionRepository,
-    private val recurringTransactionDao: RecurringTransactionDao,
+    private val recurringTransactionRepository: IRecurringTransactionRepository,
     val potentialTransaction: PotentialTransaction,
 ) : ViewModel() {
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
@@ -67,7 +67,7 @@ class LinkTransactionViewModel(
             }
             // Update the last run date of the rule to today
             val ruleId = potentialTransaction.sourceSmsId.toInt()
-            recurringTransactionDao.updateLastRunDate(ruleId, System.currentTimeMillis())
+            recurringTransactionRepository.updateLastRunDate(ruleId, System.currentTimeMillis())
             onComplete()
         }
     }
@@ -78,7 +78,7 @@ class LinkTransactionViewModel(
             // This makes the rule due again starting today.
             val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
             val ruleId = potentialTransaction.sourceSmsId.toInt()
-            recurringTransactionDao.updateLastRunDate(ruleId, yesterday)
+            recurringTransactionRepository.updateLastRunDate(ruleId, yesterday)
             onComplete()
         }
     }

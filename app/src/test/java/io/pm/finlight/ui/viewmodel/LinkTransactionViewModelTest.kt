@@ -35,7 +35,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
     private lateinit var transactionRepository: TransactionRepository
 
     @Mock
-    private lateinit var recurringTransactionDao: RecurringTransactionDao
+    private lateinit var recurringTransactionRepository: IRecurringTransactionRepository
 
     @Captor
     private lateinit var intCaptor: ArgumentCaptor<Int>
@@ -73,7 +73,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
             // Act
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
 
             // Assert
             viewModel.linkableTransactions.test {
@@ -88,7 +88,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -97,7 +97,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
-            verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
+            verify(recurringTransactionRepository).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
 
             val capturedRuleId = intCaptor.value
             val capturedTimestamp = longCaptor.value
@@ -112,14 +112,14 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionDao, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
             var onCompleteCalled = false
 
             // Act
             viewModel.remindTomorrow { onCompleteCalled = true }
 
             // Assert
-            verify(recurringTransactionDao).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
+            verify(recurringTransactionRepository).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
             val capturedRuleId = intCaptor.value
             val capturedTimestamp = longCaptor.value
 

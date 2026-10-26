@@ -222,13 +222,20 @@ class DashboardViewModel(
                     emptyList()
                 } else {
                     val now = timeProvider.now().timeInMillis
-                    rules.filter { rule ->
-                        val nextDue = DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
-                        // Consider it upcoming if due within the next 30 days
-                        nextDue in now..(now + 30L * 24 * 60 * 60 * 1000)
-                    }.sortedBy { rule ->
-                        DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
-                    }
+                    rules.mapNotNull { rule ->
+                        val nextDue =
+                            if (rule.lastRunDate == null) {
+                                rule.startDate
+                            } else {
+                                DateUtils.calculateNextDueDate(rule.lastRunDate, rule.recurrenceInterval)
+                            }
+                        val isExpired = rule.endDate != null && (now > rule.endDate || nextDue > rule.endDate)
+                        if (!isExpired && nextDue in now..(now + 30L * 24 * 60 * 60 * 1000)) {
+                            rule to nextDue
+                        } else {
+                            null
+                        }
+                    }.sortedBy { it.second }.map { it.first }
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
