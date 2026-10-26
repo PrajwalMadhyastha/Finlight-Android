@@ -741,7 +741,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `upcomingPayments are loaded correctly from repository`() =
         runTest {
             // Arrange
-            val now = System.currentTimeMillis()
+            val now = timeProvider.now().timeInMillis
             val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
             initializeViewModel()
@@ -760,7 +760,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `upcomingPayments filters and sorts correctly`() =
         runTest {
             // Arrange
-            val now = System.currentTimeMillis()
+            val now = timeProvider.now().timeInMillis
             // rule1 is due today + 10 days
             val rule1 = RecurringTransaction(1, "Sub1", 10.0, TransactionType.EXPENSE, "Monthly", now - 20L * 24 * 60 * 60 * 1000, 1, 1, null)
             // rule2 is due today + 40 days (should be filtered out)
@@ -786,7 +786,7 @@ open class DashboardViewModelTest : BaseViewModelTest() {
     fun `upcomingPayments emits empty list when recurring transactions are disabled by feature flag`() =
         runTest {
             // Arrange
-            val now = System.currentTimeMillis()
+            val now = timeProvider.now().timeInMillis
             val rule = RecurringTransaction(1, "Netflix", 149.0, TransactionType.EXPENSE, "Monthly", now - 10L * 24 * 60 * 60 * 1000, 1, 1, null)
             `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(rule)))
             `when`(settingsRepository.getRecurringTransactionsEnabled()).thenReturn(flowOf(false))
@@ -797,6 +797,95 @@ open class DashboardViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
                 val payments = awaitItem()
                 assertEquals(0, payments.size)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments calculates nextDue from lastRunDate when present`() =
+        runTest {
+            // Arrange
+            val now = timeProvider.now().timeInMillis
+            // rule with lastRunDate != null: nextDue is lastRunDate + 1 month = now + 10 days
+            val ruleWithLastRun =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Sub with lastRunDate",
+                    amount = 50.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 60L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = now - 20L * 24 * 60 * 60 * 1000,
+                )
+            // rule with lastRunDate == null: nextDue is startDate + 1 month = now + 15 days
+            val ruleWithStartDate =
+                RecurringTransaction(
+                    id = 2,
+                    description = "Sub with startDate",
+                    amount = 30.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 15L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = null,
+                )
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(ruleWithStartDate, ruleWithLastRun)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(2, payments.size)
+                assertEquals("Sub with lastRunDate", payments[0].description) // due in 10 days
+                assertEquals("Sub with startDate", payments[1].description) // due in 15 days
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `upcomingPayments excludes overdue transactions whose nextDue is in the past`() =
+        runTest {
+            // Arrange
+            val now = timeProvider.now().timeInMillis
+            // Overdue rule: nextDue was in the past (20 days ago: startDate was 50 days ago + 1 month = 20 days ago)
+            val overdueRule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Overdue Bill",
+                    amount = 100.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 50L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = null,
+                )
+            // Upcoming rule: nextDue is in 10 days
+            val upcomingRule =
+                RecurringTransaction(
+                    id = 2,
+                    description = "Upcoming Bill",
+                    amount = 200.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = now - 20L * 24 * 60 * 60 * 1000,
+                    accountId = 1,
+                    categoryId = 1,
+                    lastRunDate = null,
+                )
+            `when`(recurringTransactionRepository.getAll()).thenReturn(flowOf(listOf(overdueRule, upcomingRule)))
+            initializeViewModel()
+
+            // Act & Assert
+            viewModel.upcomingPayments.test {
+                advanceUntilIdle()
+                val payments = awaitItem()
+                assertEquals(1, payments.size)
+                assertEquals("Upcoming Bill", payments.first().description)
                 cancelAndIgnoreRemainingEvents()
             }
         }

@@ -132,6 +132,45 @@ class RecurringTransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `saveRule with default parameters uses expected defaults and schedules worker`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+
+            // Act
+            viewModel.saveRule(
+                ruleId = null,
+                description = "Gym Membership",
+                amount = 45.0,
+                recurrenceInterval = "Monthly",
+                startDate = 1000L,
+                accountId = 1,
+                categoryId = 2,
+                lastRunDate = null,
+            )
+            advanceUntilIdle()
+
+            // Assert
+            verify(recurringTransactionRepository).insert(capture(recurringTransactionCaptor))
+            verify(scheduleWorkerUseCase).invoke()
+            val capturedRule = recurringTransactionCaptor.value
+            assertEquals(0, capturedRule.id)
+            assertEquals("Gym Membership", capturedRule.description)
+            assertEquals(45.0, capturedRule.amount, 0.0)
+            assertEquals(TransactionType.EXPENSE, capturedRule.transactionType)
+            assertEquals("Monthly", capturedRule.recurrenceInterval)
+            assertEquals(1000L, capturedRule.startDate)
+            assertEquals(1, capturedRule.accountId)
+            assertEquals(2, capturedRule.categoryId)
+            assertEquals(null, capturedRule.lastRunDate)
+            assertEquals(false, capturedRule.isVariableBill)
+            assertEquals(false, capturedRule.autoApprove)
+            assertEquals(null, capturedRule.endDate)
+            assertEquals(null, capturedRule.smsSenderId)
+            assertEquals(0, capturedRule.skipCount)
+        }
+
+    @Test
     fun `saveRule with existing id calls repository update without scheduling worker`() =
         runTest {
             // Arrange

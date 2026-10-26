@@ -221,11 +221,11 @@ class DashboardViewModel(
                 if (!enabled) {
                     emptyList()
                 } else {
-                    val now = System.currentTimeMillis()
+                    val now = timeProvider.now().timeInMillis
                     rules.filter { rule ->
                         val nextDue = DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
                         // Consider it upcoming if due within the next 30 days
-                        (nextDue - now) <= 30L * 24 * 60 * 60 * 1000
+                        nextDue in now..(now + 30L * 24 * 60 * 60 * 1000)
                     }.sortedBy { rule ->
                         DateUtils.calculateNextDueDate(rule.lastRunDate ?: rule.startDate, rule.recurrenceInterval)
                     }
