@@ -3,6 +3,8 @@ package io.pm.finlight.data.repository
 import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.RecurringPattern
+import io.pm.finlight.RecurringPatternDao
 import io.pm.finlight.RecurringTransaction
 import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.RecurringTransactionRepository
@@ -27,12 +29,15 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var recurringTransactionDao: RecurringTransactionDao
 
+    @Mock
+    private lateinit var recurringPatternDao: RecurringPatternDao
+
     private lateinit var repository: RecurringTransactionRepository
 
     @Before
     override fun setup() {
         super.setup()
-        repository = RecurringTransactionRepository(recurringTransactionDao)
+        repository = RecurringTransactionRepository(recurringTransactionDao, recurringPatternDao)
     }
 
     @Test
@@ -183,5 +188,39 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
 
             // Assert
             verify(recurringTransactionDao).updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+        }
+
+    @Test
+    fun `getUnacknowledgedPatterns calls recurringPatternDao`() {
+        // Act
+        repository.getUnacknowledgedPatterns()
+
+        // Assert
+        verify(recurringPatternDao).getUnacknowledgedPatterns()
+    }
+
+    @Test
+    fun `dismissPatternSuggestion calls recurringPatternDao update with isDismissed true`() =
+        runTest {
+            // Arrange
+            val pattern =
+                RecurringPattern(
+                    smsSignature = "NETFLIX",
+                    description = "Netflix",
+                    amount = 149.0,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    occurrences = 2,
+                    firstSeen = 1000L,
+                    lastSeen = 2000L,
+                    isDismissed = false,
+                )
+
+            // Act
+            repository.dismissPatternSuggestion(pattern)
+
+            // Assert
+            verify(recurringPatternDao).update(pattern.copy(isDismissed = true))
         }
 }

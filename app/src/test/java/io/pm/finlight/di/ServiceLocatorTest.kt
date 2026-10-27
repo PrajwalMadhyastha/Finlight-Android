@@ -32,6 +32,7 @@ import io.pm.finlight.MerchantCategoryMappingRepository
 import io.pm.finlight.MerchantMappingDao
 import io.pm.finlight.MerchantRenameRuleDao
 import io.pm.finlight.MerchantRenameRuleRepository
+import io.pm.finlight.RecurringPatternDao
 import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.SplitTransactionDao
@@ -39,10 +40,12 @@ import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -270,14 +273,17 @@ class ServiceLocatorTest {
     @Test
     fun provideRecurringTransactionRepository_withResolvedDb_usesSuppliedDatabase() {
         val customDao: RecurringTransactionDao = mockk(relaxed = true)
+        val customPatternDao: RecurringPatternDao = mockk(relaxed = true)
         val customDb: AppDatabase =
             mockk {
                 every { recurringTransactionDao() } returns customDao
+                every { recurringPatternDao() } returns customPatternDao
             }
 
         val repo = ServiceLocator.provideRecurringTransactionRepository(application, customDb)
         assertNotNull(repo)
         verify(exactly = 1) { customDb.recurringTransactionDao() }
+        verify(exactly = 1) { customDb.recurringPatternDao() }
         assertSame(repo, ServiceLocator.provideRecurringTransactionRepository(application))
     }
 
@@ -528,6 +534,32 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideScheduleRecurringTransactionWorkerUseCase_returnsSingletonInstance() {
+        val useCase1 = ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application)
+        val useCase2 = ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application)
+
+        assertNotNull(useCase1)
+        assertSame(useCase1, useCase2)
+        assertTrue(useCase1 is DefaultScheduleRecurringTransactionWorkerUseCase)
+    }
+
+    @Test
+    fun setScheduleRecurringTransactionWorkerUseCase_overridesInstance() {
+        val mockUseCase: ScheduleRecurringTransactionWorkerUseCase = mockk(relaxed = true)
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockUseCase)
+        assertSame(mockUseCase, ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application))
+
+        val mockUseCase2: ScheduleRecurringTransactionWorkerUseCase = mockk(relaxed = true)
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockUseCase2)
+        assertSame(mockUseCase2, ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application))
+
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(null)
+        val defaultUseCase = ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application)
+        assertNotNull(defaultUseCase)
+        assertNotSame(mockUseCase2, defaultUseCase)
+    }
+
+    @Test
     fun setMerchantMappingRepository_overridesInstance() {
         val mockRepo: IMerchantMappingRepository = mockk(relaxed = true)
         ServiceLocator.setMerchantMappingRepository(mockRepo)
@@ -669,6 +701,7 @@ class ServiceLocatorTest {
         val mockMergeTransactions: MergeTransactionsUseCase = mockk(relaxed = true)
         val mockAutoSave: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
         val mockGetMonthlyConsistency: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+        val mockScheduleWorker: ScheduleRecurringTransactionWorkerUseCase = mockk(relaxed = true)
         val mockMerchantMapping: IMerchantMappingRepository = mockk(relaxed = true)
         val mockBudget: IBudgetRepository = mockk(relaxed = true)
         val mockRecurring: IRecurringTransactionRepository = mockk(relaxed = true)
@@ -688,6 +721,7 @@ class ServiceLocatorTest {
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactions)
         ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSave)
         ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockGetMonthlyConsistency)
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockScheduleWorker)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMapping)
         ServiceLocator.setBudgetRepository(mockBudget)
         ServiceLocator.setRecurringTransactionRepository(mockRecurring)
@@ -707,6 +741,7 @@ class ServiceLocatorTest {
         assertSame(mockMergeTransactions, ServiceLocator.provideMergeTransactionsUseCase(application))
         assertSame(mockAutoSave, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
         assertSame(mockGetMonthlyConsistency, ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application))
+        assertSame(mockScheduleWorker, ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application))
         assertSame(mockMerchantMapping, ServiceLocator.provideMerchantMappingRepository(application))
         assertSame(mockBudget, ServiceLocator.provideBudgetRepository(application))
         assertSame(mockRecurring, ServiceLocator.provideRecurringTransactionRepository(application))
@@ -728,6 +763,7 @@ class ServiceLocatorTest {
         val newMergeTransactions = ServiceLocator.provideMergeTransactionsUseCase(application)
         val newAutoSave = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
         val newGetMonthlyConsistency = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
+        val newScheduleWorker = ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application)
         val newMerchantMapping = ServiceLocator.provideMerchantMappingRepository(application)
         val newBudget = ServiceLocator.provideBudgetRepository(application)
         val newRecurring = ServiceLocator.provideRecurringTransactionRepository(application)

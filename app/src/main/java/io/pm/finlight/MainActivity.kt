@@ -1368,6 +1368,7 @@ fun AppNavHost(
             LinkTransactionScreen(navController = navController, potentialTransactionJson = json)
         }
 
+        // Legacy recurring link route (superseded by confirm_pending_transaction, retained for deep-link compatibility)
         composable(
             route = "link_recurring_transaction/{potentialTransactionJson}",
             arguments = listOf(navArgument("potentialTransactionJson") { type = NavType.StringType }),

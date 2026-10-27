@@ -51,9 +51,11 @@ class RecurringTransactionViewModelFactoryTest {
     @Test
     fun create_withRecurringTransactionViewModelClass_resolvesRepositoryFromServiceLocator() {
         val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        val mockScheduleWorkerUseCase: io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase = mockk(relaxed = true)
         every { mockRecurringRepo.getAll() } returns flowOf(emptyList())
 
         ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockScheduleWorkerUseCase)
 
         val viewModel = factory.create(RecurringTransactionViewModel::class.java)
 
@@ -65,11 +67,11 @@ class RecurringTransactionViewModelFactoryTest {
             }.get(viewModel)
         assertSame(mockRecurringRepo, repoField)
 
-        val daoField =
-            RecurringTransactionViewModel::class.java.getDeclaredField("patternDao").apply {
+        val useCaseField =
+            RecurringTransactionViewModel::class.java.getDeclaredField("scheduleWorkerUseCase").apply {
                 isAccessible = true
             }.get(viewModel)
-        assertSame(db.recurringPatternDao(), daoField)
+        assertSame(mockScheduleWorkerUseCase, useCaseField)
     }
 
     @Test
