@@ -13,11 +13,9 @@ class LinkTransactionViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val recurringTransactionRepository = ServiceLocator.provideRecurringTransactionRepository(application)
             @Suppress("UNCHECKED_CAST")
             return LinkTransactionViewModel(
                 transactionRepository,
-                recurringTransactionRepository,
                 potentialTransaction,
             ) as T
         }

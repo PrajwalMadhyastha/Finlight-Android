@@ -208,9 +208,8 @@ private fun DashboardCard(
             }
         }
         DashboardCardType.FINANCIAL_SIMULATORS -> AuroraSimulatorsCard(navController = navController)
-        // --- Temporarily Disabled (Issue #105) ---
-        DashboardCardType.UPCOMING_PAYMENTS -> { /* UpcomingPaymentsCard(navController = navController) */ }
-        DashboardCardType.RECURRING_SUGGESTIONS -> { /* RecurringSuggestionsCard(navController = navController) */ }
+        DashboardCardType.UPCOMING_PAYMENTS -> UpcomingPaymentsCard(navController = navController)
+        DashboardCardType.RECURRING_SUGGESTIONS -> RecurringSuggestionsCard(navController = navController)
         DashboardCardType.SAVINGS_GOALS -> SavingsGoalsCard(navController = navController)
     }
 }

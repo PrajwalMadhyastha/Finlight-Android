@@ -3,6 +3,7 @@
 // REASON: REFACTOR (Testing) - The test class now extends `BaseViewModelTest`,
 // inheriting all common setup logic and removing boilerplate for rules,
 // dispatchers, and Mockito initialization.
+// Decoupled from IRecurringTransactionRepository to test isolated SMS linking.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -18,14 +19,12 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentCaptor
-import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
-import java.util.Calendar
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -33,15 +32,6 @@ import java.util.Calendar
 class LinkTransactionViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var transactionRepository: TransactionRepository
-
-    @Mock
-    private lateinit var recurringTransactionRepository: IRecurringTransactionRepository
-
-    @Captor
-    private lateinit var intCaptor: ArgumentCaptor<Int>
-
-    @Captor
-    private lateinit var longCaptor: ArgumentCaptor<Long>
 
     private lateinit var viewModel: LinkTransactionViewModel
 
@@ -73,7 +63,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
             // Act
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
 
             // Assert
             viewModel.linkableTransactions.test {
@@ -84,11 +74,11 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `linkTransaction calls repository and dao methods correctly`() =
+    fun `linkTransaction calls repository setSmsHash and completes`() =
         runTest {
             // Arrange
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -97,40 +87,24 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
 
             // Assert
             verify(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
-            verify(recurringTransactionRepository).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
-
-            val capturedRuleId = intCaptor.value
-            val capturedTimestamp = longCaptor.value
-
-            assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
-            assertTrue("Timestamp should be recent", System.currentTimeMillis() - capturedTimestamp < 1000)
             assertTrue("onComplete lambda should be called", onCompleteCalled)
         }
 
     @Test
-    fun `remindTomorrow calls dao with yesterday's date`() =
+    fun `linkTransaction handles null sourceSmsHash gracefully`() =
         runTest {
             // Arrange
+            val txnWithoutHash = potentialTxn.copy(sourceSmsHash = null)
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, txnWithoutHash)
+            val selectedTxnId = 99
             var onCompleteCalled = false
 
             // Act
-            viewModel.remindTomorrow { onCompleteCalled = true }
+            viewModel.linkTransaction(selectedTxnId) { onCompleteCalled = true }
 
             // Assert
-            verify(recurringTransactionRepository).updateLastRunDate(intCaptor.capture(), longCaptor.capture())
-            val capturedRuleId = intCaptor.value
-            val capturedTimestamp = longCaptor.value
-
-            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
-            val oneSecondInMillis = 1000
-
-            assertEquals(potentialTxn.sourceSmsId.toInt(), capturedRuleId)
-            assertTrue(
-                "Captured timestamp should be approximately yesterday",
-                kotlin.math.abs(capturedTimestamp - yesterday) < oneSecondInMillis,
-            )
+            verify(transactionRepository, never()).setSmsHash(anyLong().toInt(), org.mockito.Mockito.anyString())
             assertTrue("onComplete lambda should be called", onCompleteCalled)
         }
 }
