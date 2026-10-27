@@ -24,12 +24,12 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import io.pm.finlight.GoalViewModel
 import io.pm.finlight.Transaction
 import io.pm.finlight.data.db.entity.GoalContribution
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.components.TransactionPickerSheet
 import io.pm.finlight.utils.FormatUtils
 import java.util.*
@@ -70,7 +70,7 @@ fun GoalDetailScreen(
     }
 
     val currentGoal = goal!!
-    val totalSaved = linkedTotal + offlineTotal
+    val totalSaved = currentGoal.savedAmount + linkedTotal + offlineTotal
     val progress = if (currentGoal.targetAmount > 0) (totalSaved / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -168,9 +168,10 @@ fun GoalDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        if (offlineTotal > 0.0) {
+                        val offlineBreakdown = currentGoal.savedAmount + offlineTotal
+                        if (offlineBreakdown > 0.0) {
                             Text(
-                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
+                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp)

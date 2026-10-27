@@ -34,6 +34,8 @@ import io.pm.finlight.*
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.viewmodel.GoalProgressState
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.utils.FormatUtils
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -47,13 +49,13 @@ fun GoalScreen(
     navController: NavController,
     goalViewModel: GoalViewModel = viewModel(),
 ) {
-    val goals by goalViewModel.allGoals.collectAsState()
+    val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
     var goalToDelete by remember { mutableStateOf<Goal?>(null) }
 
     Scaffold(
         containerColor = Color.Transparent
     ) { innerPadding ->
-        if (goals.isEmpty()) {
+        if (goalsWithProgress.isEmpty()) {
             EmptyStateMessage(
                 message = "No savings goals yet. Tap '+' to add one!",
                 icon = Icons.Default.Info,
@@ -65,10 +67,11 @@ fun GoalScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                items(goals, key = { it.id }) { goal ->
+                items(goalsWithProgress, key = { it.goalWithAccount.id }) { goalProgress ->
+                    val goal = goalProgress.goalWithAccount
                     GoalItem(
                         modifier = Modifier.animateItemPlacement(),
-                        goal = goal,
+                        goalProgress = goalProgress,
                         goalViewModel = goalViewModel,
                         onEdit = { navController.navigate("add_edit_goal/${goal.id}") },
                         onDelete = {
@@ -77,6 +80,7 @@ fun GoalScreen(
                                     id = goal.id,
                                     name = goal.name,
                                     targetAmount = goal.targetAmount,
+                                    savedAmount = goal.savedAmount,
                                     targetDate = goal.targetDate,
                                     accountId = goal.accountId,
                                     notes = goal.notes,
@@ -109,19 +113,18 @@ fun GoalScreen(
 @Composable
 private fun GoalItem(
     modifier: Modifier = Modifier,
-    goal: GoalWithAccountName,
+    goalProgress: GoalProgressState,
     goalViewModel: GoalViewModel,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onClick: () -> Unit,
 ) {
-    val linkedTotal by goalViewModel.getLinkedTotal(goal.id).collectAsState(initial = 0.0)
-    val offlineTotal by goalViewModel.getTotalContributionForGoal(goal.id).collectAsState(initial = 0.0)
+    val goal = goalProgress.goalWithAccount
     val linkedCount by goalViewModel.getLinkedTransactionCount(goal.id).collectAsState(initial = 0)
     val linkedTransactions by goalViewModel.getLinkedTransactions(goal.id).collectAsState(initial = emptyList())
 
-    val totalSaved = linkedTotal + offlineTotal
-    val progress = if (goal.targetAmount > 0) (totalSaved / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val totalSaved = goalProgress.totalSaved
+    val progress = goalProgress.progressPercentage
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1000, easing = EaseOutCubic),
@@ -140,11 +143,11 @@ private fun GoalItem(
 
     // Calculate projected completion date
     val projectedDate =
-        remember(linkedTotal, linkedTransactions, goal.targetAmount, totalSaved) {
-            if (linkedTransactions.isEmpty() || linkedTotal <= 0) return@remember null
+        remember(goalProgress.linkedTotal, linkedTransactions, goal.targetAmount, totalSaved) {
+            if (linkedTransactions.isEmpty() || goalProgress.linkedTotal <= 0) return@remember null
             val firstDate = linkedTransactions.minByOrNull { it.date }?.date ?: return@remember null
             val daysSinceFirst = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - firstDate).coerceAtLeast(1)
-            val avgPerDay = linkedTotal / daysSinceFirst
+            val avgPerDay = goalProgress.linkedTotal / daysSinceFirst
             if (avgPerDay <= 0) return@remember null
             val remainingAmount = goal.targetAmount - totalSaved
             if (remainingAmount <= 0) return@remember System.currentTimeMillis()
@@ -167,7 +170,7 @@ private fun GoalItem(
                     CircularProgressIndicator(
                         progress = { animatedProgress },
                         modifier = Modifier.fillMaxSize(),
-                        color = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                        color = if (goalProgress.isCompleted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                         strokeWidth = 6.dp,
                         strokeCap = StrokeCap.Round,
                         trackColor = Color.Transparent,
@@ -208,7 +211,7 @@ private fun GoalItem(
                         MilestoneBadge(text = "25%", reached = progress >= 0.25f)
                         MilestoneBadge(text = "50%", reached = progress >= 0.5f)
                         MilestoneBadge(text = "75%", reached = progress >= 0.75f)
-                        MilestoneBadge(text = "100%", reached = progress >= 1f)
+                        MilestoneBadge(text = "100%", reached = goalProgress.isCompleted)
                     }
                 }
 
@@ -250,9 +253,10 @@ private fun GoalItem(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
 
-                    if (offlineTotal > 0.0) {
+                    val offlineBreakdown = goalProgress.offlineTotal + goalProgress.manualContributionsTotal
+                    if (offlineBreakdown > 0.0) {
                         Text(
-                            text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
+                            text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

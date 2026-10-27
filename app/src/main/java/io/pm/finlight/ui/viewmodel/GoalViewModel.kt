@@ -1,24 +1,59 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/GoalViewModel.kt
-// REASON: FEATURE (Issue #104) - Reworked for dynamic progress tracking.
-// - Removed `savedAmount` from `saveGoal()` — progress is now computed from
-//   linked transactions.
-// - Added `linkTransactionToGoal()` and `unlinkTransactionFromGoal()` methods.
-// - Exposed `activeGoals` flow and `getLinkedTotal()` for dynamic progress.
-// - Added `notes`, `iconEmoji`, `priority` fields to `saveGoal()`.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.Goal
+import io.pm.finlight.GoalWithAccountName
+import io.pm.finlight.IGoalRepository
+import io.pm.finlight.Transaction
 import io.pm.finlight.data.db.entity.GoalContribution
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+data class GoalProgressState(
+    val goalWithAccount: GoalWithAccountName,
+    val linkedTotal: Double,
+    val offlineTotal: Double,
+    val manualContributionsTotal: Double,
+    val totalSaved: Double,
+    val progressPercentage: Float,
+    val isCompleted: Boolean,
+) {
+    companion object {
+        fun create(
+            goalWithAccount: GoalWithAccountName,
+            linkedTotal: Double,
+            manualContributionsTotal: Double,
+            offlineTotal: Double = goalWithAccount.savedAmount,
+        ): GoalProgressState {
+            val totalSaved = offlineTotal + linkedTotal + manualContributionsTotal
+            val progressPercentage =
+                if (goalWithAccount.targetAmount > 0.0) {
+                    (totalSaved / goalWithAccount.targetAmount).toFloat().coerceIn(0f, 1f)
+                } else {
+                    0f
+                }
+            return GoalProgressState(
+                goalWithAccount = goalWithAccount,
+                linkedTotal = linkedTotal,
+                offlineTotal = offlineTotal,
+                manualContributionsTotal = manualContributionsTotal,
+                totalSaved = totalSaved,
+                progressPercentage = progressPercentage,
+                isCompleted = progressPercentage >= 1f,
+            )
+        }
+    }
+}
 
 class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
@@ -26,6 +61,35 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
 
     val allGoals: StateFlow<List<GoalWithAccountName>> =
         goalRepository.getAllGoalsWithAccountName()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList(),
+            )
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val goalsWithProgress: StateFlow<List<GoalProgressState>> =
+        goalRepository.getAllGoalsWithAccountName()
+            .flatMapLatest { goals ->
+                if (goals.isEmpty()) {
+                    flowOf(emptyList())
+                } else {
+                    val flows: List<Flow<GoalProgressState>> =
+                        goals.map { goal ->
+                            combine(
+                                goalRepository.getLinkedTotal(goal.id),
+                                goalRepository.getTotalContributionForGoal(goal.id),
+                            ) { linkedTotal, manualContributionsTotal ->
+                                GoalProgressState.create(
+                                    goalWithAccount = goal,
+                                    linkedTotal = linkedTotal,
+                                    manualContributionsTotal = manualContributionsTotal,
+                                )
+                            }
+                        }
+                    combine(flows) { it.toList() }
+                }
+            }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
