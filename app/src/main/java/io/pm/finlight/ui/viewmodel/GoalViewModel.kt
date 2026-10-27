@@ -29,6 +29,7 @@ data class GoalProgressState(
     val totalSaved: Double,
     val progressPercentage: Float,
     val isCompleted: Boolean,
+    val linkedTransactionCount: Int = 0,
 ) {
     val totalOfflineSavings: Double
         get() = offlineTotal + manualContributionsTotal
@@ -39,6 +40,7 @@ data class GoalProgressState(
             linkedTotal: Double,
             manualContributionsTotal: Double,
             offlineTotal: Double = goalWithAccount.savedAmount,
+            linkedTransactionCount: Int = 0,
         ): GoalProgressState {
             val totalSaved = offlineTotal + linkedTotal + manualContributionsTotal
             val progressPercentage =
@@ -55,6 +57,7 @@ data class GoalProgressState(
                 totalSaved = totalSaved,
                 progressPercentage = progressPercentage,
                 isCompleted = progressPercentage >= 1f,
+                linkedTransactionCount = linkedTransactionCount,
             )
         }
     }
@@ -76,11 +79,13 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
                             combine(
                                 goalRepository.getLinkedTotal(goal.id),
                                 goalRepository.getTotalContributionForGoal(goal.id),
-                            ) { linkedTotal, manualContributionsTotal ->
+                                goalRepository.getLinkedTransactionCount(goal.id),
+                            ) { linkedTotal, manualContributionsTotal, txnCount ->
                                 GoalProgressState.create(
                                     goalWithAccount = goal,
                                     linkedTotal = linkedTotal,
                                     manualContributionsTotal = manualContributionsTotal,
+                                    linkedTransactionCount = txnCount,
                                 )
                             }
                         }

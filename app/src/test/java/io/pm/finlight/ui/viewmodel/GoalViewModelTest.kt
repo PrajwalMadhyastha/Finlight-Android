@@ -40,6 +40,9 @@ class GoalViewModelTest : BaseViewModelTest() {
     @Before
     override fun setup() {
         super.setup()
+        `when`(goalRepository.getLinkedTransactionCount(anyInt())).thenReturn(flowOf(0))
+        `when`(goalRepository.getLinkedTotal(anyInt())).thenReturn(flowOf(0.0))
+        `when`(goalRepository.getTotalContributionForGoal(anyInt())).thenReturn(flowOf(0.0))
         initializeViewModel()
     }
 
@@ -771,7 +774,7 @@ class GoalViewModelTest : BaseViewModelTest() {
     fun `GoalProgressState create helper correctly computes and clamps values`() {
         val goal = GoalWithAccountName(1, "Trip", 200.0, 50.0, null, 1, "Savings", null, null, 0)
 
-        val stateNormal = GoalProgressState.create(goal, linkedTotal = 50.0, manualContributionsTotal = 20.0)
+        val stateNormal = GoalProgressState.create(goal, linkedTotal = 50.0, manualContributionsTotal = 20.0, linkedTransactionCount = 3)
         assertEquals(50.0, stateNormal.offlineTotal, 0.0)
         assertEquals(50.0, stateNormal.linkedTotal, 0.0)
         assertEquals(20.0, stateNormal.manualContributionsTotal, 0.0)
@@ -779,13 +782,39 @@ class GoalViewModelTest : BaseViewModelTest() {
         assertEquals(120.0, stateNormal.totalSaved, 0.0)
         assertEquals(0.6f, stateNormal.progressPercentage, 0.001f)
         assertFalse(stateNormal.isCompleted)
+        assertEquals(3, stateNormal.linkedTransactionCount)
 
         val stateClamped = GoalProgressState.create(goal, linkedTotal = 200.0, manualContributionsTotal = 50.0)
         assertEquals(100.0, stateClamped.totalOfflineSavings, 0.0)
         assertEquals(300.0, stateClamped.totalSaved, 0.0)
         assertEquals(1.0f, stateClamped.progressPercentage, 0.001f)
         assertTrue(stateClamped.isCompleted)
+        assertEquals(0, stateClamped.linkedTransactionCount)
     }
+
+    @Test
+    fun `goalsWithProgress aggregates linked transaction count into GoalProgressState`() =
+        runTest {
+            val goal = GoalWithAccountName(1, "New Laptop", 50000.0, 5000.0, null, 1, "Savings", null, null, 0)
+            val txnCountFlow = MutableStateFlow(4)
+            `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(listOf(goal)))
+            `when`(goalRepository.getLinkedTotal(1)).thenReturn(flowOf(10000.0))
+            `when`(goalRepository.getTotalContributionForGoal(1)).thenReturn(flowOf(2000.0))
+            `when`(goalRepository.getLinkedTransactionCount(1)).thenReturn(txnCountFlow)
+            viewModel = GoalViewModel(goalRepository)
+
+            viewModel.goalsWithProgress.test {
+                val item = awaitItem()
+                assertEquals(1, item.size)
+                assertEquals(4, item[0].linkedTransactionCount)
+
+                txnCountFlow.value = 7
+                val updated = awaitItem()
+                assertEquals(7, updated[0].linkedTransactionCount)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 
     @Test
     fun `getGoalProgress emits GoalProgressState for existing goal and null for non-existent goal`() =

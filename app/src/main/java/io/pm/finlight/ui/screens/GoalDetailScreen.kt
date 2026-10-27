@@ -36,6 +36,10 @@ import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
 
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.delay
+
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
@@ -49,11 +53,21 @@ fun GoalDetailScreen(
     navController: NavController,
     goalViewModel: GoalViewModel = viewModel(),
 ) {
+    val allGoalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
     val goalProgress =
         remember(goalId) { goalViewModel.getGoalProgress(goalId) }
             .collectAsState(initial = null).value
     val offlineContributions by goalViewModel.getContributionsForGoal(goalId).collectAsState(initial = emptyList())
     val linkedTransactions by goalViewModel.getLinkedTransactions(goalId).collectAsState(initial = emptyList<Transaction>())
+
+    var isTimedOut by remember(goalId) { mutableStateOf(false) }
+
+    LaunchedEffect(goalId) {
+        delay(1500)
+        isTimedOut = true
+    }
+
+    val isNotFound = (allGoalsWithProgress.isNotEmpty() && goalProgress == null) || (isTimedOut && goalProgress == null)
 
     // We'll just fetch all recent transactions for the picker and filter out already linked ones.
     val cal = Calendar.getInstance()
@@ -63,8 +77,61 @@ fun GoalDetailScreen(
     var showTransactionPicker by remember { mutableStateOf(false) }
 
     if (goalProgress == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(if (isNotFound) "Goal Details" else "") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                        ),
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { innerPadding ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isNotFound) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(24.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "Goal Not Found",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "This savings goal may have been deleted or does not exist.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(onClick = { navController.popBackStack() }) {
+                            Text("Go Back")
+                        }
+                    }
+                } else {
+                    CircularProgressIndicator()
+                }
+            }
         }
         return
     }

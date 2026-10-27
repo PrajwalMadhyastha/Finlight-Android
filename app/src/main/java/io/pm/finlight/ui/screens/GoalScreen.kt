@@ -120,7 +120,7 @@ private fun GoalItem(
     onClick: () -> Unit,
 ) {
     val goal = goalProgress.goalWithAccount
-    val linkedCount by goalViewModel.getLinkedTransactionCount(goal.id).collectAsState(initial = 0)
+    val linkedCount = goalProgress.linkedTransactionCount
     val linkedTransactions by goalViewModel.getLinkedTransactions(goal.id).collectAsState(initial = emptyList())
 
     val totalSaved = goalProgress.totalSaved
