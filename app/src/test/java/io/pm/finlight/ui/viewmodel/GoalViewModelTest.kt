@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -799,4 +800,83 @@ class GoalViewModelTest : BaseViewModelTest() {
         assertEquals(1.0f, stateClamped.progressPercentage, 0.001f)
         assertTrue(stateClamped.isCompleted)
     }
+
+    @Test
+    fun `getGoalProgress emits GoalProgressState for existing goal and null for non-existent goal`() =
+        runTest {
+            // Arrange
+            val goal = GoalWithAccountName(1, "Vacation", 1000.0, 200.0, null, 1, "Savings", null, null, 0)
+            `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(listOf(goal)))
+            `when`(goalRepository.getLinkedTotal(1)).thenReturn(flowOf(300.0))
+            `when`(goalRepository.getTotalContributionForGoal(1)).thenReturn(flowOf(100.0))
+            viewModel = GoalViewModel(goalRepository)
+
+            // Act & Assert - existing goal
+            viewModel.getGoalProgress(1).test {
+                val progress = awaitItem()
+                assertTrue(progress != null)
+                assertEquals(1, progress!!.goalWithAccount.id)
+                assertEquals(600.0, progress.totalSaved, 0.0)
+                assertEquals(0.6f, progress.progressPercentage, 0.001f)
+                assertFalse(progress.isCompleted)
+                cancelAndIgnoreRemainingEvents()
+            }
+
+            // Act & Assert - non-existent goal
+            viewModel.getGoalProgress(999).test {
+                val progress = awaitItem()
+                assertNull(progress)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `goalsWithProgress dynamically updates multi-goal list when individual goals update`() =
+        runTest {
+            // Arrange
+            val goal1 = GoalWithAccountName(1, "Goal 1", 1000.0, 100.0, null, 1, "Savings", null, null, 0)
+            val goal2 = GoalWithAccountName(2, "Goal 2", 2000.0, 200.0, null, 1, "Savings", null, null, 0)
+            val linkedFlow1 = MutableStateFlow(100.0)
+            val manualFlow1 = MutableStateFlow(50.0)
+            val linkedFlow2 = MutableStateFlow(300.0)
+            val manualFlow2 = MutableStateFlow(100.0)
+
+            `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(listOf(goal1, goal2)))
+            `when`(goalRepository.getLinkedTotal(1)).thenReturn(linkedFlow1)
+            `when`(goalRepository.getTotalContributionForGoal(1)).thenReturn(manualFlow1)
+            `when`(goalRepository.getLinkedTotal(2)).thenReturn(linkedFlow2)
+            `when`(goalRepository.getTotalContributionForGoal(2)).thenReturn(manualFlow2)
+            viewModel = GoalViewModel(goalRepository)
+
+            // Act & Assert
+            viewModel.goalsWithProgress.test {
+                // Initial emission:
+                // Goal 1: 100 offline + 100 linked + 50 manual = 250 (25%)
+                // Goal 2: 200 offline + 300 linked + 100 manual = 600 (30%)
+                val initial = awaitItem()
+                assertEquals(2, initial.size)
+                assertEquals(250.0, initial[0].totalSaved, 0.0)
+                assertEquals(0.25f, initial[0].progressPercentage, 0.001f)
+                assertEquals(600.0, initial[1].totalSaved, 0.0)
+                assertEquals(0.30f, initial[1].progressPercentage, 0.001f)
+
+                // Update Goal 1 linked total: Goal 1 updates, Goal 2 remains constant
+                linkedFlow1.value = 350.0
+                val update1 = awaitItem()
+                assertEquals(500.0, update1[0].totalSaved, 0.0)
+                assertEquals(0.50f, update1[0].progressPercentage, 0.001f)
+                assertEquals(600.0, update1[1].totalSaved, 0.0)
+                assertEquals(0.30f, update1[1].progressPercentage, 0.001f)
+
+                // Update Goal 2 manual total: Goal 2 updates, Goal 1 remains constant
+                manualFlow2.value = 500.0
+                val update2 = awaitItem()
+                assertEquals(500.0, update2[0].totalSaved, 0.0)
+                assertEquals(0.50f, update2[0].progressPercentage, 0.001f)
+                assertEquals(1000.0, update2[1].totalSaved, 0.0)
+                assertEquals(0.50f, update2[1].progressPercentage, 0.001f)
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

@@ -47,11 +47,10 @@ private fun getPopupContainerColor() = if (MaterialTheme.colorScheme.background.
 fun GoalDetailScreen(
     goalId: Int,
     navController: NavController,
-    goalViewModel: GoalViewModel = viewModel()
+    goalViewModel: GoalViewModel = viewModel(),
 ) {
-    val goal by goalViewModel.getGoalById(goalId).collectAsState(initial = null)
-    val linkedTotal by goalViewModel.getLinkedTotal(goalId).collectAsState(initial = 0.0)
-    val offlineTotal by goalViewModel.getTotalContributionForGoal(goalId).collectAsState(initial = 0.0)
+    val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
+    val goalProgress = goalsWithProgress.firstOrNull { it.goalWithAccount.id == goalId }
     val offlineContributions by goalViewModel.getContributionsForGoal(goalId).collectAsState(initial = emptyList())
     val linkedTransactions by goalViewModel.getLinkedTransactions(goalId).collectAsState(initial = emptyList<Transaction>())
 
@@ -62,20 +61,20 @@ fun GoalDetailScreen(
 
     var showTransactionPicker by remember { mutableStateOf(false) }
 
-    if (goal == null) {
+    if (goalProgress == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
     }
 
-    val currentGoal = goal!!
-    val totalSaved = currentGoal.savedAmount + linkedTotal + offlineTotal
-    val progress = if (currentGoal.targetAmount > 0) (totalSaved / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val currentGoal = goalProgress.goalWithAccount
+    val totalSaved = goalProgress.totalSaved
+    val progress = goalProgress.progressPercentage
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1500, easing = EaseOutCubic),
-        label = "DetailGoalProgress"
+        label = "DetailGoalProgress",
     )
 
     var showContributionDialog by remember { mutableStateOf(false) }
@@ -108,11 +107,11 @@ fun GoalDetailScreen(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                        containerColor = Color.Transparent,
+                    ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         LazyColumn(
             modifier =
@@ -121,7 +120,7 @@ fun GoalDetailScreen(
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(bottom = 80.dp),
         ) {
             item {
                 GlassPanel {
@@ -130,7 +129,7 @@ fun GoalDetailScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
                             CircularProgressIndicator(
@@ -138,15 +137,15 @@ fun GoalDetailScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 strokeWidth = 12.dp,
-                                trackColor = Color.Transparent
+                                trackColor = Color.Transparent,
                             )
                             CircularProgressIndicator(
                                 progress = { animatedProgress },
                                 modifier = Modifier.fillMaxSize(),
-                                color = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                                color = if (goalProgress.isCompleted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                                 strokeWidth = 12.dp,
                                 strokeCap = StrokeCap.Round,
-                                trackColor = Color.Transparent
+                                trackColor = Color.Transparent,
                             )
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 if (!currentGoal.iconEmoji.isNullOrBlank()) {
@@ -156,7 +155,7 @@ fun GoalDetailScreen(
                                     text = "${(progress * 100).roundToInt()}%",
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -166,15 +165,15 @@ fun GoalDetailScreen(
                         Text(
                             text = "${currencyFormat.format(totalSaved)} saved of ${currencyFormat.format(currentGoal.targetAmount)}",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        val offlineBreakdown = currentGoal.savedAmount + offlineTotal
+                        val offlineBreakdown = goalProgress.offlineTotal + goalProgress.manualContributionsTotal
                         if (offlineBreakdown > 0.0) {
                             Text(
-                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
+                                text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                         }
 

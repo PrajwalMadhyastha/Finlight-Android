@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -59,6 +60,10 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
+    @Deprecated(
+        "Use goalsWithProgress for comprehensive goal progress state.",
+        ReplaceWith("goalsWithProgress"),
+    )
     val allGoals: StateFlow<List<GoalWithAccountName>> =
         goalRepository.getAllGoalsWithAccountName()
             .stateIn(
@@ -95,6 +100,9 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList(),
             )
+
+    fun getGoalProgress(goalId: Int): Flow<GoalProgressState?> =
+        goalsWithProgress.map { list -> list.firstOrNull { it.goalWithAccount.id == goalId } }
 
     val activeGoals: StateFlow<List<Goal>> =
         goalRepository.getActiveGoals()
