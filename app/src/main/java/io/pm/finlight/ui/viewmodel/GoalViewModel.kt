@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -29,6 +30,9 @@ data class GoalProgressState(
     val progressPercentage: Float,
     val isCompleted: Boolean,
 ) {
+    val totalOfflineSavings: Double
+        get() = offlineTotal + manualContributionsTotal
+
     companion object {
         fun create(
             goalWithAccount: GoalWithAccountName,
@@ -60,18 +64,6 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
-    @Deprecated(
-        "Use goalsWithProgress for comprehensive goal progress state.",
-        ReplaceWith("goalsWithProgress"),
-    )
-    val allGoals: StateFlow<List<GoalWithAccountName>> =
-        goalRepository.getAllGoalsWithAccountName()
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList(),
-            )
-
     @OptIn(ExperimentalCoroutinesApi::class)
     val goalsWithProgress: StateFlow<List<GoalProgressState>> =
         goalRepository.getAllGoalsWithAccountName()
@@ -102,7 +94,9 @@ class GoalViewModel(private val goalRepository: IGoalRepository) : ViewModel() {
             )
 
     fun getGoalProgress(goalId: Int): Flow<GoalProgressState?> =
-        goalsWithProgress.map { list -> list.firstOrNull { it.goalWithAccount.id == goalId } }
+        goalsWithProgress
+            .map { list -> list.firstOrNull { it.goalWithAccount.id == goalId } }
+            .distinctUntilChanged()
 
     val activeGoals: StateFlow<List<Goal>> =
         goalRepository.getActiveGoals()

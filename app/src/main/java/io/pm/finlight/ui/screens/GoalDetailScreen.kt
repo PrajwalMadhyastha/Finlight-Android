@@ -49,8 +49,9 @@ fun GoalDetailScreen(
     navController: NavController,
     goalViewModel: GoalViewModel = viewModel(),
 ) {
-    val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
-    val goalProgress = goalsWithProgress.firstOrNull { it.goalWithAccount.id == goalId }
+    val goalProgress =
+        remember(goalId) { goalViewModel.getGoalProgress(goalId) }
+            .collectAsState(initial = null).value
     val offlineContributions by goalViewModel.getContributionsForGoal(goalId).collectAsState(initial = emptyList())
     val linkedTransactions by goalViewModel.getLinkedTransactions(goalId).collectAsState(initial = emptyList<Transaction>())
 
@@ -167,10 +168,9 @@ fun GoalDetailScreen(
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        val offlineBreakdown = goalProgress.offlineTotal + goalProgress.manualContributionsTotal
-                        if (offlineBreakdown > 0.0) {
+                        if (goalProgress.totalOfflineSavings > 0.0) {
                             Text(
-                                text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
+                                text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(goalProgress.totalOfflineSavings)} offline)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 4.dp),

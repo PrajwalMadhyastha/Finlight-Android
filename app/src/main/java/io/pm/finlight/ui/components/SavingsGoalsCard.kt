@@ -29,10 +29,13 @@ import io.pm.finlight.ui.viewmodel.GoalViewModelFactory
 import kotlin.math.roundToInt
 
 @Composable
-fun SavingsGoalsCard(navController: NavController) {
-    val factory = GoalViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
-    val goalViewModel: GoalViewModel = viewModel(factory = factory)
-
+fun SavingsGoalsCard(
+    navController: NavController,
+    goalViewModel: GoalViewModel =
+        viewModel(
+            factory = GoalViewModelFactory(LocalContext.current.applicationContext as android.app.Application),
+        ),
+) {
     val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
 
     if (goalsWithProgress.isNotEmpty()) {

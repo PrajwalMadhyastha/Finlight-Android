@@ -12,6 +12,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -46,23 +47,6 @@ class GoalViewModelTest : BaseViewModelTest() {
         `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(initialGoals))
         viewModel = GoalViewModel(goalRepository)
     }
-
-    @Test
-    fun `allGoals flow emits goals from repository`() =
-        runTest {
-            // Arrange
-            val goals =
-                listOf(
-                    GoalWithAccountName(1, "Vacation", 50000.0, 10000.0, null, 1, "Savings", null, null, 0),
-                )
-            initializeViewModel(goals)
-
-            // Assert
-            viewModel.allGoals.test {
-                assertEquals(goals, awaitItem())
-                cancelAndIgnoreRemainingEvents()
-            }
-        }
 
     @Test
     fun `getGoalById calls repository getGoalById`() =
@@ -791,11 +775,13 @@ class GoalViewModelTest : BaseViewModelTest() {
         assertEquals(50.0, stateNormal.offlineTotal, 0.0)
         assertEquals(50.0, stateNormal.linkedTotal, 0.0)
         assertEquals(20.0, stateNormal.manualContributionsTotal, 0.0)
+        assertEquals(70.0, stateNormal.totalOfflineSavings, 0.0)
         assertEquals(120.0, stateNormal.totalSaved, 0.0)
         assertEquals(0.6f, stateNormal.progressPercentage, 0.001f)
         assertFalse(stateNormal.isCompleted)
 
         val stateClamped = GoalProgressState.create(goal, linkedTotal = 200.0, manualContributionsTotal = 50.0)
+        assertEquals(100.0, stateClamped.totalOfflineSavings, 0.0)
         assertEquals(300.0, stateClamped.totalSaved, 0.0)
         assertEquals(1.0f, stateClamped.progressPercentage, 0.001f)
         assertTrue(stateClamped.isCompleted)
@@ -826,6 +812,45 @@ class GoalViewModelTest : BaseViewModelTest() {
             viewModel.getGoalProgress(999).test {
                 val progress = awaitItem()
                 assertNull(progress)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `getGoalProgress does not emit duplicate values when other goals change`() =
+        runTest {
+            // Arrange
+            val goal1 = GoalWithAccountName(1, "Goal 1", 1000.0, 100.0, null, 1, "Savings", null, null, 0)
+            val goal2 = GoalWithAccountName(2, "Goal 2", 2000.0, 200.0, null, 1, "Savings", null, null, 0)
+            val linkedFlow1 = MutableStateFlow(100.0)
+            val manualFlow1 = MutableStateFlow(50.0)
+            val linkedFlow2 = MutableStateFlow(300.0)
+            val manualFlow2 = MutableStateFlow(100.0)
+
+            `when`(goalRepository.getAllGoalsWithAccountName()).thenReturn(flowOf(listOf(goal1, goal2)))
+            `when`(goalRepository.getLinkedTotal(1)).thenReturn(linkedFlow1)
+            `when`(goalRepository.getTotalContributionForGoal(1)).thenReturn(manualFlow1)
+            `when`(goalRepository.getLinkedTotal(2)).thenReturn(linkedFlow2)
+            `when`(goalRepository.getTotalContributionForGoal(2)).thenReturn(manualFlow2)
+            viewModel = GoalViewModel(goalRepository)
+
+            // Act & Assert
+            viewModel.getGoalProgress(1).test {
+                val initial = awaitItem()
+                assertNotNull(initial)
+                assertEquals(1, initial!!.goalWithAccount.id)
+                assertEquals(250.0, initial.totalSaved, 0.0)
+
+                // Updating Goal 2 changes goalsWithProgress, but getGoalProgress(1) should not emit because it is distinctUntilChanged
+                linkedFlow2.value = 500.0
+                expectNoEvents()
+
+                // Updating Goal 1 emits a new value
+                linkedFlow1.value = 350.0
+                val updated = awaitItem()
+                assertNotNull(updated)
+                assertEquals(500.0, updated!!.totalSaved, 0.0)
+
                 cancelAndIgnoreRemainingEvents()
             }
         }

@@ -253,10 +253,9 @@ private fun GoalItem(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
 
-                    val offlineBreakdown = goalProgress.offlineTotal + goalProgress.manualContributionsTotal
-                    if (offlineBreakdown > 0.0) {
+                    if (goalProgress.totalOfflineSavings > 0.0) {
                         Text(
-                            text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(offlineBreakdown)} offline)",
+                            text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(goalProgress.totalOfflineSavings)} offline)",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
