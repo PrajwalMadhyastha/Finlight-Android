@@ -58,7 +58,7 @@ class LinkRecurringTransactionViewModelFactoryTest {
 
         assertNotNull(viewModel)
         val txnField =
-            LinkRecurringTransactionViewModel::class.java.getDeclaredField("transactionRepository").apply {
+            LinkTransactionViewModel::class.java.getDeclaredField("transactionRepository").apply {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockTxnRepo, txnField)

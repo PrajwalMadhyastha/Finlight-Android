@@ -17,8 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class LinkTransactionViewModel(
-    private val transactionRepository: ITransactionRepository,
+open class LinkTransactionViewModel(
+    protected val transactionRepository: ITransactionRepository,
     val potentialTransaction: PotentialTransaction,
 ) : ViewModel() {
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
@@ -54,7 +54,7 @@ class LinkTransactionViewModel(
         }
     }
 
-    fun linkTransaction(
+    open fun linkTransaction(
         selectedTransactionId: Int,
         onComplete: () -> Unit,
     ) {
