@@ -23,19 +23,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import io.pm.finlight.GoalViewModel
-import io.pm.finlight.GoalWithAccountName
+import io.pm.finlight.ui.viewmodel.GoalProgressState
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModelFactory
 import kotlin.math.roundToInt
 
 @Composable
-fun SavingsGoalsCard(navController: NavController) {
-    val factory = GoalViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
-    val goalViewModel: GoalViewModel = viewModel(factory = factory)
+fun SavingsGoalsCard(
+    navController: NavController,
+    goalViewModel: GoalViewModel =
+        viewModel(
+            factory = GoalViewModelFactory(LocalContext.current.applicationContext as android.app.Application),
+        ),
+) {
+    val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
 
-    val goals by goalViewModel.allGoals.collectAsState()
-
-    if (goals.isNotEmpty()) {
+    if (goalsWithProgress.isNotEmpty()) {
         GlassPanel(
             modifier = Modifier.fillMaxWidth().clickable { navController.navigate("goal_screen") }
         ) {
@@ -64,8 +67,8 @@ fun SavingsGoalsCard(navController: NavController) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    items(goals, key = { it.id }) { goal ->
-                        CompactGoalItem(goal = goal, goalViewModel = goalViewModel)
+                    items(goalsWithProgress, key = { it.goalWithAccount.id }) { goalProgress ->
+                        CompactGoalItem(goalProgress = goalProgress)
                     }
                 }
             }
@@ -110,11 +113,10 @@ fun SavingsGoalsCard(navController: NavController) {
 
 @Composable
 private fun CompactGoalItem(
-    goal: GoalWithAccountName,
-    goalViewModel: GoalViewModel
+    goalProgress: GoalProgressState
 ) {
-    val linkedTotal by goalViewModel.getLinkedTotal(goal.id).collectAsState(initial = 0.0)
-    val progress = if (goal.targetAmount > 0) (linkedTotal / goal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val goal = goalProgress.goalWithAccount
+    val progress = goalProgress.progressPercentage
 
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
@@ -158,7 +160,7 @@ private fun CompactGoalItem(
             LinearProgressIndicator(
                 progress = { animatedProgress },
                 modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                color = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                color = if (goalProgress.isCompleted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                 strokeCap = StrokeCap.Round,
                 trackColor = Color.Transparent
             )
