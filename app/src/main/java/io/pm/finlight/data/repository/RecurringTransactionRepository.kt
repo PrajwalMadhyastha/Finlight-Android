@@ -40,6 +40,8 @@ class RecurringTransactionRepository(
         ruleId: Int,
         lastRunDate: Long,
     ) {
+        require(ruleId > 0) { "Rule ID must be positive: $ruleId" }
+        require(lastRunDate > 0L) { "Last run date must be positive epoch millis: $lastRunDate" }
         recurringTransactionDao.updateLastRunDate(ruleId, lastRunDate)
     }
 
@@ -48,6 +50,9 @@ class RecurringTransactionRepository(
         lastRunDate: Long,
         skipCount: Int,
     ) {
+        require(ruleId > 0) { "Rule ID must be positive: $ruleId" }
+        require(lastRunDate > 0L) { "Last run date must be positive epoch millis: $lastRunDate" }
+        require(skipCount >= 0) { "Skip count cannot be negative: $skipCount" }
         recurringTransactionDao.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
     }
 }

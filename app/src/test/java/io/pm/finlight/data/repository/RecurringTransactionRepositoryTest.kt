@@ -15,9 +15,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito.verify
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.`when`
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 
 @ExperimentalCoroutinesApi
@@ -183,5 +185,50 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
 
             // Assert
             verify(recurringTransactionDao).updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+        }
+
+    @Test
+    fun `updateLastRunDate with invalid arguments throws IllegalArgumentException`() =
+        runTest {
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunDate(0, 1700000000000L)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunDate(-5, 1700000000000L)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunDate(5, 0L)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunDate(5, -100L)
+            }
+            verifyNoInteractions(recurringTransactionDao)
+        }
+
+    @Test
+    fun `updateLastRunAndSkipCount with invalid arguments throws IllegalArgumentException`() =
+        runTest {
+            // invalid ruleId
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(0, 1700000000000L, 0)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(-1, 1700000000000L, 0)
+            }
+            // invalid lastRunDate
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(5, 0L, 0)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(5, -100L, 0)
+            }
+            // negative skipCount
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(5, 1700000000000L, -1)
+            }
+            assertFailsWith<IllegalArgumentException> {
+                repository.updateLastRunAndSkipCount(5, 1700000000000L, -10)
+            }
+            verifyNoInteractions(recurringTransactionDao)
         }
 }

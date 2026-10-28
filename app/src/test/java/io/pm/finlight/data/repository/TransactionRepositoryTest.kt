@@ -223,6 +223,22 @@ class TransactionRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `confirmTransaction with invalid transactionId throws IllegalArgumentException without DB interaction`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            for (invalidId in listOf(0, -1, -42)) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = invalidId)
+                }
+            }
+
+            coVerify(exactly = 0) { db.withTransaction<Any?>(any()) }
+            verify(transactionDao, never()).confirmTransaction(any())
+        }
+
+    @Test
     fun `skipTransaction delegates to transactionWriteDao`() =
         runTest {
             setupDefaultPropertyMocks()
@@ -231,6 +247,21 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             repository.skipTransaction(transactionId = 42)
 
             verify(transactionDao).skipTransaction(42)
+        }
+
+    @Test
+    fun `skipTransaction with invalid transactionId throws IllegalArgumentException`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+
+            for (invalidId in listOf(0, -1, -42)) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.skipTransaction(transactionId = invalidId)
+                }
+            }
+
+            verify(transactionDao, never()).skipTransaction(any())
         }
 
     // ── Reimbursement / Offset Feature Tests ──────────────────────────────────

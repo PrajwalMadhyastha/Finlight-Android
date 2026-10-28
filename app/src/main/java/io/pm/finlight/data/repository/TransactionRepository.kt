@@ -545,6 +545,7 @@ class TransactionRepository(
         transactionId: Int,
         confirmedAmount: Double?,
     ) {
+        require(transactionId > 0) { "Transaction ID must be positive: $transactionId" }
         if (confirmedAmount != null) {
             require(confirmedAmount > 0.0 && !confirmedAmount.isNaN() && !confirmedAmount.isInfinite()) {
                 "Confirmed amount must be positive and finite, but was: $confirmedAmount"
@@ -560,8 +561,10 @@ class TransactionRepository(
         }
     }
 
-    override suspend fun skipTransaction(transactionId: Int) =
+    override suspend fun skipTransaction(transactionId: Int) {
+        require(transactionId > 0) { "Transaction ID must be positive: $transactionId" }
         withContext(dispatcherProvider.io) {
             transactionWriteDao.skipTransaction(transactionId)
         }
+    }
 }

@@ -238,6 +238,19 @@ class TransactionRepositoryDomainDaoTest {
         }
 
     @Test
+    fun testConfirmTransactionWithInvalidIdThrowsIllegalArgumentException() =
+        runTest {
+            for (invalidId in listOf(0, -1, -42)) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.confirmTransaction(transactionId = invalidId)
+                }
+            }
+
+            coVerify(exactly = 0) { any<AppDatabase>().withTransaction<Any?>(any()) }
+            coVerify(exactly = 0) { writeDao.confirmTransaction(any()) }
+        }
+
+    @Test
     fun testDelegationToSkipTransaction() =
         runTest {
             coJustRun { writeDao.skipTransaction(any()) }
@@ -245,5 +258,17 @@ class TransactionRepositoryDomainDaoTest {
             repository.skipTransaction(transactionId = 42)
 
             coVerify(exactly = 1) { writeDao.skipTransaction(42) }
+        }
+
+    @Test
+    fun testSkipTransactionWithInvalidIdThrowsIllegalArgumentException() =
+        runTest {
+            for (invalidId in listOf(0, -1, -42)) {
+                assertFailsWith<IllegalArgumentException> {
+                    repository.skipTransaction(transactionId = invalidId)
+                }
+            }
+
+            coVerify(exactly = 0) { writeDao.skipTransaction(any()) }
         }
 }
