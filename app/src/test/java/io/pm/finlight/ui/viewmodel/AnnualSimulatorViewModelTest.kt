@@ -2,22 +2,26 @@ package io.pm.finlight.ui.viewmodel
 
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.SettingsRepository
+import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
+import io.pm.finlight.anyObject
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
-import org.mockito.Mockito.verify
-import org.mockito.Mockito.`when`
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
-import io.pm.finlight.anyObject
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import java.util.Calendar
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,6 +58,8 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         val mockBudgets = mapOf(1 to 1000f, 2 to 1000f, 3 to 1000f, 4 to 1000f, 5 to 1000f, 6 to 1000f)
         runTest {
             `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
+            `when`(settingsRepository.getOverallBudgetsForYear(2025)).thenReturn(mapOf(1 to 500f))
+            `when`(settingsRepository.getOverallBudgetsForYear(2027)).thenReturn(mapOf(1 to 1200f))
         }
         `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
@@ -62,14 +68,36 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             .thenReturn(flowOf(emptyList()))
     }
 
-    private fun createViewModel() {
+    private fun createViewModel(simulationYear: Int? = null) {
         viewModel =
             AnnualSimulatorViewModel(
                 transactionRepository = transactionRepository,
                 settingsRepository = settingsRepository,
-                timeProvider = mockTimeProvider
+                timeProvider = mockTimeProvider,
+                simulationYear = simulationYear
             )
     }
+
+    private fun createIncomeTxn(amount: Double): TransactionDetails =
+        TransactionDetails(
+            transaction =
+                Transaction(
+                    id = 1,
+                    description = "Salary",
+                    amount = amount,
+                    transactionType = TransactionType.INCOME,
+                    date = 100L,
+                    accountId = 1,
+                    categoryId = null,
+                    notes = null
+                ),
+            images = emptyList(),
+            accountName = "Bank",
+            categoryName = "Salary",
+            categoryIconKey = null,
+            categoryColorKey = null,
+            tagNames = null
+        )
 
     @Test
     fun `initialization loads base annual budget correctly`() =
@@ -94,39 +122,173 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `initialization calculates projected annual income correctly`() =
+    fun `initialization calculates projected annual income correctly for current year`() =
         runTest {
-            val incomeTxn =
-                io.pm.finlight.TransactionDetails(
-                    transaction = io.pm.finlight.Transaction(id = 1, description = "Salary", amount = 5000.0, transactionType = TransactionType.INCOME, date = 100L, accountId = 1, categoryId = null, notes = null),
-                    images = emptyList(),
-                    accountName = "Bank",
-                    categoryName = "Salary",
-                    categoryIconKey = null,
-                    categoryColorKey = null,
-                    tagNames = null
-                )
             `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
-                .thenReturn(flowOf(listOf(incomeTxn)))
+                .thenReturn(flowOf(listOf(createIncomeTxn(5000.0))))
 
             createViewModel()
 
-            // It should calculate (5000 / 6) * 12 = 10000.0 (since current month index is 6)
+            // Current calendar month is June (index 6).
+            // It should calculate (5000 / 6) * 12 = 10000.0
             val baseIncome = viewModel.baseAnnualIncome.first()
             assertEquals(10000.0, baseIncome, 0.0)
         }
 
     @Test
-    fun `addLifeEvent adds event correctly`() =
+    fun `simulating past years does not extrapolate using the current calendar month`() =
+        runTest {
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(createIncomeTxn(5000.0))))
+
+            // Simulate year 2025 when current calendar year is 2026
+            createViewModel(simulationYear = 2025)
+
+            // Past year should use full actual ytdIncome (5000.0) without monthly extrapolation
+            assertEquals(2025, viewModel.currentYear.first())
+            val baseIncome = viewModel.baseAnnualIncome.first()
+            assertEquals(5000.0, baseIncome, 0.0)
+        }
+
+    @Test
+    fun `simulating past years with zero income returns zero`() =
+        runTest {
+            createViewModel(simulationYear = 2025)
+
+            assertEquals(0.0, viewModel.baseAnnualIncome.first(), 0.0)
+        }
+
+    @Test
+    fun `simulating future years uses actual income without extrapolation`() =
+        runTest {
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(createIncomeTxn(3000.0))))
+
+            // Simulate year 2027 when current calendar year is 2026
+            createViewModel(simulationYear = 2027)
+
+            assertEquals(2027, viewModel.currentYear.first())
+            val baseIncome = viewModel.baseAnnualIncome.first()
+            assertEquals(3000.0, baseIncome, 0.0)
+        }
+
+    @Test
+    fun `setYear updates year and reloads base annual metrics`() =
+        runTest {
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(createIncomeTxn(6000.0))))
+
+            createViewModel(simulationYear = 2026)
+            assertEquals(12000.0, viewModel.baseAnnualIncome.first(), 0.0)
+
+            // Switch to past year 2025
+            viewModel.setYear(2025)
+            assertEquals(2025, viewModel.currentYear.first())
+            assertEquals(6000.0, viewModel.baseAnnualIncome.first(), 0.0)
+
+            // Calling with same year should be a no-op
+            viewModel.setYear(2025)
+            assertEquals(2025, viewModel.currentYear.first())
+        }
+
+    @Test
+    fun `addLifeEvent with valid parameters adds event and returns success`() =
         runTest {
             createViewModel()
 
-            viewModel.addLifeEvent("Buy Car", 5000.0, false, 5)
+            val result = viewModel.addLifeEvent("Buy Car", 5000.0, false, 5)
 
+            assertTrue(result.isSuccess)
+            assertNull(viewModel.validationError.first())
             val events = viewModel.lifeEvents.first()
             assertEquals(1, events.size)
             assertEquals("Buy Car", events[0].name)
             assertEquals(5000.0, events[0].amount, 0.0)
+            assertEquals(5, events[0].startMonthIndex)
+        }
+
+    @Test
+    fun `addLifeEvent with blank name returns failure and updates validation error`() =
+        runTest {
+            createViewModel()
+
+            val resultEmpty = viewModel.addLifeEvent("", 5000.0, false, 5)
+            assertTrue(resultEmpty.isFailure)
+            assertEquals("Event name cannot be blank", viewModel.validationError.first())
+            assertTrue(viewModel.lifeEvents.first().isEmpty())
+
+            val resultWhitespace = viewModel.addLifeEvent("   ", 5000.0, false, 5)
+            assertTrue(resultWhitespace.isFailure)
+            assertEquals("Event name cannot be blank", viewModel.validationError.first())
+            assertTrue(viewModel.lifeEvents.first().isEmpty())
+        }
+
+    @Test
+    fun `addLifeEvent with non-positive amount returns failure and updates validation error`() =
+        runTest {
+            createViewModel()
+
+            val resultZero = viewModel.addLifeEvent("Event", 0.0, false, 0)
+            assertTrue(resultZero.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            val resultNegative = viewModel.addLifeEvent("Event", -100.0, false, 0)
+            assertTrue(resultNegative.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            val resultNan = viewModel.addLifeEvent("Event", Double.NaN, false, 0)
+            assertTrue(resultNan.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            val resultInfinity = viewModel.addLifeEvent("Event", Double.POSITIVE_INFINITY, false, 0)
+            assertTrue(resultInfinity.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            assertTrue(viewModel.lifeEvents.first().isEmpty())
+        }
+
+    @Test
+    fun `addLifeEvent with invalid month index returns failure and updates validation error`() =
+        runTest {
+            createViewModel()
+
+            val resultUnder = viewModel.addLifeEvent("Event", 100.0, false, -1)
+            assertTrue(resultUnder.isFailure)
+            assertEquals("Start month index must be between 0 and 11", viewModel.validationError.first())
+
+            val resultOver = viewModel.addLifeEvent("Event", 100.0, false, 12)
+            assertTrue(resultOver.isFailure)
+            assertEquals("Start month index must be between 0 and 11", viewModel.validationError.first())
+
+            assertTrue(viewModel.lifeEvents.first().isEmpty())
+        }
+
+    @Test
+    fun `subsequent valid addLifeEvent clears previous validation error`() =
+        runTest {
+            createViewModel()
+
+            // Trigger error
+            viewModel.addLifeEvent("", 100.0, false, 0)
+            assertEquals("Event name cannot be blank", viewModel.validationError.first())
+
+            // Follow with valid event
+            val result = viewModel.addLifeEvent("Valid Event", 100.0, false, 0)
+            assertTrue(result.isSuccess)
+            assertNull(viewModel.validationError.first())
+            assertEquals(1, viewModel.lifeEvents.first().size)
+        }
+
+    @Test
+    fun `clearValidationError clears error state`() =
+        runTest {
+            createViewModel()
+
+            viewModel.addLifeEvent("", 100.0, false, 0)
+            assertEquals("Event name cannot be blank", viewModel.validationError.first())
+
+            viewModel.clearValidationError()
+            assertNull(viewModel.validationError.first())
         }
 
     @Test
@@ -154,15 +316,21 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `calculateProjectedAnnualImpact calculates correctly for recurring event`() =
+    fun `calculateProjectedAnnualImpact calculates correctly for recurring event across boundary months`() =
         runTest {
             createViewModel()
 
-            // Start month 6 (July, 0-indexed). It will be active for 12 - 6 = 6 months
-            viewModel.addLifeEvent("New Subscription", 50.0, true, 6)
-            val impact = viewModel.calculateProjectedAnnualImpact()
+            // Start month 0 (Jan): Active for 12 months -> 100 * 12 = 1200
+            viewModel.addLifeEvent("Gym Jan", 100.0, true, 0)
+            assertEquals(1200.0, viewModel.calculateProjectedAnnualImpact(), 0.0)
 
-            assertEquals(300.0, impact, 0.0)
+            // Start month 11 (Dec): Active for 1 month -> 50 * 1 = 50
+            viewModel.addLifeEvent("Gym Dec", 50.0, true, 11)
+            assertEquals(1250.0, viewModel.calculateProjectedAnnualImpact(), 0.0)
+
+            // Start month 6 (July): Active for 6 months -> 200 * 6 = 1200
+            viewModel.addLifeEvent("Gym Jul", 200.0, true, 6)
+            assertEquals(2450.0, viewModel.calculateProjectedAnnualImpact(), 0.0)
         }
 
     @Test
@@ -172,7 +340,6 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
 
             viewModel.togglePrivacyMode()
 
-            // Initially false, so toggling should save true
             verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
         }
 }

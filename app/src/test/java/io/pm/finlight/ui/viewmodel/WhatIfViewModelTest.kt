@@ -1,18 +1,21 @@
 package io.pm.finlight.ui.viewmodel
 
 import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.FinancialSummary
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TransactionRepository
-import io.pm.finlight.WhatIfViewModel
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import java.util.Calendar
@@ -32,6 +35,10 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             set(Calendar.YEAR, 2026)
             set(Calendar.MONTH, Calendar.JUNE)
             set(Calendar.DAY_OF_MONTH, 15)
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
         }
 
     private val mockTimeProvider =
@@ -47,13 +54,11 @@ class WhatIfViewModelTest : BaseViewModelTest() {
         `when`(settingsRepository.getOverallBudgetForMonth(2026, 6)).thenReturn(flowOf(5000f))
         `when`(settingsRepository.getSimulatorPrivacyModeEnabled()).thenReturn(flowOf(false))
 
-        // Mock transactions repository
-        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(testCalendar.timeInMillis - 86400000L))
+        // Mock financial summary
+        `when`(transactionRepository.getFinancialSummaryForRangeFlow(anyLong(), anyLong()))
+            .thenReturn(flowOf(FinancialSummary(totalIncome = 8000.0, totalExpenses = 2000.0)))
 
-        // Note: The daily spending calculation inside getMonthlyConsistencyData is complex to mock fully,
-        // but for WhatIfViewModel, we only care about base budgets if we are to use safeToSpend directly.
-        // Actually, WhatIfViewModel relies on settingsRepository.getOverallBudgetForMonth and transactionDao?
-        // Wait, WhatIfViewModel needs transactionRepository.getMonthlyConsistencyData to return a flow.
+        `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(testCalendar.timeInMillis - 86400000L))
     }
 
     private fun createViewModel() {
@@ -66,18 +71,19 @@ class WhatIfViewModelTest : BaseViewModelTest() {
     }
 
     @Test
-    fun `initial state is empty hypothetical expenses`() =
+    fun `initial state is empty hypothetical expenses and loaded actuals`() =
         runTest {
-            // We will just mock getOverallBudgetForMonth since WhatIfViewModel accesses it directly
-            // WhatIfViewModel uses `getMonthlyConsistencyData` from TransactionRepository?
-            // Actually, let's just initialize and test state.
-
-            // Wait, WhatIfViewModel actually relies on `SettingsRepository.getOverallBudgetForMonth`
-            // and doesn't call `getMonthlyConsistencyData`. Let's check WhatIfViewModel implementation.
             createViewModel()
 
             val expenses = viewModel.hypotheticalExpenses.first()
             assertTrue(expenses.isEmpty())
+            assertEquals(8000L, viewModel.actualMonthlyIncome.first())
+            assertEquals(2000L, viewModel.actualMonthlyExpenses.first())
+            assertEquals(5000L, viewModel.overallMonthlyBudget.first())
+            assertEquals(2000L, viewModel.simulatedExpenses.first())
+            assertEquals(3000L, viewModel.simulatedAmountRemaining.first())
+            assertFalse(viewModel.isDeficitSpending.first())
+            assertFalse(viewModel.isDeficit.first())
         }
 
     @Test
@@ -91,6 +97,20 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             assertEquals(1, expenses.size)
             assertEquals("New Phone", expenses[0].name)
             assertEquals(800L, expenses[0].amount)
+        }
+
+    @Test
+    fun `addHypotheticalExpense ignores invalid expense`() =
+        runTest {
+            createViewModel()
+
+            viewModel.addHypotheticalExpense("", 800L)
+            viewModel.addHypotheticalExpense("   ", 800L)
+            viewModel.addHypotheticalExpense("Valid", 0L)
+            viewModel.addHypotheticalExpense("Invalid", -100L)
+
+            val expenses = viewModel.hypotheticalExpenses.first()
+            assertTrue(expenses.isEmpty())
         }
 
     @Test
@@ -114,7 +134,56 @@ class WhatIfViewModelTest : BaseViewModelTest() {
 
             viewModel.togglePrivacyMode()
 
-            // Initially false, so toggling should save true
             verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
+        }
+
+    @Test
+    fun `simulatedSafeToSpendPerDay calculates positive amount when within budget`() =
+        runTest {
+            createViewModel()
+
+            // Budget = 5000, Actual Expenses = 2000, Remaining = 3000
+            // June has 30 days. Today is June 15. Remaining days = 30 - 15 + 1 = 16 days.
+            // 3000.0 / 16 = 187.5 -> roundToLong = 188L
+            val safeToSpend = viewModel.simulatedSafeToSpendPerDay.first()
+            assertEquals(188L, safeToSpend)
+            assertFalse(viewModel.isDeficitSpending.first())
+            assertFalse(viewModel.isDeficit.first())
+        }
+
+    @Test
+    fun `WhatIfViewModel accurately signals deficit spending when simulated expenses exceed budget`() =
+        runTest {
+            createViewModel()
+
+            // Budget = 5000, Actual Expenses = 2000
+            // Add hypothetical expense of 4600 -> Simulated Expenses = 6600, Remaining = -1600
+            viewModel.addHypotheticalExpense("Large Purchase", 4600L)
+
+            assertEquals(6600L, viewModel.simulatedExpenses.first())
+            assertEquals(-1600L, viewModel.simulatedAmountRemaining.first())
+            assertTrue(viewModel.isDeficitSpending.first())
+            assertTrue(viewModel.isDeficit.first())
+
+            // Remaining days = 16. -1600.0 / 16 = -100L.
+            // Should accurately reflect negative rate instead of clamping to 0L.
+            val safeToSpend = viewModel.simulatedSafeToSpendPerDay.first()
+            assertEquals(-100L, safeToSpend)
+        }
+
+    @Test
+    fun `break-even simulation results in zero safe to spend and no deficit`() =
+        runTest {
+            createViewModel()
+
+            // Budget = 5000, Actual Expenses = 2000
+            // Add expense of 3000 -> Remaining = 0
+            viewModel.addHypotheticalExpense("Exact Budget Filler", 3000L)
+
+            assertEquals(5000L, viewModel.simulatedExpenses.first())
+            assertEquals(0L, viewModel.simulatedAmountRemaining.first())
+            assertFalse(viewModel.isDeficitSpending.first())
+            assertFalse(viewModel.isDeficit.first())
+            assertEquals(0L, viewModel.simulatedSafeToSpendPerDay.first())
         }
 }

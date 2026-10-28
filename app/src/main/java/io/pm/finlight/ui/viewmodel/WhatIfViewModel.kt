@@ -1,11 +1,20 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.FormatUtils
 import io.pm.finlight.utils.TimeProvider
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Locale
@@ -33,6 +42,8 @@ class WhatIfViewModel(
     val simulatedExpenses: StateFlow<Long>
     val simulatedAmountRemaining: StateFlow<Long>
     val simulatedSafeToSpendPerDay: StateFlow<Long>
+    val isDeficitSpending: StateFlow<Boolean>
+    val isDeficit: StateFlow<Boolean>
 
     val privacyModeEnabled: StateFlow<Boolean>
     val monthYear: String
@@ -83,15 +94,23 @@ class WhatIfViewModel(
                 val lastDayOfMonth = today.getActualMaximum(Calendar.DAY_OF_MONTH)
                 val remainingDays = (lastDayOfMonth - today.get(Calendar.DAY_OF_MONTH) + 1).coerceAtLeast(1)
 
-                if (remaining > 0) (remaining.toDouble() / remainingDays).roundToLong() else 0L
+                (remaining.toDouble() / remainingDays).roundToLong()
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+        isDeficitSpending =
+            simulatedAmountRemaining.map { it < 0 }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+        isDeficit = isDeficitSpending
     }
 
     fun addHypotheticalExpense(
         name: String,
         amount: Long
     ) {
-        _hypotheticalExpenses.update { it + HypotheticalExpense(name = name, amount = amount) }
+        if (name.isNotBlank() && amount > 0L) {
+            _hypotheticalExpenses.update { it + HypotheticalExpense(name = name.trim(), amount = amount) }
+        }
     }
 
     fun removeHypotheticalExpense(id: String) {

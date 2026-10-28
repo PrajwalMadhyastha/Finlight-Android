@@ -28,12 +28,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import io.pm.finlight.WhatIfViewModel
 import io.pm.finlight.ui.components.AuroraProgressBar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 
 // Helper to detect perceived luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -259,6 +259,14 @@ private fun SimulatedHeroCard(
         label = "SimulatedBudgetProgress"
     )
 
+    val isDeficit = amountRemaining < 0
+    val safeBoxColor =
+        if (isDeficit) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+        } else {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        }
+
     GlassPanel {
         Column(
             modifier =
@@ -295,9 +303,9 @@ private fun SimulatedHeroCard(
                     PrivacyAwareText(
                         amount = amountRemaining,
                         isPrivacyMode = isPrivacyModeEnabled,
-                        prefix = "Remaining: ",
+                        prefix = if (isDeficit) "Deficit: " else "Remaining: ",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isDeficit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     PrivacyAwareText(
                         amount = totalBudget,
@@ -321,7 +329,7 @@ private fun SimulatedHeroCard(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                        .background(safeBoxColor)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -330,7 +338,7 @@ private fun SimulatedHeroCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "Simulated Safe to Spend",
+                        text = if (isDeficit) "Simulated Deficit per Day" else "Simulated Safe to Spend",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -349,7 +357,7 @@ private fun SimulatedHeroCard(
                                     letterSpacing = 0.5.sp
                                 ),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (isDeficit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "/day",
