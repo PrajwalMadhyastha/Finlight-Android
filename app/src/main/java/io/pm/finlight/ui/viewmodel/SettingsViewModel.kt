@@ -365,8 +365,6 @@ class SettingsViewModel(
     private fun createMerchantRenameRuleProvider(): MerchantRenameRuleProvider =
         object : MerchantRenameRuleProvider {
             override suspend fun getAllRules(): List<MerchantRenameRule> = merchantRenameRuleRepository.getAllRules().first()
-
-            override suspend fun getAllRulesMap(): Map<String, String> = merchantRenameRuleRepository.getAliasesAsMap().first()
         }
 
     private fun createIgnoreRuleProvider(): IgnoreRuleProvider =
@@ -898,21 +896,26 @@ class SettingsViewModel(
             val allCategories = categoryRepository.getAllCategoriesSnapshot()
             val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
-            transactionRunner.run {
-                if (isFinlightExport) {
-                    importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
-                } else {
-                    importGenericCsv(header, rows, learnedMappings, usedColorKeys)
-                }
+            try {
+                transactionRunner.run {
+                    if (isFinlightExport) {
+                        importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
+                    } else {
+                        importGenericCsv(header, rows, learnedMappings, usedColorKeys)
+                    }
 
-                if (learnedMappings.isNotEmpty()) {
-                    val newMappings =
-                        learnedMappings.map { (merchant, categoryId) ->
-                            MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
-                        }
-                    merchantCategoryMappingRepository.insertAll(newMappings)
-                    Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
+                    if (learnedMappings.isNotEmpty()) {
+                        val newMappings =
+                            learnedMappings.map { (merchant, categoryId) ->
+                                MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
+                            }
+                        merchantCategoryMappingRepository.insertAll(newMappings)
+                        Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("CsvImport", "Failed to import CSV", e)
+                _uiEvent.send("CSV import failed: ${e.localizedMessage ?: "Unknown error"}")
             }
         }
     }
@@ -936,6 +939,7 @@ class SettingsViewModel(
             idMap[oldId] = newId
         }
 
+        val splits = mutableListOf<SplitTransaction>()
         for (row in children) {
             val parentIdCsv = row[header.indexOf("ParentId")]
             val newParentId = idMap[parentIdCsv]?.toInt()
@@ -944,7 +948,10 @@ class SettingsViewModel(
                 continue
             }
             val split = createSplitFromRow(row, header, newParentId, usedColorKeys)
-            splitTransactionRepository.insertAll(listOf(split))
+            splits.add(split)
+        }
+        if (splits.isNotEmpty()) {
+            splitTransactionRepository.insertAll(splits)
         }
     }
 

@@ -12,11 +12,6 @@ interface TransactionRunner {
     suspend fun <R> run(
         block: suspend () -> R,
     ): R
-
-    suspend fun <R> run(
-        db: RoomDatabase,
-        block: suspend () -> R,
-    ): R = run(block)
 }
 
 /**
@@ -26,13 +21,6 @@ class RoomTransactionRunner(
     private val db: RoomDatabase,
 ) : TransactionRunner {
     override suspend fun <R> run(
-        block: suspend () -> R,
-    ): R {
-        return db.withTransaction(block)
-    }
-
-    override suspend fun <R> run(
-        db: RoomDatabase,
         block: suspend () -> R,
     ): R {
         return db.withTransaction(block)

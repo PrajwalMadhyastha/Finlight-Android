@@ -24,6 +24,7 @@ import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
@@ -101,6 +102,7 @@ class SettingsViewModelFactoryTest {
         val mockMerchantCategoryMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
         val mockCustomSmsRuleRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
         val mockIgnoreRuleRepo: IIgnoreRuleRepository = mockk(relaxed = true)
+        val mockTransactionRunner: TransactionRunner = mockk(relaxed = true)
 
         mockkObject(MlModelFactory)
         val mockClassifier: SmsClassifier = mockk(relaxed = true)
@@ -121,6 +123,7 @@ class SettingsViewModelFactoryTest {
         ServiceLocator.setMerchantCategoryMappingRepository(mockMerchantCategoryMappingRepo)
         ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRuleRepo)
         ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
+        ServiceLocator.setTransactionRunner(mockTransactionRunner)
 
         val factory = SettingsViewModelFactory(application)
         val viewModel = factory.create(SettingsViewModel::class.java)
@@ -210,6 +213,12 @@ class SettingsViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockIgnoreRuleRepo, ignoreRuleRepoField)
+
+        val transactionRunnerField =
+            SettingsViewModel::class.java.getDeclaredField("transactionRunner").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTransactionRunner, transactionRunnerField)
 
         // NerExtractor is NOT eagerly instantiated on creation
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }

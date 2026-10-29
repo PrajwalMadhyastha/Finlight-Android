@@ -147,10 +147,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val block = firstArg<suspend () -> Any?>()
             block()
         }
-        coEvery { transactionRunner.run<Any?>(any(), any()) } coAnswers {
-            val block = secondArg<suspend () -> Any?>()
-            block()
-        }
 
         // --- NEW: Grant SMS permissions via Shadow (backup) ---
         org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -582,10 +578,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val splitsCaptor = argumentCaptor<List<SplitTransaction>>()
             verify(
                 splitTransactionRepository,
-                org.mockito.Mockito.timeout(5000).atLeastOnce(),
+                org.mockito.Mockito.timeout(5000),
             ).insertAll(capture(splitsCaptor))
 
-            val allCapturedSplits = splitsCaptor.allValues.flatten()
+            val allCapturedSplits = splitsCaptor.value
             assertEquals(2, allCapturedSplits.size)
             assertTrue(allCapturedSplits.any { it.parentTransactionId == 100 && it.amount == 200.0 && it.categoryId == 1 })
             assertTrue(allCapturedSplits.any { it.parentTransactionId == 100 && it.amount == 100.0 && it.categoryId == 2 })
@@ -598,6 +594,37 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val learnedList = mappingsCaptor.value
             assertTrue(learnedList.any { it.parsedName == "Starbucks" && it.categoryId == 3 })
+        }
+
+    @Test
+    fun `commitCsvImport catches exception during transaction execution and sends error message to uiEvent`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val header = listOf("Id", "Date", "Description", "Amount", "Type", "Category", "Account")
+            val row =
+                ReviewableRow(
+                    lineNumber = 2,
+                    rowData = listOf("1", "2025-10-09 10:00:00", "Coffee", "50.0", "expense", "Food", "Cash"),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            setCsvValidationReport(viewModel, CsvValidationReport(header = header, reviewableRows = listOf(row)))
+
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
+            coEvery { transactionRunner.run<Any?>(any()) } coAnswers {
+                throw IllegalStateException("Database write failed")
+            }
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.commitCsvImport(listOf(row))
+                advanceUntilIdle()
+
+                val event = awaitItem()
+                assertTrue(event.contains("CSV import failed: Database write failed"))
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
     @Test

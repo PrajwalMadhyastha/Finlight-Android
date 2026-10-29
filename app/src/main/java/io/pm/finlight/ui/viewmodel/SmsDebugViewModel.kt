@@ -13,7 +13,6 @@ import android.app.Application
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
@@ -45,7 +44,12 @@ data class SmsDebugUiState(
 class SmsDebugViewModel(
     application: Application,
     private val smsRepository: ISmsRepository,
-    private val db: AppDatabase,
+    private val transactionRepository: ITransactionRepository,
+    private val customSmsRuleRepository: ICustomSmsRuleRepository,
+    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
+    private val ignoreRuleRepository: IIgnoreRuleRepository,
+    private val merchantCategoryMappingRepository: IMerchantCategoryMappingRepository,
+    private val smsParseTemplateProvider: SmsParseTemplateProvider,
     private val smsClassifier: SmsClassifier,
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
@@ -55,14 +59,24 @@ class SmsDebugViewModel(
     constructor(
         application: Application,
         smsRepository: ISmsRepository,
-        db: AppDatabase,
+        transactionRepository: ITransactionRepository,
+        customSmsRuleRepository: ICustomSmsRuleRepository,
+        merchantRenameRuleRepository: IMerchantRenameRuleRepository,
+        ignoreRuleRepository: IIgnoreRuleRepository,
+        merchantCategoryMappingRepository: IMerchantCategoryMappingRepository,
+        smsParseTemplateProvider: SmsParseTemplateProvider,
         smsClassifier: SmsClassifier,
         nerExtractor: SmsEntityExtractor,
         autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
     ) : this(
         application = application,
         smsRepository = smsRepository,
-        db = db,
+        transactionRepository = transactionRepository,
+        customSmsRuleRepository = customSmsRuleRepository,
+        merchantRenameRuleRepository = merchantRenameRuleRepository,
+        ignoreRuleRepository = ignoreRuleRepository,
+        merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+        smsParseTemplateProvider = smsParseTemplateProvider,
         smsClassifier = smsClassifier,
         nerExtractorProvider = { nerExtractor },
         autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
@@ -87,35 +101,26 @@ class SmsDebugViewModel(
     // Create the required rule providers
     private val customSmsRuleProvider =
         object : CustomSmsRuleProvider {
-            override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
+            override suspend fun getAllRules(): List<CustomSmsRule> = customSmsRuleRepository.getAllRules().first()
         }
     private val merchantRenameRuleProvider =
         object : MerchantRenameRuleProvider {
-            override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
+            override suspend fun getAllRules(): List<MerchantRenameRule> = merchantRenameRuleRepository.getAllRules().first()
         }
     private val ignoreRuleProvider =
         object : IgnoreRuleProvider {
-            override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
+            override suspend fun getEnabledRules(): List<IgnoreRule> = ignoreRuleRepository.getEnabledRules()
         }
     private val merchantCategoryMappingProvider =
         object : MerchantCategoryMappingProvider {
             override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
+                merchantCategoryMappingRepository.getCategoryIdForMerchant(merchantName)
         }
     private val categoryFinderProvider =
         object : CategoryFinderProvider {
             override fun getCategoryIdByName(name: String): Int? {
                 return CategoryIconHelper.getCategoryIdByName(name)
             }
-        }
-    private val smsParseTemplateProvider =
-        object : SmsParseTemplateProvider {
-            override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-
-            override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                db.smsParseTemplateDao().getTemplatesBySignature(
-                    signature,
-                )
         }
 
     init {
@@ -206,8 +211,8 @@ class SmsDebugViewModel(
             val newResults = mutableListOf<SmsDebugResult>()
             val transactionsToImport = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toSet()
-            val deletedHashes = db.deletedSmsHashDao().getAllHashes().toSet()
+            val existingSmsHashes = transactionRepository.getAllSmsHashes().first().toSet()
+            val deletedHashes = transactionRepository.getAllDeletedSmsHashes().toSet()
 
             if (recentSms.isNotEmpty()) {
                 nerExtractorProvider().use { nerExtractor ->

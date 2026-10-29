@@ -15,6 +15,7 @@ import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.utils.SmsProviderHelper
 
 class SmsDebugViewModelFactory(
     private val application: Application,
@@ -32,8 +33,14 @@ class SmsDebugViewModelFactory(
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
-            val smsRepository = ServiceLocator.provideSmsRepository(application)
             val db = AppDatabase.getInstance(application)
+            val smsRepository = ServiceLocator.provideSmsRepository(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(application, db)
+            val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db)
+            val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
+            val merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db)
+            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
             val smsClassifier = MlModelFactory.getClassifier(application)
             val autoSaveUseCase =
                 autoSaveSmsTransactionUseCase
@@ -44,7 +51,12 @@ class SmsDebugViewModelFactory(
                 SmsDebugViewModel(
                     application = application,
                     smsRepository = smsRepository,
-                    db = db,
+                    transactionRepository = transactionRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
                     autoSaveSmsTransactionUseCase = autoSaveUseCase,

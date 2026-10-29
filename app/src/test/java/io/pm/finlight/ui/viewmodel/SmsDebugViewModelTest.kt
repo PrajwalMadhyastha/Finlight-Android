@@ -20,8 +20,6 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -51,50 +49,27 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var smsRepository: SmsRepository
 
-    @Mock private lateinit var db: AppDatabase
+    @Mock private lateinit var transactionRepository: ITransactionRepository
+
+    @Mock private lateinit var customSmsRuleRepository: ICustomSmsRuleRepository
+
+    @Mock private lateinit var merchantRenameRuleRepository: IMerchantRenameRuleRepository
+
+    @Mock private lateinit var ignoreRuleRepository: IIgnoreRuleRepository
+
+    @Mock private lateinit var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository
+
+    @Mock private lateinit var smsParseTemplateProvider: SmsParseTemplateProvider
 
     @Mock private lateinit var smsClassifier: SmsClassifier
 
     @Mock private lateinit var nerExtractor: SmsEntityExtractor
-
-    // DAOs
-    @Mock private lateinit var customSmsRuleDao: CustomSmsRuleDao
-
-    @Mock private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
-
-    @Mock private lateinit var ignoreRuleDao: IgnoreRuleDao
-
-    @Mock private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
-
-    @Mock private lateinit var smsParseTemplateDao: SmsParseTemplateDao
-
-    @Mock private lateinit var transactionQueryDao: TransactionQueryDao
-
-    @Mock private lateinit var transactionWriteDao: TransactionWriteDao
-
-    @Mock private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
-
-    @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
-
-    @Mock private lateinit var deletedSmsHashDao: DeletedSmsHashDao
 
     private lateinit var viewModel: SmsDebugViewModel
 
     @Before
     override fun setup() {
         super.setup()
-
-        // Mock DAO access from the AppDatabase mock
-        `when`(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
-        `when`(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
-        `when`(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
-        `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
-        `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
-        `when`(db.transactionQueryDao()).thenReturn(transactionQueryDao)
-        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
-        `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
-        `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
-        `when`(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
 
         `when`(application.applicationContext).thenReturn(application)
 
@@ -103,36 +78,45 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
         }
     }
 
-    private fun setupDefaultDaoBehaviors() =
+    private fun setupDefaultRepositoryBehaviors() =
         runTest {
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenAnswer { DEFAULT_IGNORE_PHRASES }
-            `when`(smsParseTemplateDao.getAllTemplates()).thenAnswer { emptyList<SmsParseTemplate>() }
-            // --- FIX: Add missing mock for getTemplatesBySignature to prevent NPE ---
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenAnswer { DEFAULT_IGNORE_PHRASES }
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenAnswer { emptyList<SmsParseTemplate>() }
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenAnswer { emptyList<SmsParseTemplate>() }
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyObject())).thenAnswer { null }
         }
 
+    private fun createViewModel(
+        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    ): SmsDebugViewModel {
+        return SmsDebugViewModel(
+            application = application,
+            smsRepository = smsRepository,
+            transactionRepository = transactionRepository,
+            customSmsRuleRepository = customSmsRuleRepository,
+            merchantRenameRuleRepository = merchantRenameRuleRepository,
+            ignoreRuleRepository = ignoreRuleRepository,
+            merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+            smsParseTemplateProvider = smsParseTemplateProvider,
+            smsClassifier = smsClassifier,
+            nerExtractorProvider = nerExtractorProvider ?: { nerExtractor },
+            autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+        )
+    }
+
     private fun initializeViewModel() {
-        viewModel =
-            SmsDebugViewModel(
-                application,
-                smsRepository,
-                db,
-                smsClassifier,
-                nerExtractor,
-                autoSaveSmsTransactionUseCase,
-            )
+        viewModel = createViewModel()
     }
 
     @Test
     fun `refreshScan loads and parses sms messages correctly`() =
         runTest {
             // Arrange
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "Sender1", "Success: you spent Rs 100 on Food", 1L)
             val sms2 = SmsMessage(2, "Sender2", "Ignored by ML", 2L)
             val sms3 = SmsMessage(3, "Sender3", "Not parsed", 3L)
@@ -142,7 +126,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.05f) // Should be ignored
             `when`(smsClassifier.classify(sms3.body)).thenReturn(0.9f)
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // This rule will parse sms1
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // This rule will parse sms1
 
             // Act
             initializeViewModel()
@@ -170,7 +154,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     fun `setFilter correctly filters the results`() =
         runTest {
             // Arrange
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "S1", "Success: spent Rs 100", 1L)
             val sms2 = SmsMessage(2, "S2", "Problem", 2L)
             val successTxnRule = CustomSmsRule(1, "spent Rs", null, "spent Rs ([\\d,.]+)", null, null, null, null, 10, "")
@@ -178,7 +162,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms1, sms2))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
             `when`(smsClassifier.classify(sms2.body)).thenReturn(0.9f)
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // Will parse sms1
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule))) // Will parse sms1
 
             initializeViewModel()
 
@@ -207,7 +191,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     fun `loadMore increases loadCount and refreshes`() =
         runTest {
             // Arrange
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val initialSms = List(100) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
             val moreSms = List(200) { SmsMessage(it.toLong(), "Sender", "Body", it.toLong()) }
             whenever(smsRepository.fetchAllSms(null)).thenReturn(initialSms, moreSms)
@@ -237,7 +221,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     fun `runAutoImportAndRefresh imports newly parsed transaction`() =
         runTest {
             // Arrange
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             // --- TEST FIX: Removed "Txn" from the start of the message body ---
             val sms1Body = "Update from MyBank. Order 123 completed. Val: 20."
             val sms1 = SmsMessage(1, "SENDER1", sms1Body, 1L)
@@ -262,8 +246,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             // Mocks for the INITIAL scan (no custom rules)
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer { invocation ->
                 capturedTxn = invocation.getArgument(0)
                 capturedSource = invocation.getArgument(1)
@@ -283,7 +267,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             )
 
             // Arrange mocks for the refresh action.
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
 
             // Act: Call the function to be tested.
             viewModel.runAutoImportAndRefresh()
@@ -310,7 +294,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     fun `runAutoImportAndRefresh handles autoSave failure`() =
         runTest {
             // Arrange
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms = SmsMessage(1, "S1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
             val successTxnRule =
                 CustomSmsRule(
@@ -328,7 +312,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(sms.body)).thenReturn(0.9f)
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList())).thenReturn(flowOf(listOf(successTxnRule)))
             // Mocks for failure
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -350,7 +334,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh handles empty sms inbox gracefully`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(emptyList())
 
             initializeViewModel()
@@ -368,7 +352,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `onCleared closes smsClassifier but does not hold persistent nerExtractor`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             initializeViewModel()
 
             // Find onCleared in the hierarchy
@@ -393,7 +377,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `refreshScan invokes nerExtractorProvider and closes extractor on completion`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
             whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
@@ -405,15 +389,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 nerExtractor
             }
 
-            viewModel =
-                SmsDebugViewModel(
-                    application = application,
-                    smsRepository = smsRepository,
-                    db = db,
-                    smsClassifier = smsClassifier,
-                    nerExtractorProvider = countingProvider,
-                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
-                )
+            viewModel = createViewModel(countingProvider)
 
             advanceUntilIdle()
 
@@ -424,7 +400,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `refreshScan does not invoke nerExtractorProvider when no SMS found`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             whenever(smsRepository.fetchAllSms(null)).thenReturn(emptyList())
 
             var providerInvocationCount = 0
@@ -433,15 +409,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 nerExtractor
             }
 
-            viewModel =
-                SmsDebugViewModel(
-                    application = application,
-                    smsRepository = smsRepository,
-                    db = db,
-                    smsClassifier = smsClassifier,
-                    nerExtractorProvider = countingProvider,
-                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
-                )
+            viewModel = createViewModel(countingProvider)
 
             advanceUntilIdle()
 
@@ -452,14 +420,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `refreshScan uses categoryFinderProvider for keyword lookup`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             // "Swiggy" matches "Food & Drinks" (ID 4)
             // Adding "Spent" and a period to trigger merchant extraction via regex
             val sms = SmsMessage(1, "S1", "Spent Rs 500 at Swiggy.", 1L)
             whenever(smsRepository.fetchAllSms(null)).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
             `when`(nerExtractor.extract(anyString())).thenReturn(emptyMap())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
 
             initializeViewModel()
 
@@ -475,7 +443,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh skips transaction when current hash exists in existingSmsHashes`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
             val currentHash = SmsParser.computeSmsHash(sms1.sender, sms1.body)
             val successTxnRule =
@@ -494,14 +462,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
 
             initializeViewModel()
             advanceUntilIdle()
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
@@ -511,7 +479,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh skips transaction when legacy hash exists in existingSmsHashes`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
             val legacyHash = SmsParser.computeLegacySmsHash(sms1.sender, sms1.body)
             val successTxnRule =
@@ -530,14 +498,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
 
             initializeViewModel()
             advanceUntilIdle()
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
@@ -547,7 +515,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh skips transaction when current hash exists in deletedHashes`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
             val currentHash = SmsParser.computeSmsHash(sms1.sender, sms1.body)
             val successTxnRule =
@@ -566,14 +534,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(currentHash))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
 
             initializeViewModel()
             advanceUntilIdle()
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
@@ -583,7 +551,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh skips transaction when legacy hash exists in deletedHashes`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms1 = SmsMessage(1, "SENDER1", "Update from MyBank. Order 123 completed. Val: 20.", 1L)
             val legacyHash = SmsParser.computeLegacySmsHash(sms1.sender, sms1.body)
             val successTxnRule =
@@ -602,14 +570,14 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms1))
             `when`(smsClassifier.classify(sms1.body)).thenReturn(0.9f)
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(legacyHash))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(legacyHash))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
 
             initializeViewModel()
             advanceUntilIdle()
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(successTxnRule)))
             viewModel.runAutoImportAndRefresh()
             advanceUntilIdle()
 
@@ -619,7 +587,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh falls back to classifier and nerExtractor when no custom rules match, invoking and closing nerExtractor`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms = SmsMessage(1, "VM-HDFCBK", "Spent Rs 500 at Swiggy on Card XX1234", 1L)
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(sms.body)).thenReturn(0.95f)
@@ -629,8 +597,8 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                     "MERCHANT" to io.pm.finlight.core.NerEntity("Swiggy", 0.9f),
                 ),
             )
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
 
             var providerInvocationCount = 0
             val countingProvider: () -> SmsEntityExtractor = {
@@ -638,15 +606,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
                 nerExtractor
             }
 
-            viewModel =
-                SmsDebugViewModel(
-                    application = application,
-                    smsRepository = smsRepository,
-                    db = db,
-                    smsClassifier = smsClassifier,
-                    nerExtractorProvider = countingProvider,
-                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
-                )
+            viewModel = createViewModel(countingProvider)
             advanceUntilIdle()
 
             val initialProviderCount = providerInvocationCount
@@ -670,21 +630,13 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
     @Test
     fun `runAutoImportAndRefresh sets IgnoredByClassifier when classifier confidence below threshold`() =
         runTest {
-            setupDefaultDaoBehaviors()
+            setupDefaultRepositoryBehaviors()
             val sms = SmsMessage(1, "VM-UNKNOWN", "Random non-transactional text", 1L)
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(smsClassifier.classify(sms.body)).thenReturn(0.05f)
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
 
-            viewModel =
-                SmsDebugViewModel(
-                    application = application,
-                    smsRepository = smsRepository,
-                    db = db,
-                    smsClassifier = smsClassifier,
-                    nerExtractorProvider = { nerExtractor },
-                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
-                )
+            initializeViewModel()
             advanceUntilIdle()
 
             viewModel.runAutoImportAndRefresh()

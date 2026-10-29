@@ -3,7 +3,6 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
@@ -46,7 +45,7 @@ class SettingsViewModelFactory(
             val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(application, db)
             val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
             val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
-            val transactionRunner = RoomTransactionRunner(db)
+            val transactionRunner = ServiceLocator.provideTransactionRunner(application, db)
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =

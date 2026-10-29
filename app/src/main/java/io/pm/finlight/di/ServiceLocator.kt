@@ -50,6 +50,8 @@ import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
+import io.pm.finlight.data.RoomTransactionRunner
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
@@ -161,6 +163,9 @@ object ServiceLocator {
 
     @Volatile
     private var ignoreRuleRepository: IIgnoreRuleRepository? = null
+
+    @Volatile
+    private var transactionRunner: TransactionRunner? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -696,6 +701,30 @@ object ServiceLocator {
         }
     }
 
+    /**
+     * Resolves the singleton [TransactionRunner] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideTransactionRunner(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): TransactionRunner {
+        return transactionRunner ?: synchronized(this) {
+            transactionRunner ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                RoomTransactionRunner(db).also {
+                    transactionRunner = it
+                }
+            }
+        }
+    }
+
     @VisibleForTesting
     fun setSettingsRepository(repository: ISettingsRepository?) {
         settingsRepository = repository
@@ -852,6 +881,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setTransactionRunner(runner: TransactionRunner?) {
+        transactionRunner = runner
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -884,5 +918,6 @@ object ServiceLocator {
         merchantCategoryMappingRepository = null
         customSmsRuleRepository = null
         ignoreRuleRepository = null
+        transactionRunner = null
     }
 }
