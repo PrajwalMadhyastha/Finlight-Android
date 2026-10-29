@@ -52,6 +52,8 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
@@ -173,6 +175,10 @@ object ServiceLocator {
                 dispatcherProvider = it
             }
         }
+    }
+
+    fun provideDatabaseHealthChecker(): IDatabaseHealthChecker {
+        return DatabaseHealthChecker
     }
 
     fun provideAppConfigRepository(context: Context): IAppConfigRepository {

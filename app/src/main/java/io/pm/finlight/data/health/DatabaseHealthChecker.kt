@@ -33,11 +33,17 @@ data class RepairResult(
     val message: String,
 )
 
+interface IDatabaseHealthChecker {
+    suspend fun checkHealth(context: Context): HealthCheckResult
+
+    suspend fun repair(context: Context): RepairResult
+}
+
 /**
  * Diagnostic and self-repair engine for database consistency,
  * orphan transactions re-linking, corrupted records healing, and DataStore resilience.
  */
-object DatabaseHealthChecker {
+object DatabaseHealthChecker : IDatabaseHealthChecker {
     val REGISTERED_FINANCE_KEYS: List<Preferences.Key<*>> =
         listOf(
             stringPreferencesKey("user_name"),
@@ -126,7 +132,7 @@ object DatabaseHealthChecker {
             "is_first_launch_complete" to java.lang.Boolean::class.java,
         )
 
-    suspend fun checkHealth(
+    override suspend fun checkHealth(
         context: Context,
     ): HealthCheckResult = checkHealth(AppDatabase.getInstance(context), context)
 
@@ -258,7 +264,7 @@ object DatabaseHealthChecker {
             )
         }
 
-    suspend fun repair(
+    override suspend fun repair(
         context: Context,
     ): RepairResult = repair(AppDatabase.getInstance(context), context)
 

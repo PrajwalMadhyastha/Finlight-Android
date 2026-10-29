@@ -903,7 +903,6 @@ fun AppNavHost(
         ) {
             SmsDebugScreen(
                 navController = navController,
-                transactionViewModel = transactionViewModel,
             )
         }
         // --- DELETED: "account_mapping_screen" route ---

@@ -23,6 +23,8 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
@@ -67,6 +69,7 @@ class SettingsViewModel(
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
     private val transactionRunner: TransactionRunner,
+    private val databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     // Secondary constructor for backward compatibility
@@ -89,6 +92,7 @@ class SettingsViewModel(
         smsParseTemplateProvider: SmsParseTemplateProvider,
         nerExtractor: SmsEntityExtractor,
         transactionRunner: TransactionRunner,
+        databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
         dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         application = application,
@@ -109,6 +113,7 @@ class SettingsViewModel(
         smsParseTemplateProvider = smsParseTemplateProvider,
         nerExtractorProvider = { nerExtractor },
         transactionRunner = transactionRunner,
+        databaseHealthChecker = databaseHealthChecker,
         dispatchers = dispatchers,
     )
 
@@ -1124,7 +1129,7 @@ class SettingsViewModel(
         viewModelScope.launch(dispatchers.io) {
             _isCheckingHealth.value = true
             try {
-                val result = io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(context)
+                val result = databaseHealthChecker.checkHealth(context)
                 _healthCheckResult.value = result
             } finally {
                 _isCheckingHealth.value = false
@@ -1137,7 +1142,7 @@ class SettingsViewModel(
         viewModelScope.launch(dispatchers.io) {
             _isRepairingDb.value = true
             try {
-                val repairOutcome = io.pm.finlight.data.health.DatabaseHealthChecker.repair(context)
+                val repairOutcome = databaseHealthChecker.repair(context)
                 _healthCheckResult.value = null
                 val total =
                     repairOutcome.repairedAccountsCount +

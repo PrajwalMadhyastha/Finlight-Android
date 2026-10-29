@@ -22,6 +22,7 @@ import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -625,6 +626,191 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 assertTrue(event.contains("CSV import failed: Database write failed"))
                 cancelAndIgnoreRemainingEvents()
             }
+        }
+
+    @Test
+    fun `commitCsvImport with generic CSV imports rows as non-split transactions and learns mappings`() =
+        runTest {
+            // Arrange: Generic CSV without "Id" or "ParentId"
+            initializeViewModel()
+            val header = listOf("Date", "Description", "Amount", "Type", "Category", "Account", "Notes", "Tags")
+            val row =
+                ReviewableRow(
+                    lineNumber = 2,
+                    rowData = listOf("2025-10-09 10:00:00", "Starbucks", "120.0", "expense", "Coffee", "Checking", "Morning latte", "Work|Personal"),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val rowsToImport = listOf(row)
+            setCsvValidationReport(viewModel, CsvValidationReport(header = header, reviewableRows = rowsToImport))
+
+            val coffeeCat = Category(id = 5, name = "Coffee", iconKey = "category", colorKey = "brown")
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(coffeeCat))
+            `when`(categoryRepository.findByName("Coffee")).thenReturn(coffeeCat)
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Checking", "Bank")))
+            `when`(tagRepository.findByName("Work")).thenReturn(Tag(1, "Work"))
+            `when`(tagRepository.findByName("Personal")).thenReturn(Tag(2, "Personal"))
+            `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(50L)
+
+            // Act
+            viewModel.commitCsvImport(rowsToImport)
+            advanceUntilIdle()
+
+            // Assert
+            val txnCaptor = argumentCaptor<Transaction>()
+            val tagsCaptor = argumentCaptor<Set<Tag>>()
+            verify(
+                transactionRepository,
+                org.mockito.Mockito.timeout(5000),
+            ).insertTransactionWithTags(capture(txnCaptor), capture(tagsCaptor))
+
+            val insertedTxn = txnCaptor.value
+            assertEquals("Starbucks", insertedTxn.description)
+            assertEquals(120.0, insertedTxn.amount, 0.0)
+            assertFalse(insertedTxn.isSplit)
+            assertEquals(5, insertedTxn.categoryId)
+            assertEquals(1, insertedTxn.accountId)
+
+            val capturedTags = tagsCaptor.value
+            assertEquals(2, capturedTags.size)
+
+            val mappingsCaptor = argumentCaptor<List<MerchantCategoryMapping>>()
+            verify(
+                merchantCategoryMappingRepository,
+                org.mockito.Mockito.timeout(5000),
+            ).insertAll(capture(mappingsCaptor))
+            assertTrue(mappingsCaptor.value.any { it.parsedName == "Starbucks" && it.categoryId == 5 })
+        }
+
+    @Test
+    fun `commitCsvImport skips orphan split child row when parentId is not found in idMap`() =
+        runTest {
+            initializeViewModel()
+            val header = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags".split(',')
+            val parentRow =
+                ReviewableRow(
+                    lineNumber = 2,
+                    rowData = "10,,2025-10-09 10:00:00,Supermarket,300.0,expense,Split Transaction,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val orphanChildRow =
+                ReviewableRow(
+                    lineNumber = 3,
+                    rowData = "11,999,2025-10-09 10:00:00,Orphan Split,100.0,expense,Groceries,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val validChildRow =
+                ReviewableRow(
+                    lineNumber = 4,
+                    rowData = "12,10,2025-10-09 10:00:00,Valid Split,200.0,expense,Groceries,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val rowsToImport = listOf(parentRow, orphanChildRow, validChildRow)
+            setCsvValidationReport(viewModel, CsvValidationReport(header = header, reviewableRows = rowsToImport))
+
+            val groceriesCat = Category(id = 1, name = "Groceries", iconKey = "category", colorKey = "green")
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(groceriesCat))
+            `when`(categoryRepository.findByName("Groceries")).thenReturn(groceriesCat)
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
+            `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(100L)
+
+            // Act
+            viewModel.commitCsvImport(rowsToImport)
+            advanceUntilIdle()
+
+            // Assert
+            val splitsCaptor = argumentCaptor<List<SplitTransaction>>()
+            verify(
+                splitTransactionRepository,
+                org.mockito.Mockito.timeout(5000),
+            ).insertAll(capture(splitsCaptor))
+
+            val allSplits = splitsCaptor.value
+            assertEquals(1, allSplits.size)
+            assertEquals(100, allSplits[0].parentTransactionId)
+            assertEquals(200.0, allSplits[0].amount, 0.0)
+        }
+
+    @Test
+    fun `commitCsvImport dynamically creates category with next available color when not found`() =
+        runTest {
+            initializeViewModel()
+            val header = listOf("Date", "Description", "Amount", "Type", "Category", "Account")
+            val row =
+                ReviewableRow(
+                    lineNumber = 2,
+                    rowData = listOf("2025-10-09 10:00:00", "Gym Membership", "50.0", "expense", "Fitness", "Checking"),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val rowsToImport = listOf(row)
+            setCsvValidationReport(viewModel, CsvValidationReport(header = header, reviewableRows = rowsToImport))
+
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
+            `when`(categoryRepository.findByName("Fitness")).thenReturn(null)
+            `when`(categoryRepository.insert(anyObject())).thenReturn(42L)
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Checking", "Bank")))
+            `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
+
+            // Act
+            viewModel.commitCsvImport(rowsToImport)
+            advanceUntilIdle()
+
+            // Assert
+            val catCaptor = argumentCaptor<Category>()
+            verify(categoryRepository, org.mockito.Mockito.timeout(5000)).insert(capture(catCaptor))
+            assertEquals("Fitness", catCaptor.value.name)
+            assertEquals("letter_default", catCaptor.value.iconKey)
+            assertNotNull(catCaptor.value.colorKey)
+
+            val txnCaptor = argumentCaptor<Transaction>()
+            verify(transactionRepository, org.mockito.Mockito.timeout(5000)).insertTransactionWithTags(capture(txnCaptor), anyObject())
+            assertEquals(42, txnCaptor.value.categoryId)
+        }
+
+    @Test
+    fun `commitCsvImport returns early without inserting when validation report header is null`() =
+        runTest {
+            initializeViewModel()
+            setCsvValidationReport(viewModel, null)
+
+            viewModel.commitCsvImport(emptyList())
+            advanceUntilIdle()
+
+            verify(transactionRepository, never()).insertTransactionWithTags(anyObject(), anyObject())
+            verify(splitTransactionRepository, never()).insertAll(anyObject())
+        }
+
+    @Test
+    fun `secondary constructor instantiates SettingsViewModel successfully`() =
+        runTest {
+            val secondaryVm =
+                SettingsViewModel(
+                    application = applicationContext,
+                    settingsRepository = settingsRepository,
+                    transactionRepository = transactionRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    smsRepository = smsRepository,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                    smsClassifier = smsClassifier,
+                    tagRepository = tagRepository,
+                    splitTransactionRepository = splitTransactionRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    nerExtractor = nerExtractor,
+                    transactionRunner = transactionRunner,
+                    databaseHealthChecker = DatabaseHealthChecker,
+                    dispatchers = TestDispatcherProvider(testDispatcher),
+                )
+            assertNotNull(secondaryVm)
         }
 
     @Test
@@ -1457,6 +1643,115 @@ class SettingsViewModelTest : BaseViewModelTest() {
             verify(merchantRenameRuleRepository).deleteByOriginalName(originalName)
             verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
             verify(merchantRenameRuleRepository, never()).insert(any())
+        }
+
+    @Test
+    fun `saveMerchantRenameRule returns early when originalName or newName is blank`() =
+        runTest {
+            initializeViewModel()
+
+            viewModel.saveMerchantRenameRule("", "Amazon")
+            viewModel.saveMerchantRenameRule("Amazon", "   ")
+            advanceUntilIdle()
+
+            verify(merchantRenameRuleRepository, never()).insert(any())
+            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(any())
+        }
+
+    @Test
+    fun `saveMerchantRenameRule passes oldDescription from existing rule when updating`() =
+        runTest {
+            val existingRule = MerchantRenameRule("Uber", "Uber Rides")
+            `when`(merchantRenameRuleRepository.getRuleByOriginalName("Uber")).thenReturn(existingRule)
+            whenever(transactionRepository.updateDescriptionByOriginalDescription(any(), any(), anyOrNull())).thenReturn(1)
+            initializeViewModel()
+
+            viewModel.saveMerchantRenameRule("Uber", "Uber Trip")
+            advanceUntilIdle()
+
+            verify(transactionRepository).updateDescriptionByOriginalDescription("Uber", "Uber Trip", "Uber Rides")
+        }
+
+    @Test
+    fun `removeRowFromReport does nothing when csvValidationReport is null`() =
+        runTest {
+            initializeViewModel()
+            setCsvValidationReport(viewModel, null)
+
+            val row = ReviewableRow(1, listOf("a"), CsvRowStatus.VALID, "")
+            viewModel.removeRowFromReport(row)
+
+            assertNull(viewModel.csvValidationReport.value)
+        }
+
+    @Test
+    fun `updateAndRevalidateRow handles null report and non-existent line number gracefully`() =
+        runTest {
+            initializeViewModel()
+            setCsvValidationReport(viewModel, null)
+            viewModel.updateAndRevalidateRow(99, listOf("test"))
+            advanceUntilIdle()
+            assertNull(viewModel.csvValidationReport.value)
+
+            val row = ReviewableRow(1, listOf("a"), CsvRowStatus.VALID, "")
+            setCsvValidationReport(viewModel, CsvValidationReport(reviewableRows = listOf(row)))
+            viewModel.updateAndRevalidateRow(99, listOf("test"))
+            advanceUntilIdle()
+            assertEquals(1, viewModel.csvValidationReport.value?.reviewableRows?.size)
+        }
+
+    @Test
+    fun `updateAndRevalidateRow revalidates row and updates report status for invalid columns, amounts, and new categories`() =
+        runTest {
+            initializeViewModel()
+            val row1 =
+                ReviewableRow(
+                    1,
+                    listOf("1", "", "2025-10-09 10:00:00", "Coffee", "150.0", "expense", "Food", "Savings", "", "false", ""),
+                    CsvRowStatus.INVALID_DATE,
+                    "",
+                )
+            setCsvValidationReport(viewModel, CsvValidationReport(reviewableRows = listOf(row1)))
+
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
+
+            // 1. Invalid columns (< 8)
+            viewModel.updateAndRevalidateRow(1, listOf("1", "2"))
+            advanceUntilIdle()
+            assertEquals(CsvRowStatus.INVALID_COLUMN_COUNT, viewModel.csvValidationReport.value?.reviewableRows?.first()?.status)
+
+            // 2. Invalid amount (<= 0)
+            viewModel.updateAndRevalidateRow(
+                1,
+                listOf("1", "", "2025-10-09 10:00:00", "Coffee", "-5.0", "expense", "Food", "Savings", "", "false", ""),
+            )
+            advanceUntilIdle()
+            assertEquals(CsvRowStatus.INVALID_AMOUNT, viewModel.csvValidationReport.value?.reviewableRows?.first()?.status)
+
+            // 3. Needs account creation
+            viewModel.updateAndRevalidateRow(
+                1,
+                listOf("1", "", "2025-10-09 10:00:00", "Coffee", "50.0", "expense", "Food", "NewAcc", "", "false", ""),
+            )
+            advanceUntilIdle()
+            assertEquals(CsvRowStatus.NEEDS_ACCOUNT_CREATION, viewModel.csvValidationReport.value?.reviewableRows?.first()?.status)
+
+            // 4. Needs category creation
+            viewModel.updateAndRevalidateRow(
+                1,
+                listOf("1", "", "2025-10-09 10:00:00", "Coffee", "50.0", "expense", "NewCat", "Savings", "", "false", ""),
+            )
+            advanceUntilIdle()
+            assertEquals(CsvRowStatus.NEEDS_CATEGORY_CREATION, viewModel.csvValidationReport.value?.reviewableRows?.first()?.status)
+
+            // 5. Valid row
+            viewModel.updateAndRevalidateRow(
+                1,
+                listOf("1", "", "2025-10-09 10:00:00", "Coffee", "50.0", "expense", "Food", "Savings", "", "false", ""),
+            )
+            advanceUntilIdle()
+            assertEquals(CsvRowStatus.VALID, viewModel.csvValidationReport.value?.reviewableRows?.first()?.status)
         }
 
     @Test

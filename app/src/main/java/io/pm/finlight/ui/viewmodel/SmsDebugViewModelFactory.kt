@@ -45,6 +45,7 @@ class SmsDebugViewModelFactory(
             val autoSaveUseCase =
                 autoSaveSmsTransactionUseCase
                     ?: ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
@@ -60,6 +61,7 @@ class SmsDebugViewModelFactory(
                     smsClassifier = smsClassifier,
                     nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
                     autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                    dispatchers = dispatcherProvider,
                 )
             return viewModel as T
         }

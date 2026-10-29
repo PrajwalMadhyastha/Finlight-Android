@@ -23,6 +23,8 @@ import io.pm.finlight.*
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
@@ -92,6 +94,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
 
     private fun createViewModel(
         nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+        dispatchers: DispatcherProvider = TestDispatcherProvider(testDispatcher),
     ): SmsDebugViewModel {
         return SmsDebugViewModel(
             application = application,
@@ -105,6 +108,7 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             smsClassifier = smsClassifier,
             nerExtractorProvider = nerExtractorProvider ?: { nerExtractor },
             autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+            dispatchers = dispatchers,
         )
     }
 
@@ -652,5 +656,84 @@ class SmsDebugViewModelTest : BaseViewModelTest() {
             )
             assertEquals(0.05f, (result?.parseResult as ParseResult.IgnoredByClassifier).confidence, 0.001f)
             verify(nerExtractor, atLeastOnce()).close()
+        }
+
+    @Test
+    fun `forceSaveTransaction calls autoSaveSmsTransactionUseCase with Manual Import and returns success`() =
+        runTest {
+            setupDefaultRepositoryBehaviors()
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Sender1",
+                    amount = 150.0,
+                    transactionType = "expense",
+                    merchantName = "TestMerchant",
+                    originalMessage = "Test message",
+                    sourceSmsHash = "hash123",
+                )
+            whenever(autoSaveSmsTransactionUseCase(txn, source = "Manual Import")).thenReturn(true)
+
+            var callbackResult: Boolean? = null
+            viewModel.forceSaveTransaction(txn) { success ->
+                callbackResult = success
+            }
+            advanceUntilIdle()
+
+            assertTrue(callbackResult == true)
+            verify(autoSaveSmsTransactionUseCase).invoke(txn, source = "Manual Import")
+        }
+
+    @Test
+    fun `forceSaveTransaction returns false when autoSave fails`() =
+        runTest {
+            setupDefaultRepositoryBehaviors()
+            initializeViewModel()
+            advanceUntilIdle()
+
+            val txn =
+                PotentialTransaction(
+                    sourceSmsId = 2L,
+                    smsSender = "Sender2",
+                    amount = 250.0,
+                    transactionType = "expense",
+                    merchantName = "FailedMerchant",
+                    originalMessage = "Failed message",
+                    sourceSmsHash = "hash456",
+                )
+            whenever(autoSaveSmsTransactionUseCase(txn, source = "Manual Import")).thenReturn(false)
+
+            var callbackResult: Boolean? = null
+            viewModel.forceSaveTransaction(txn) { success ->
+                callbackResult = success
+            }
+            advanceUntilIdle()
+
+            assertTrue(callbackResult == false)
+            verify(autoSaveSmsTransactionUseCase).invoke(txn, source = "Manual Import")
+        }
+
+    @Test
+    fun `secondary constructor instantiates SmsDebugViewModel successfully`() =
+        runTest {
+            val secondaryVm =
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    transactionRepository = transactionRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    smsClassifier = smsClassifier,
+                    nerExtractor = nerExtractor,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                    dispatchers = TestDispatcherProvider(testDispatcher),
+                )
+            assertNotNull(secondaryVm)
         }
 }

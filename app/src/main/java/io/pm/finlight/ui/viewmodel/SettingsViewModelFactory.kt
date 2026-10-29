@@ -46,6 +46,7 @@ class SettingsViewModelFactory(
             val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
             val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
             val transactionRunner = ServiceLocator.provideTransactionRunner(application, db)
+            val databaseHealthChecker = ServiceLocator.provideDatabaseHealthChecker()
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
@@ -68,6 +69,7 @@ class SettingsViewModelFactory(
                     smsParseTemplateProvider = smsParseTemplateProvider,
                     nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
                     transactionRunner = transactionRunner,
+                    databaseHealthChecker = databaseHealthChecker,
                     dispatchers = dispatcherProvider,
                 )
             return viewModel as T

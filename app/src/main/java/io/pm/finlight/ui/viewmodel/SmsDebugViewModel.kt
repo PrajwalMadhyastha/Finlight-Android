@@ -18,8 +18,11 @@ import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.utils.CategoryIconHelper
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Data class to hold the result for each SMS
 data class SmsDebugResult(
@@ -54,6 +57,7 @@ class SmsDebugViewModel(
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
     private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
+    private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     // Secondary constructor for backward compatibility
     constructor(
@@ -68,6 +72,7 @@ class SmsDebugViewModel(
         smsClassifier: SmsClassifier,
         nerExtractor: SmsEntityExtractor,
         autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
+        dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         application = application,
         smsRepository = smsRepository,
@@ -80,6 +85,7 @@ class SmsDebugViewModel(
         smsClassifier = smsClassifier,
         nerExtractorProvider = { nerExtractor },
         autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+        dispatchers = dispatchers,
     )
 
     private val _uiState = MutableStateFlow(SmsDebugUiState())
@@ -132,54 +138,56 @@ class SmsDebugViewModel(
             _uiState.update { it.copy(isLoading = true) }
 
             val currentLimit = _uiState.value.loadCount
-            val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
-            val results = mutableListOf<SmsDebugResult>()
+            val results =
+                withContext(dispatchers.io) {
+                    val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
+                    val innerResults = mutableListOf<SmsDebugResult>()
 
-            if (recentSms.isEmpty()) {
-                _uiState.update { it.copy(isLoading = false, debugResults = results) }
-                return@launch
-            }
+                    if (recentSms.isEmpty()) {
+                        return@withContext innerResults
+                    }
 
-            nerExtractorProvider().use { nerExtractor ->
-                for (sms in recentSms) {
-                    // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---
-                    val parseResult: ParseResult =
-                        run {
-                            // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
-                            var result: ParseResult? =
-                                SmsParser.parseWithOnlyCustomRules(
-                                    sms = sms,
-                                    customSmsRuleProvider = customSmsRuleProvider,
-                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                    categoryFinderProvider = categoryFinderProvider,
-                                )
-
-                            // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
-                            if (result == null) {
-                                val transactionConfidence = smsClassifier.classify(sms.body)
-                                result =
-                                    if (transactionConfidence < 0.1) {
-                                        ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
-                                    } else {
-                                        SmsParser.parseWithReason(
+                    nerExtractorProvider().use { nerExtractor ->
+                        for (sms in recentSms) {
+                            val parseResult: ParseResult =
+                                run {
+                                    // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                                    var result: ParseResult? =
+                                        SmsParser.parseWithOnlyCustomRules(
                                             sms = sms,
-                                            mappings = emptyMap(),
                                             customSmsRuleProvider = customSmsRuleProvider,
                                             merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                            ignoreRuleProvider = ignoreRuleProvider,
                                             merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                             categoryFinderProvider = categoryFinderProvider,
-                                            smsParseTemplateProvider = smsParseTemplateProvider,
-                                            nerEntities = nerExtractor.extract(sms.body),
                                         )
+
+                                    // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                                    if (result == null) {
+                                        val transactionConfidence = smsClassifier.classify(sms.body)
+                                        result =
+                                            if (transactionConfidence < 0.1) {
+                                                ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                                            } else {
+                                                SmsParser.parseWithReason(
+                                                    sms = sms,
+                                                    mappings = emptyMap(),
+                                                    customSmsRuleProvider = customSmsRuleProvider,
+                                                    merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                                    ignoreRuleProvider = ignoreRuleProvider,
+                                                    merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                                    categoryFinderProvider = categoryFinderProvider,
+                                                    smsParseTemplateProvider = smsParseTemplateProvider,
+                                                    nerEntities = nerExtractor.extract(sms.body),
+                                                )
+                                            }
                                     }
-                            }
-                            result
+                                    result
+                                }
+                            innerResults.add(SmsDebugResult(sms, parseResult))
                         }
-                    results.add(SmsDebugResult(sms, parseResult))
+                    }
+                    innerResults
                 }
-            }
 
             _uiState.update { it.copy(isLoading = false, debugResults = results) }
         }
@@ -200,81 +208,98 @@ class SmsDebugViewModel(
         refreshScan()
     }
 
+    fun forceSaveTransaction(
+        transaction: PotentialTransaction,
+        onResult: (Boolean) -> Unit,
+    ) {
+        viewModelScope.launch(dispatchers.io) {
+            val success = autoSaveSmsTransactionUseCase(transaction, source = "Manual Import")
+            withContext(dispatchers.main) {
+                onResult(success)
+            }
+        }
+    }
+
     fun runAutoImportAndRefresh() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val originalResults = _uiState.value.debugResults
             val currentLimit = _uiState.value.loadCount
 
-            // Re-scan to get the new state
-            val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
-            val newResults = mutableListOf<SmsDebugResult>()
-            val transactionsToImport = mutableListOf<PotentialTransaction>()
+            val (newResults, transactionsToImport) =
+                withContext(dispatchers.io) {
+                    // Re-scan to get the new state
+                    val recentSms = smsRepository.fetchAllSms(null).take(currentLimit)
+                    val innerResults = mutableListOf<SmsDebugResult>()
+                    val innerTxns = mutableListOf<PotentialTransaction>()
 
-            val existingSmsHashes = transactionRepository.getAllSmsHashes().first().toSet()
-            val deletedHashes = transactionRepository.getAllDeletedSmsHashes().toSet()
+                    val existingSmsHashes = transactionRepository.getAllSmsHashes().first().toSet()
+                    val deletedHashes = transactionRepository.getAllDeletedSmsHashes().toSet()
 
-            if (recentSms.isNotEmpty()) {
-                nerExtractorProvider().use { nerExtractor ->
-                    for (sms in recentSms) {
-                        // --- REMOVED: withContext(Dispatchers.IO) to make ViewModel more testable ---
-                        val newParseResult =
-                            run {
-                                // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
-                                // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
-                                var result: ParseResult? =
-                                    SmsParser.parseWithOnlyCustomRules(
-                                        sms = sms,
-                                        customSmsRuleProvider = customSmsRuleProvider,
-                                        merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
-                                        categoryFinderProvider = categoryFinderProvider,
-                                    )
-
-                                // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
-                                if (result == null) {
-                                    val transactionConfidence = smsClassifier.classify(sms.body)
-                                    result =
-                                        if (transactionConfidence < 0.1) {
-                                            ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
-                                        } else {
-                                            SmsParser.parseWithReason(
+                    if (recentSms.isNotEmpty()) {
+                        nerExtractorProvider().use { nerExtractor ->
+                            for (sms in recentSms) {
+                                val newParseResult =
+                                    run {
+                                        // --- UPDATED: Replicate the full pipeline from SmsReceiver ---
+                                        // --- HIERARCHY STEP 1: Check for User-Defined Custom Rules First ---
+                                        var result: ParseResult? =
+                                            SmsParser.parseWithOnlyCustomRules(
                                                 sms = sms,
-                                                mappings = emptyMap(),
                                                 customSmsRuleProvider = customSmsRuleProvider,
                                                 merchantRenameRuleProvider = merchantRenameRuleProvider,
-                                                ignoreRuleProvider = ignoreRuleProvider,
                                                 merchantCategoryMappingProvider = merchantCategoryMappingProvider,
                                                 categoryFinderProvider = categoryFinderProvider,
-                                                smsParseTemplateProvider = smsParseTemplateProvider,
-                                                nerEntities = nerExtractor.extract(sms.body),
                                             )
-                                        }
-                                }
-                                result
-                            }
-                        newResults.add(SmsDebugResult(sms, newParseResult))
 
-                        val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
-                        if ((originalResult !is ParseResult.Success) && newParseResult is ParseResult.Success) {
-                            val currentHash = newParseResult.transaction.sourceSmsHash
-                            val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
-                            if (currentHash !in existingSmsHashes && legacyHash !in existingSmsHashes &&
-                                currentHash !in deletedHashes && legacyHash !in deletedHashes
-                            ) {
-                                transactionsToImport.add(newParseResult.transaction)
+                                        // --- HIERARCHY STEP 2 & 3: If no custom rule matched, run ML pre-filter and then the main parser ---
+                                        if (result == null) {
+                                            val transactionConfidence = smsClassifier.classify(sms.body)
+                                            result =
+                                                if (transactionConfidence < 0.1) {
+                                                    ParseResult.IgnoredByClassifier(confidence = transactionConfidence)
+                                                } else {
+                                                    SmsParser.parseWithReason(
+                                                        sms = sms,
+                                                        mappings = emptyMap(),
+                                                        customSmsRuleProvider = customSmsRuleProvider,
+                                                        merchantRenameRuleProvider = merchantRenameRuleProvider,
+                                                        ignoreRuleProvider = ignoreRuleProvider,
+                                                        merchantCategoryMappingProvider = merchantCategoryMappingProvider,
+                                                        categoryFinderProvider = categoryFinderProvider,
+                                                        smsParseTemplateProvider = smsParseTemplateProvider,
+                                                        nerEntities = nerExtractor.extract(sms.body),
+                                                    )
+                                                }
+                                        }
+                                        result
+                                    }
+                                innerResults.add(SmsDebugResult(sms, newParseResult))
+
+                                val originalResult = originalResults.find { it.smsMessage.id == sms.id }?.parseResult
+                                if ((originalResult !is ParseResult.Success) && newParseResult is ParseResult.Success) {
+                                    val currentHash = newParseResult.transaction.sourceSmsHash
+                                    val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
+                                    if (currentHash !in existingSmsHashes && legacyHash !in existingSmsHashes &&
+                                        currentHash !in deletedHashes && legacyHash !in deletedHashes
+                                    ) {
+                                        innerTxns.add(newParseResult.transaction)
+                                    }
+                                }
                             }
                         }
                     }
+                    Pair(innerResults, innerTxns)
                 }
-            }
 
             var importedCount = 0
             if (transactionsToImport.isNotEmpty()) {
-                for (txn in transactionsToImport) {
-                    val success = autoSaveSmsTransactionUseCase(txn, source = "Imported")
-                    if (success) {
-                        importedCount++
+                withContext(dispatchers.io) {
+                    for (txn in transactionsToImport) {
+                        val success = autoSaveSmsTransactionUseCase(txn, source = "Imported")
+                        if (success) {
+                            importedCount++
+                        }
                     }
                 }
             }
