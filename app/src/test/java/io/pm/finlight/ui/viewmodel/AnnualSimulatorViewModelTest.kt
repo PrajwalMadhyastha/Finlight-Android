@@ -192,6 +192,22 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `setYear clears life events and validation errors`() =
+        runTest {
+            createViewModel(simulationYear = 2026)
+
+            viewModel.addLifeEvent("Buy Car", 5000.0, false, 5)
+            assertEquals(1, viewModel.lifeEvents.first().size)
+
+            viewModel.addLifeEvent("", 1000.0, false, 0)
+            assertEquals("Event name cannot be blank", viewModel.validationError.first())
+
+            viewModel.setYear(2025)
+            assertTrue(viewModel.lifeEvents.first().isEmpty())
+            assertNull(viewModel.validationError.first())
+        }
+
+    @Test
     fun `addLifeEvent with valid parameters adds event and returns success`() =
         runTest {
             createViewModel()

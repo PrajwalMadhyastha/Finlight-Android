@@ -61,6 +61,8 @@ class AnnualSimulatorViewModel(
     fun setYear(year: Int) {
         if (_currentYear.value != year) {
             _currentYear.value = year
+            _lifeEvents.value = emptyList()
+            _validationError.value = null
             loadBaseAnnualMetrics()
         }
     }

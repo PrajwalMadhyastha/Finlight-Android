@@ -50,6 +50,7 @@ fun WhatIfSimulatorScreen(
     val simulatedExpenses by viewModel.simulatedExpenses.collectAsState()
     val simulatedAmountRemaining by viewModel.simulatedAmountRemaining.collectAsState()
     val simulatedSafeToSpendPerDay by viewModel.simulatedSafeToSpendPerDay.collectAsState()
+    val isDeficit by viewModel.isDeficitSpending.collectAsState()
     val privacyModeEnabled by viewModel.privacyModeEnabled.collectAsState()
     val monthYear = viewModel.monthYear
 
@@ -115,6 +116,7 @@ fun WhatIfSimulatorScreen(
                     amountSpent = simulatedExpenses,
                     amountRemaining = simulatedAmountRemaining,
                     safeToSpend = simulatedSafeToSpendPerDay,
+                    isDeficit = isDeficit,
                     isPrivacyModeEnabled = privacyModeEnabled
                 )
             }
@@ -230,7 +232,7 @@ fun WhatIfSimulatorScreen(
                             showAddDialog = false
                         }
                     },
-                    enabled = name.isNotBlank() && amountStr.isNotBlank()
+                    enabled = name.isNotBlank() && (amountStr.toLongOrNull() ?: 0L) > 0L
                 ) {
                     Text("Add")
                 }
@@ -250,6 +252,7 @@ private fun SimulatedHeroCard(
     amountSpent: Long,
     amountRemaining: Long,
     safeToSpend: Long,
+    isDeficit: Boolean,
     isPrivacyModeEnabled: Boolean
 ) {
     val progress = if (totalBudget > 0) (amountSpent.toFloat() / totalBudget.toFloat()) else 0f
@@ -259,7 +262,6 @@ private fun SimulatedHeroCard(
         label = "SimulatedBudgetProgress"
     )
 
-    val isDeficit = amountRemaining < 0
     val safeBoxColor =
         if (isDeficit) {
             MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
@@ -301,7 +303,7 @@ private fun SimulatedHeroCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     PrivacyAwareText(
-                        amount = amountRemaining,
+                        amount = if (isDeficit) kotlin.math.abs(amountRemaining) else amountRemaining,
                         isPrivacyMode = isPrivacyModeEnabled,
                         prefix = if (isDeficit) "Deficit: " else "Remaining: ",
                         style = MaterialTheme.typography.bodyMedium,
@@ -348,7 +350,7 @@ private fun SimulatedHeroCard(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         PrivacyAwareText(
-                            amount = safeToSpend,
+                            amount = if (isDeficit) kotlin.math.abs(safeToSpend) else safeToSpend,
                             isPrivacyMode = isPrivacyModeEnabled,
                             isCurrency = true,
                             style =

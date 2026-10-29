@@ -83,7 +83,6 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             assertEquals(2000L, viewModel.simulatedExpenses.first())
             assertEquals(3000L, viewModel.simulatedAmountRemaining.first())
             assertFalse(viewModel.isDeficitSpending.first())
-            assertFalse(viewModel.isDeficit.first())
         }
 
     @Test
@@ -148,7 +147,6 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             val safeToSpend = viewModel.simulatedSafeToSpendPerDay.first()
             assertEquals(188L, safeToSpend)
             assertFalse(viewModel.isDeficitSpending.first())
-            assertFalse(viewModel.isDeficit.first())
         }
 
     @Test
@@ -163,7 +161,6 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             assertEquals(6600L, viewModel.simulatedExpenses.first())
             assertEquals(-1600L, viewModel.simulatedAmountRemaining.first())
             assertTrue(viewModel.isDeficitSpending.first())
-            assertTrue(viewModel.isDeficit.first())
 
             // Remaining days = 16. -1600.0 / 16 = -100L.
             // Should accurately reflect negative rate instead of clamping to 0L.
@@ -183,7 +180,6 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             assertEquals(5000L, viewModel.simulatedExpenses.first())
             assertEquals(0L, viewModel.simulatedAmountRemaining.first())
             assertFalse(viewModel.isDeficitSpending.first())
-            assertFalse(viewModel.isDeficit.first())
             assertEquals(0L, viewModel.simulatedSafeToSpendPerDay.first())
         }
 }

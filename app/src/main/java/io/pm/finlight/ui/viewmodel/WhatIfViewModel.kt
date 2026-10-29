@@ -43,7 +43,6 @@ class WhatIfViewModel(
     val simulatedAmountRemaining: StateFlow<Long>
     val simulatedSafeToSpendPerDay: StateFlow<Long>
     val isDeficitSpending: StateFlow<Boolean>
-    val isDeficit: StateFlow<Boolean>
 
     val privacyModeEnabled: StateFlow<Boolean>
     val monthYear: String
@@ -100,8 +99,6 @@ class WhatIfViewModel(
         isDeficitSpending =
             simulatedAmountRemaining.map { it < 0 }
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-
-        isDeficit = isDeficitSpending
     }
 
     fun addHypotheticalExpense(
