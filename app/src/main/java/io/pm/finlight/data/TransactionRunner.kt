@@ -10,15 +10,27 @@ import androidx.room.withTransaction
  */
 interface TransactionRunner {
     suspend fun <R> run(
-        db: RoomDatabase,
         block: suspend () -> R,
     ): R
+
+    suspend fun <R> run(
+        db: RoomDatabase,
+        block: suspend () -> R,
+    ): R = run(block)
 }
 
 /**
  * Default implementation that delegates to Room's withTransaction extension function.
  */
-class RoomTransactionRunner : TransactionRunner {
+class RoomTransactionRunner(
+    private val db: RoomDatabase? = null,
+) : TransactionRunner {
+    override suspend fun <R> run(
+        block: suspend () -> R,
+    ): R {
+        return checkNotNull(db) { "RoomDatabase must be provided to RoomTransactionRunner" }.withTransaction(block)
+    }
+
     override suspend fun <R> run(
         db: RoomDatabase,
         block: suspend () -> R,

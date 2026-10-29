@@ -87,6 +87,14 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var nerExtractor: SmsEntityExtractor
     private lateinit var transactionRunner: TransactionRunner
 
+    @Mock private lateinit var tagRepository: ITagRepository
+    @Mock private lateinit var splitTransactionRepository: ISplitTransactionRepository
+    @Mock private lateinit var merchantRenameRuleRepository: IMerchantRenameRuleRepository
+    @Mock private lateinit var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository
+    @Mock private lateinit var customSmsRuleRepository: ICustomSmsRuleRepository
+    @Mock private lateinit var ignoreRuleRepository: IIgnoreRuleRepository
+    @Mock private lateinit var smsParseTemplateProvider: SmsParseTemplateProvider
+
     // Mocks for all DAOs called by DataExportService and ViewModel
     @Mock private lateinit var transactionQueryDao: TransactionQueryDao
 
@@ -195,6 +203,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         // --- NEW: Mock TransactionRunner to execute immediately ---
         transactionRunner = io.mockk.mockk()
         // Match generic arguments using MockK
+        coEvery { transactionRunner.run<Any?>(any()) } coAnswers {
+            val block = firstArg<suspend () -> Any?>()
+            block()
+        }
         coEvery { transactionRunner.run<Any?>(any(), any()) } coAnswers {
             val block = secondArg<suspend () -> Any?>()
             block()
@@ -231,6 +243,18 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(tripDao.getAll()).thenReturn(emptyList())
             `when`(accountAliasDao.getAll()).thenReturn(emptyList())
             `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(tagRepository.findByName(anyString())).thenReturn(null)
+            `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
+            `when`(splitTransactionRepository.getSplitsForParent(any())).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAliasesAsMap()).thenReturn(flowOf(emptyMap()))
+            `when`(merchantCategoryMappingRepository.getAllMappings()).thenReturn(flowOf(emptyList()))
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
         }
 
         // Setup default instance mocks for initialization
@@ -259,18 +283,24 @@ class SettingsViewModelTest : BaseViewModelTest() {
     ) {
         viewModel =
             SettingsViewModel(
-                applicationContext,
-                settingsRepository,
-                db,
-                transactionRepository,
-                merchantMappingRepository,
-                accountRepository,
-                categoryRepository,
-                smsRepository,
-                autoSaveSmsTransactionUseCase,
-                smsClassifier,
+                application = applicationContext,
+                settingsRepository = settingsRepository,
+                transactionRepository = transactionRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                smsRepository = smsRepository,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                smsClassifier = smsClassifier,
+                tagRepository = tagRepository,
+                splitTransactionRepository = splitTransactionRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                customSmsRuleRepository = customSmsRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                smsParseTemplateProvider = smsParseTemplateProvider,
                 nerExtractorProvider = customNerExtractorProvider ?: { nerExtractor },
-                transactionRunner,
+                transactionRunner = transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
             )
     }
@@ -291,11 +321,11 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
@@ -314,7 +344,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     sourceSmsBody = sms.body,
                     transactionType = null,
                 )
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             // Grant SMS permission (required by ViewModel)
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -502,9 +532,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
             `when`(categoryRepository.findByName("Food")).thenReturn(Category(1, "Food", "", ""))
             `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
-            `when`(tagDao.findByName("Work")).thenReturn(Tag(1, "Work"))
-            `when`(tagDao.findByName("Personal")).thenReturn(null)
-            `when`(tagDao.insert(anyObject())).thenReturn(2L)
+            `when`(tagRepository.findByName("Work")).thenReturn(Tag(1, "Work"))
+            `when`(tagRepository.findByName("Personal")).thenReturn(null)
+            `when`(tagRepository.insert(anyObject())).thenReturn(2L)
             `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(1L)
 
             // Act
@@ -786,19 +816,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList())) // No existing hashes
 
             // Mock all parser dependencies to return empty/null
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             // Mock the parser to successfully parse the transaction
             // We can do this by mocking the one rule it needs
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             // Mock the final auto-save step
             // --- FIX: Use anyObject() for non-nullable Kotlin class ---
@@ -833,19 +863,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             initializeViewModel()
 
@@ -856,7 +886,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertEquals("Should have found 0 new transactions", 0, newTransactionCount)
-            verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+            verify(transactionRepository).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
             verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
@@ -872,19 +902,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(legacyHash))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(legacyHash))
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             initializeViewModel()
 
@@ -895,7 +925,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertEquals("Should have found 0 new transactions", 0, newTransactionCount)
-            verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+            verify(transactionRepository).insertDeletedSmsHash(currentHash)
             verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
@@ -910,19 +940,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             initializeViewModel()
 
@@ -947,19 +977,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(currentHash))
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             initializeViewModel()
 
@@ -983,19 +1013,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -1033,19 +1063,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(legacyHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -1065,7 +1095,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
 
                 assertEquals(0, importedCount)
-                verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                verify(transactionRepository).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
                 assertFalse(autoSaveCalled)
             } finally {
                 eventJob.cancel()
@@ -1083,19 +1113,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(listOf(currentHash)))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(emptyList())
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -1133,19 +1163,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(legacyHash))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(legacyHash))
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -1165,7 +1195,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 advanceUntilIdle()
 
                 assertEquals(0, importedCount)
-                verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
+                verify(transactionRepository).insertDeletedSmsHash(currentHash)
                 assertFalse(autoSaveCalled)
             } finally {
                 eventJob.cancel()
@@ -1183,19 +1213,19 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(listOf(currentHash))
+            `when`(transactionRepository.getAllDeletedSmsHashes()).thenReturn(listOf(currentHash))
 
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
             `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
@@ -1376,9 +1406,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            verify(merchantRenameRuleDao).insert(MerchantRenameRule(originalName, newName))
+            verify(merchantRenameRuleRepository).insert(MerchantRenameRule(originalName, newName))
             verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, newName, null)
-            verify(merchantRenameRuleDao, never()).deleteByOriginalName(anyString())
+            verify(merchantRenameRuleRepository, never()).deleteByOriginalName(anyString())
         }
 
     @Test
@@ -1395,9 +1425,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(merchantRenameRuleRepository).deleteByOriginalName(originalName)
             verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
-            verify(merchantRenameRuleDao, never()).insert(any())
+            verify(merchantRenameRuleRepository, never()).insert(any())
         }
 
     @Test
@@ -1414,9 +1444,9 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             // Assert
-            verify(merchantRenameRuleDao).deleteByOriginalName(originalName)
+            verify(merchantRenameRuleRepository).deleteByOriginalName(originalName)
             verify(transactionRepository).updateDescriptionByOriginalDescription(originalName, originalName, null)
-            verify(merchantRenameRuleDao, never()).insert(any())
+            verify(merchantRenameRuleRepository, never()).insert(any())
         }
 
     @Test
@@ -1745,18 +1775,24 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Re-init with unconfined for this test to ensure immediate execution of async tasks
             viewModel =
                 SettingsViewModel(
-                    applicationContext,
-                    settingsRepository,
-                    db,
-                    transactionRepository,
-                    merchantMappingRepository,
-                    accountRepository,
-                    categoryRepository,
-                    smsRepository,
-                    autoSaveSmsTransactionUseCase,
-                    smsClassifier,
+                    application = applicationContext,
+                    settingsRepository = settingsRepository,
+                    transactionRepository = transactionRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    smsRepository = smsRepository,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                    smsClassifier = smsClassifier,
+                    tagRepository = tagRepository,
+                    splitTransactionRepository = splitTransactionRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
                     nerExtractorProvider = { nerExtractor },
-                    transactionRunner,
+                    transactionRunner = transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
                 )
 
@@ -1772,12 +1808,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
@@ -1802,18 +1838,24 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val testDispatcher = UnconfinedTestDispatcher(testScheduler)
             viewModel =
                 SettingsViewModel(
-                    applicationContext,
-                    settingsRepository,
-                    db,
-                    transactionRepository,
-                    merchantMappingRepository,
-                    accountRepository,
-                    categoryRepository,
-                    smsRepository,
-                    autoSaveSmsTransactionUseCase,
-                    smsClassifier,
+                    application = applicationContext,
+                    settingsRepository = settingsRepository,
+                    transactionRepository = transactionRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    smsRepository = smsRepository,
+                    autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                    smsClassifier = smsClassifier,
+                    tagRepository = tagRepository,
+                    splitTransactionRepository = splitTransactionRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
                     nerExtractorProvider = { nerExtractor },
-                    transactionRunner,
+                    transactionRunner = transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
                 )
 
@@ -1824,12 +1866,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 .thenReturn(listOf(sms1, sms2))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
 
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -1866,14 +1908,14 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Arrange
             whenever(smsRepository.fetchAllSms(anyOrNull()))
                 .thenReturn(listOf(SmsMessage(1, "BANK", "Test", 1L)))
-            `when`(transactionQueryDao.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
+            `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
 
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -1903,17 +1945,17 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
             `when`(autoSaveSmsTransactionUseCase(anyObject(), eq("Imported"), anyOrNull())).thenReturn(true)
 
             var providerInvocationCount = 0
@@ -1939,16 +1981,16 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
             `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "on (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
             `when`(autoSaveSmsTransactionUseCase(anyObject(), eq("Imported"), anyOrNull())).thenReturn(true)
 
             var providerInvocationCount = 0
@@ -1995,12 +2037,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyLong())).thenReturn(listOf(sms))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(nerExtractor.extract(anyString())).thenThrow(RuntimeException("NER inference error"))
 
             var providerInvocationCount = 0
@@ -2025,12 +2067,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(smsClassifier.classify(anyString())).thenReturn(0.05f)
 
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
@@ -2088,12 +2130,12 @@ class SettingsViewModelTest : BaseViewModelTest() {
             whenever(smsRepository.fetchAllSms(anyOrNull())).thenReturn(listOf(sms))
             `when`(transactionRepository.getAllSmsHashes()).thenReturn(flowOf(emptyList<String>()))
             `when`(merchantMappingRepository.allMappings).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(merchantRenameRuleDao.getAllRules()).thenReturn(flowOf(emptyList()))
-            `when`(ignoreRuleDao.getEnabledRules()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getCategoryIdForMerchant(anyString())).thenReturn(null)
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getTemplatesBySignature(anyString())).thenReturn(emptyList())
+            `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(merchantRenameRuleRepository.getAllRules()).thenReturn(flowOf(emptyList()))
+            `when`(ignoreRuleRepository.getEnabledRules()).thenReturn(emptyList())
+            `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
+            `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
+            `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
             `when`(smsClassifier.classify(anyString())).thenReturn(0.9f)
             `when`(nerExtractor.extract(anyString())).thenThrow(RuntimeException("NER error"))
 
@@ -2137,16 +2179,22 @@ class SettingsViewModelTest : BaseViewModelTest() {
     fun `secondary constructor accepts direct SmsEntityExtractor instance`() {
         val vm =
             SettingsViewModel(
-                applicationContext,
-                settingsRepository,
-                db,
-                transactionRepository,
-                merchantMappingRepository,
-                accountRepository,
-                categoryRepository,
-                smsRepository,
-                autoSaveSmsTransactionUseCase,
-                smsClassifier,
+                application = applicationContext,
+                settingsRepository = settingsRepository,
+                transactionRepository = transactionRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                smsRepository = smsRepository,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                smsClassifier = smsClassifier,
+                tagRepository = tagRepository,
+                splitTransactionRepository = splitTransactionRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                customSmsRuleRepository = customSmsRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                smsParseTemplateProvider = smsParseTemplateProvider,
                 nerExtractor = nerExtractor,
                 transactionRunner = transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
@@ -2188,7 +2236,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                         corruptedPreferencesCount = 0,
                         issuesDescription = emptyList(),
                     )
-                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any(), any()) } returns mockResult
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any<android.content.Context>()) } returns mockResult
 
                 viewModel.runDatabaseHealthCheck()
 
@@ -2212,7 +2260,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
             try {
                 viewModel.runDatabaseHealthCheck()
-                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any(), any()) }
+                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any<android.content.Context>()) }
             } finally {
                 io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
             }
@@ -2232,7 +2280,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                         repairedPreferencesCount = 1,
                         message = "Success",
                     )
-                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any<android.content.Context>()) } returns repairOutcome
 
                 viewModel.repairDatabase()
 
@@ -2258,7 +2306,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                         repairedPreferencesCount = 0,
                         message = "Success",
                     )
-                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any<android.content.Context>()) } returns repairOutcome
 
                 viewModel.repairDatabase()
 
@@ -2283,7 +2331,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                         repairedPreferencesCount = 0,
                         message = "Disk I/O error",
                     )
-                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any<android.content.Context>()) } returns repairOutcome
 
                 viewModel.repairDatabase()
 
@@ -2307,7 +2355,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
             try {
                 viewModel.repairDatabase()
-                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) }
+                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any<android.content.Context>()) }
             } finally {
                 io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
             }

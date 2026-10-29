@@ -127,6 +127,10 @@ object DatabaseHealthChecker {
         )
 
     suspend fun checkHealth(
+        context: Context,
+    ): HealthCheckResult = checkHealth(AppDatabase.getInstance(context), context)
+
+    suspend fun checkHealth(
         database: AppDatabase,
         context: Context? = null,
     ): HealthCheckResult =
@@ -253,6 +257,10 @@ object DatabaseHealthChecker {
                 issuesDescription = issues,
             )
         }
+
+    suspend fun repair(
+        context: Context,
+    ): RepairResult = repair(AppDatabase.getInstance(context), context)
 
     suspend fun repair(
         database: AppDatabase,

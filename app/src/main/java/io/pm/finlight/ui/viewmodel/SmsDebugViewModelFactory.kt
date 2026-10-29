@@ -10,7 +10,6 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.SmsDebugViewModel
-import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
@@ -25,16 +24,6 @@ class SmsDebugViewModelFactory(
     constructor(
         application: Application,
         nerExtractorProvider: (() -> SmsEntityExtractor)?,
-    ) : this(
-        application = application,
-        autoSaveSmsTransactionUseCase = null,
-        nerExtractorProvider = nerExtractorProvider,
-    )
-
-    constructor(
-        application: Application,
-        transactionViewModel: TransactionViewModel,
-        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
     ) : this(
         application = application,
         autoSaveSmsTransactionUseCase = null,

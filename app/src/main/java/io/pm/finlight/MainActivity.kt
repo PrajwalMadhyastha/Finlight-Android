@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
             val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
             val settingsViewModel: SettingsViewModel =
                 viewModel(
-                    factory = SettingsViewModelFactory(application, transactionViewModel),
+                    factory = SettingsViewModelFactory(application),
                 )
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
             val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
@@ -322,7 +322,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
 
     val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
     val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
-    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
+    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
     val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
     val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
     val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
