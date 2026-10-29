@@ -3,9 +3,7 @@ package io.pm.finlight
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.utils.SystemTimeProvider
 
 /**
@@ -14,29 +12,24 @@ import io.pm.finlight.utils.SystemTimeProvider
 class DashboardViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(DashboardViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
             val settingsRepository = ServiceLocator.provideSettingsRepository(application)
             val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            val getMonthlyConsistencyDataUseCase =
-                GetMonthlyConsistencyDataUseCase(
-                    settingsRepository = settingsRepository,
-                    transactionAnalyticsDao = db.transactionAnalyticsDao(),
-                    transactionQueryDao = db.transactionQueryDao(),
-                    dispatcherProvider = dispatcherProvider,
-                )
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val getMonthlyConsistencyDataUseCase =
+                ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
-            val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application, db)
+            val mergeTransactionsUseCase = ServiceLocator.provideMergeTransactionsUseCase(application)
+            val budgetRepository = ServiceLocator.provideBudgetRepository(application)
+            val recurringTransactionRepository = ServiceLocator.provideRecurringTransactionRepository(application)
 
             @Suppress("UNCHECKED_CAST")
             return DashboardViewModel(
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
-                budgetDao = db.budgetDao(),
+                budgetRepository = budgetRepository,
                 settingsRepository = settingsRepository,
                 timeProvider = SystemTimeProvider(),
-                recurringTransactionDao = db.recurringTransactionDao(),
-                recurringPatternDao = db.recurringPatternDao(),
+                recurringTransactionRepository = recurringTransactionRepository,
                 getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 dispatcherProvider = dispatcherProvider,

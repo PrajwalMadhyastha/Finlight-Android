@@ -67,7 +67,7 @@ interface GoalDao {
         """
         SELECT
             g.id, g.name, g.targetAmount, g.savedAmount, g.targetDate, g.accountId,
-            a.name as accountName, g.notes, g.iconEmoji, g.priority
+            IFNULL(a.name, 'Unnamed Account') as accountName, g.notes, g.iconEmoji, g.priority
         FROM goals as g
         INNER JOIN accounts as a ON g.accountId = a.id
         ORDER BY g.priority DESC, g.targetDate ASC

@@ -25,6 +25,7 @@ import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
@@ -79,7 +80,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var smsRepository: SmsRepository
 
-    @Mock private lateinit var transactionViewModel: TransactionViewModel
+    @Mock private lateinit var autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase
 
     @Mock private lateinit var smsClassifier: SmsClassifier
 
@@ -266,7 +267,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 accountRepository,
                 categoryRepository,
                 smsRepository,
-                transactionViewModel,
+                autoSaveSmsTransactionUseCase,
                 smsClassifier,
                 nerExtractorProvider = customNerExtractorProvider ?: { nerExtractor },
                 transactionRunner,
@@ -343,7 +344,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             val txnToImport = PotentialTransaction(1, "", 1.0, "", "Amazon", "")
             val txnToKeep = PotentialTransaction(2, "", 1.0, "", "Flipkart", "")
             setPotentialTransactions(viewModel, listOf(txnToImport, txnToKeep))
-            `when`(transactionViewModel.autoSaveSmsTransaction(any(), anyString())).thenReturn(true)
+            `when`(autoSaveSmsTransactionUseCase(any(), any(), anyOrNull())).thenReturn(true)
 
             // Act
             val importCount = viewModel.applyLearningAndAutoImport(mapping)
@@ -352,7 +353,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             assertEquals(1, importCount)
             assertEquals(1, viewModel.potentialTransactions.value.size)
             assertEquals("Flipkart", viewModel.potentialTransactions.value.first().merchantName)
-            verify(transactionViewModel).autoSaveSmsTransaction(eq(txnToImport.copy(categoryId = 1)), eq("Imported"))
+            verify(autoSaveSmsTransactionUseCase).invoke(eq(txnToImport.copy(categoryId = 1)), eq("Imported"), anyOrNull())
         }
 
     // --- DELETED: `finalizeImport` test ---
@@ -801,7 +802,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Mock the final auto-save step
             // --- FIX: Use anyObject() for non-nullable Kotlin class ---
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), eq("Imported"), anyOrNull())).thenReturn(true)
 
             initializeViewModel()
 
@@ -817,7 +818,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             println("SettingsViewModelTest: newTransactionCount = $newTransactionCount")
             assertEquals("Should have found and saved 1 new transaction", 1, newTransactionCount)
             // --- FIX: Use anyObject() for verification too ---
-            verify(transactionViewModel).autoSaveSmsTransaction(anyObject(), eq("Imported"))
+            verify(autoSaveSmsTransactionUseCase).invoke(anyObject(), eq("Imported"), anyOrNull())
         }
 
     @Test
@@ -856,7 +857,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             assertEquals("Should have found 0 new transactions", 0, newTransactionCount)
             verify(transactionWriteDao).updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -895,7 +896,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             assertEquals("Should have found 0 new transactions", 0, newTransactionCount)
             verify(deletedSmsHashDao).insert(DeletedSmsHash(currentHash))
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -932,7 +933,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertEquals(0, newTransactionCount)
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -969,7 +970,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertEquals(0, newTransactionCount)
-            verify(transactionViewModel, never()).autoSaveSmsTransaction(anyObject(), anyString())
+            verify(autoSaveSmsTransactionUseCase, never()).invoke(anyObject(), anyString(), anyOrNull())
         }
 
     @Test
@@ -997,7 +998,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 true
             }
@@ -1047,7 +1048,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 true
             }
@@ -1097,7 +1098,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 true
             }
@@ -1147,7 +1148,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 true
             }
@@ -1197,7 +1198,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
 
             var autoSaveCalled = false
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), anyString())).thenAnswer {
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), anyString(), anyOrNull())).thenAnswer {
                 autoSaveCalled = true
                 true
             }
@@ -1752,7 +1753,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     accountRepository,
                     categoryRepository,
                     smsRepository,
-                    transactionViewModel,
+                    autoSaveSmsTransactionUseCase,
                     smsClassifier,
                     nerExtractorProvider = { nerExtractor },
                     transactionRunner,
@@ -1809,7 +1810,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     accountRepository,
                     categoryRepository,
                     smsRepository,
-                    transactionViewModel,
+                    autoSaveSmsTransactionUseCase,
                     smsClassifier,
                     nerExtractorProvider = { nerExtractor },
                     transactionRunner,
@@ -1913,7 +1914,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), eq("Imported"), anyOrNull())).thenReturn(true)
 
             var providerInvocationCount = 0
             val countingProvider: () -> SmsEntityExtractor = {
@@ -1948,7 +1949,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val rule = CustomSmsRule(1, "spent Rs", "on (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleDao.getAllRules()).thenReturn(flowOf(listOf(rule)))
-            `when`(transactionViewModel.autoSaveSmsTransaction(anyObject(), eq("Imported"))).thenReturn(true)
+            `when`(autoSaveSmsTransactionUseCase(anyObject(), eq("Imported"), anyOrNull())).thenReturn(true)
 
             var providerInvocationCount = 0
             val countingProvider: () -> SmsEntityExtractor = {
@@ -2144,7 +2145,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 accountRepository,
                 categoryRepository,
                 smsRepository,
-                transactionViewModel,
+                autoSaveSmsTransactionUseCase,
                 smsClassifier,
                 nerExtractor = nerExtractor,
                 transactionRunner = transactionRunner,
@@ -2154,4 +2155,161 @@ class SettingsViewModelTest : BaseViewModelTest() {
         val extractedNer = vm.nerExtractorProvider()
         assertEquals(nerExtractor, extractedNer)
     }
+
+    @Test
+    fun `dismissHealthCheckResult clears healthCheckResult state`() =
+        runTest {
+            initializeViewModel()
+            viewModel.dismissHealthCheckResult()
+            org.junit.Assert.assertNull(viewModel.healthCheckResult.value)
+        }
+
+    @Test
+    fun `clearRepairResultMessage clears repairResultMessage state`() =
+        runTest {
+            initializeViewModel()
+            viewModel.clearRepairResultMessage()
+            org.junit.Assert.assertNull(viewModel.repairResultMessage.value)
+        }
+
+    @Test
+    fun `runDatabaseHealthCheck executes and updates healthCheckResult`() =
+        runTest {
+            initializeViewModel()
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                val mockResult =
+                    io.pm.finlight.data.health.HealthCheckResult(
+                        isHealthy = true,
+                        integrityCheckPassed = true,
+                        corruptedAccountsCount = 0,
+                        duplicateAccountsCount = 0,
+                        orphanTransactionsCount = 0,
+                        corruptedPreferencesCount = 0,
+                        issuesDescription = emptyList(),
+                    )
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any(), any()) } returns mockResult
+
+                viewModel.runDatabaseHealthCheck()
+
+                assertEquals(mockResult, viewModel.healthCheckResult.value)
+                assertFalse(viewModel.isCheckingHealth.value)
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
+
+    @Test
+    fun `runDatabaseHealthCheck does nothing if already checking or repairing`() =
+        runTest {
+            initializeViewModel()
+            val field = viewModel.javaClass.getDeclaredField("_isCheckingHealth")
+            field.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val stateFlow = field.get(viewModel) as MutableStateFlow<Boolean>
+            stateFlow.value = true
+
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                viewModel.runDatabaseHealthCheck()
+                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(any(), any()) }
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
+
+    @Test
+    fun `repairDatabase executes and updates repairResultMessage with fixed issues count`() =
+        runTest {
+            initializeViewModel()
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                val repairOutcome =
+                    io.pm.finlight.data.health.RepairResult(
+                        success = true,
+                        repairedAccountsCount = 1,
+                        relinkedTransactionsCount = 2,
+                        repairedPreferencesCount = 1,
+                        message = "Success",
+                    )
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+
+                viewModel.repairDatabase()
+
+                assertEquals("Database repaired: 4 issues fixed.", viewModel.repairResultMessage.value)
+                assertNull(viewModel.healthCheckResult.value)
+                assertFalse(viewModel.isRepairingDb.value)
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
+
+    @Test
+    fun `repairDatabase executes and updates repairResultMessage when database is clean`() =
+        runTest {
+            initializeViewModel()
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                val repairOutcome =
+                    io.pm.finlight.data.health.RepairResult(
+                        success = true,
+                        repairedAccountsCount = 0,
+                        relinkedTransactionsCount = 0,
+                        repairedPreferencesCount = 0,
+                        message = "Success",
+                    )
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+
+                viewModel.repairDatabase()
+
+                assertEquals("Database verified and clean.", viewModel.repairResultMessage.value)
+                assertFalse(viewModel.isRepairingDb.value)
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
+
+    @Test
+    fun `repairDatabase executes and updates repairResultMessage on failure`() =
+        runTest {
+            initializeViewModel()
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                val repairOutcome =
+                    io.pm.finlight.data.health.RepairResult(
+                        success = false,
+                        repairedAccountsCount = 0,
+                        relinkedTransactionsCount = 0,
+                        repairedPreferencesCount = 0,
+                        message = "Disk I/O error",
+                    )
+                coEvery { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) } returns repairOutcome
+
+                viewModel.repairDatabase()
+
+                assertEquals("Database self-repair failed: Disk I/O error", viewModel.repairResultMessage.value)
+                assertFalse(viewModel.isRepairingDb.value)
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
+
+    @Test
+    fun `repairDatabase does nothing if already repairing`() =
+        runTest {
+            initializeViewModel()
+            val field = viewModel.javaClass.getDeclaredField("_isRepairingDb")
+            field.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            val stateFlow = field.get(viewModel) as MutableStateFlow<Boolean>
+            stateFlow.value = true
+
+            mockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            try {
+                viewModel.repairDatabase()
+                coVerify(exactly = 0) { io.pm.finlight.data.health.DatabaseHealthChecker.repair(any(), any()) }
+            } finally {
+                io.mockk.unmockkObject(io.pm.finlight.data.health.DatabaseHealthChecker)
+            }
+        }
 }

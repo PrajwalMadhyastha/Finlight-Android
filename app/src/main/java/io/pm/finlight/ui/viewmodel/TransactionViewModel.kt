@@ -20,6 +20,7 @@ import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.data.model.MergedTransactionItem
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
@@ -125,6 +126,8 @@ class TransactionViewModel(
     val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     private val manageReimbursementUseCase: ManageReimbursementUseCase =
         ServiceLocator.provideManageReimbursementUseCase(application, db),
+    private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase =
+        ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db),
 ) : AndroidViewModel(application) {
     private val context = application
 
@@ -1293,12 +1296,7 @@ class TransactionViewModel(
                     val sanitizedName = SmsParser.sanitizeAccountName(parsedAccount.formattedName)
                     val currentAccount = accountRepository.getAccountByIdSync(transaction.accountId)
                     if (currentAccount?.name?.equals(sanitizedName, ignoreCase = true) == false) {
-                        var account = db.accountDao().findByName(sanitizedName)
-                        if (account == null) {
-                            val newAccount = Account(name = sanitizedName, type = parsedAccount.accountType)
-                            val newId = accountRepository.insert(newAccount)
-                            account = accountRepository.getAccountByIdSync(newId.toInt())
-                        }
+                        val account = accountRepository.findOrCreateByName(sanitizedName, parsedAccount.accountType)
                         if (account != null) {
                             transactionRepository.updateAccountId(transactionId, account.id)
                         }
@@ -1673,20 +1671,22 @@ class TransactionViewModel(
         actionName: String,
     ): Boolean {
         val hash = potentialTxn.sourceSmsHash ?: return false
-        if (db.transactionQueryDao().existsBySmsHash(hash)) {
+        if (transactionRepository.existsBySmsHash(hash)) {
             Log.d(TAG, "Transaction with sourceSmsHash '$hash' already exists. Skipping $actionName.")
             return true
         }
         val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
-        if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+        if (legacyHash.isNotBlank() && transactionRepository.existsBySmsHash(legacyHash)) {
             Log.d(TAG, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading and skipping $actionName.")
-            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+            transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
             return true
         }
-        if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
+        val isCurrentDeleted = transactionRepository.existsDeletedSmsHash(hash)
+        val isLegacyDeleted = legacyHash.isNotBlank() && transactionRepository.existsDeletedSmsHash(legacyHash)
+        if (isCurrentDeleted || isLegacyDeleted) {
             Log.d(TAG, "Transaction with sourceSmsHash was deleted by user. Skipping $actionName.")
-            if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+            if (isLegacyDeleted) {
+                transactionRepository.insertDeletedSmsHash(hash)
             }
             return true
         }
@@ -1715,14 +1715,9 @@ class TransactionViewModel(
                 val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
                 val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
-                var account = db.accountDao().findByName(accountName)
-                if (account == null) {
-                    val newAccount = Account(name = accountName, type = accountType)
-                    accountRepository.insert(newAccount)
-                    account = db.accountDao().findByName(accountName)
-                }
-
-                if (account == null) return@withContext false
+                val account =
+                    accountRepository.findOrCreateByName(accountName, accountType)
+                        ?: return@withContext false
 
                 val currentTravelSettings = travelModeSettings.value
                 val transactionToSave =
@@ -1802,81 +1797,11 @@ class TransactionViewModel(
         potentialTxn: PotentialTransaction,
         source: String = "Auto-Captured",
     ): Boolean {
-        return withContext(dispatcherProvider.io) {
-            try {
-                if (potentialTxn.amount <= 0.0 || potentialTxn.amount.isNaN() || potentialTxn.amount.isInfinite()) {
-                    Log.e(TAG, "Invalid transaction amount: ${potentialTxn.amount}. Auto-save dropped.")
-                    return@withContext false
-                }
-
-                if (isDuplicateOrDeletedSms(potentialTxn, "auto-save")) {
-                    return@withContext false
-                }
-
-                val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
-                val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
-
-                var finalAccountId: Int? = null
-
-                // 1. Check for an alias
-                val alias = db.accountAliasDao().findByAlias(accountName)
-                if (alias != null) {
-                    finalAccountId = alias.destinationAccountId
-                } else {
-                    // 2. No alias, check for an exact account name match
-                    var account = db.accountDao().findByName(accountName)
-                    if (account == null) {
-                        // 3. No exact match, create a new account
-                        val newAccount = Account(name = accountName, type = accountType)
-                        val newId = accountRepository.insert(newAccount)
-                        // BUG FIX: AccountDao.insert uses OnConflictStrategy.IGNORE, which returns -1
-                        // if the account already exists (e.g., created by a concurrent operation or
-                        // a prior findByName cache miss). Passing -1 to getAccountById always returns
-                        // null, silently dropping the transaction. Fall back to findByName instead.
-                        account =
-                            if (newId != -1L) {
-                                accountRepository.getAccountByIdSync(newId.toInt())
-                            } else {
-                                Log.d(TAG, "Account '$accountName' already existed (IGNORE conflict). Fetching by name.")
-                                db.accountDao().findByName(accountName)
-                            }
-                    }
-                    finalAccountId = account?.id
-                }
-
-                if (finalAccountId == null) {
-                    Log.e(TAG, "Auto-save failed: Could not find or create account '$accountName'")
-                    return@withContext false
-                }
-
-                val transactionToSave =
-                    Transaction(
-                        description = potentialTxn.merchantName ?: "Unknown Merchant",
-                        // FIX: Use the raw pre-rename name for originalDescription.
-                        originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
-                        categoryId = potentialTxn.categoryId,
-                        amount = potentialTxn.amount,
-                        date = potentialTxn.date,
-                        accountId = finalAccountId,
-                        notes = null,
-                        transactionType = TransactionType.fromString(potentialTxn.transactionType),
-                        sourceSmsId = potentialTxn.sourceSmsId,
-                        sourceSmsHash = potentialTxn.sourceSmsHash,
-                        source = source,
-                    )
-
-                val finalTags = resolveTravelModeTagUseCase.getFinalTags(transactionToSave.date, emptySet(), travelModeSettings.value)
-                val newId = transactionRepository.insertTransactionWithTags(transactionToSave, finalTags)
-                if (newId <= 0L) {
-                    Log.d(TAG, "Auto-save ignored or failed due to conflict (newId: $newId).")
-                    return@withContext false
-                }
-                true
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to auto-save SMS transaction", e)
-                false
-            }
-        }
+        return autoSaveSmsTransactionUseCase(
+            potentialTxn = potentialTxn,
+            source = source,
+            travelSettings = travelModeSettings.value,
+        )
     }
 
     fun deleteTransaction(transaction: Transaction) =

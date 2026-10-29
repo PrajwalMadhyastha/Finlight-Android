@@ -116,9 +116,10 @@ class GoalFlowTest {
                 Goal(
                     name = "Test Goal #1",
                     targetAmount = 1000.0,
+                    savedAmount = 250.0,
                     targetDate = null,
-                    accountId = TestDataSeeder.ACCOUNT_BANK_ID
-                )
+                    accountId = TestDataSeeder.ACCOUNT_BANK_ID,
+                ),
             )
         }
 
@@ -129,9 +130,11 @@ class GoalFlowTest {
             composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
         }
 
-        // Scroll to Savings Goals and click it
+        // Scroll to Savings Goals and verify the offline goal displays 25% on the card
         composeTestRule.onNode(hasTestTag("dashboard_lazy_column"))
             .performScrollToNode(hasText("Savings Goals", substring = true))
+        composeTestRule.onNodeWithText("Test Goal #1", substring = true).assertExists()
+        composeTestRule.onNodeWithText("25%", substring = true).assertExists()
         composeTestRule.onNodeWithText("Savings Goals", substring = true).performClick()
 
         // Now on GoalScreen

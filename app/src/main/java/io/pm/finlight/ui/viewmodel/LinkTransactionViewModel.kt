@@ -11,16 +11,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
-import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.Transaction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 
-class LinkTransactionViewModel(
-    private val transactionRepository: ITransactionRepository,
-    private val recurringTransactionDao: RecurringTransactionDao,
+open class LinkTransactionViewModel(
+    protected val transactionRepository: ITransactionRepository,
     val potentialTransaction: PotentialTransaction,
 ) : ViewModel() {
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
@@ -56,7 +54,7 @@ class LinkTransactionViewModel(
         }
     }
 
-    fun linkTransaction(
+    open fun linkTransaction(
         selectedTransactionId: Int,
         onComplete: () -> Unit,
     ) {
@@ -65,20 +63,6 @@ class LinkTransactionViewModel(
             potentialTransaction.sourceSmsHash?.let { hash ->
                 transactionRepository.setSmsHash(selectedTransactionId, hash)
             }
-            // Update the last run date of the rule to today
-            val ruleId = potentialTransaction.sourceSmsId.toInt()
-            recurringTransactionDao.updateLastRunDate(ruleId, System.currentTimeMillis())
-            onComplete()
-        }
-    }
-
-    fun remindTomorrow(onComplete: () -> Unit) {
-        viewModelScope.launch {
-            // To "remind tomorrow", we simply update the last run date to yesterday.
-            // This makes the rule due again starting today.
-            val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }.timeInMillis
-            val ruleId = potentialTransaction.sourceSmsId.toInt()
-            recurringTransactionDao.updateLastRunDate(ruleId, yesterday)
             onComplete()
         }
     }

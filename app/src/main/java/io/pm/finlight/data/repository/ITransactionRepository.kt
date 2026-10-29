@@ -1,6 +1,7 @@
 package io.pm.finlight
 
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import kotlinx.coroutines.flow.Flow
 
 interface ITransactionRepository {
@@ -178,6 +179,17 @@ interface ITransactionRepository {
         smsHash: String,
     )
 
+    suspend fun existsBySmsHash(hash: String): Boolean
+
+    suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    )
+
+    suspend fun existsDeletedSmsHash(hash: String): Boolean
+
+    suspend fun insertDeletedSmsHash(hash: String)
+
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
     suspend fun findSimilarTransactions(
@@ -310,4 +322,48 @@ interface ITransactionRepository {
      * @throws IllegalArgumentException If [transactionId] is not positive.
      */
     suspend fun skipTransaction(transactionId: Int)
+
+    /**
+     * Searches transactions matching the specified keyword and filter criteria.
+     *
+     * @param query The search text matching description or notes.
+     * @param filter Filter criteria constraining account, category, tag, type, and date range.
+     * @return A cold [Flow] emitting the matching list of [TransactionDetails] ordered by date descending.
+     */
+    fun searchTransactions(
+        query: String,
+        filter: SearchFilter = SearchFilter(),
+    ): Flow<List<TransactionDetails>>
+
+    suspend fun getFinancialSummaryForRange(
+        startDate: Long,
+        endDate: Long,
+    ): FinancialSummary?
+
+    suspend fun getTopSpendingCategoriesForRange(
+        startDate: Long,
+        endDate: Long,
+    ): List<CategorySpending>
+
+    fun getDailyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTrend>>
+
+    fun getWeeklyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<WeeklyTrend>>
+
+    fun getTransactionsForCategoryName(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
+
+    fun getTransactionsForMerchantName(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>>
 }

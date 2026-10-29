@@ -5,6 +5,7 @@ import androidx.annotation.VisibleForTesting
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BackupSettingsRepository
+import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.DashboardSettingsRepository
@@ -13,35 +14,51 @@ import io.pm.finlight.FirstLaunchSettingsRepository
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IAppConfigRepository
 import io.pm.finlight.IBackupSettingsRepository
+import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.IBudgetSettingsRepository
+import io.pm.finlight.CustomSmsRuleRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.INotificationSettingsRepository
 import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ISecuritySettingsRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ISmsRuleSettingsRepository
+import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.IgnoreRuleRepository
+import io.pm.finlight.MerchantCategoryMappingRepository
 import io.pm.finlight.MerchantMappingRepository
+import io.pm.finlight.MerchantRenameRuleRepository
 import io.pm.finlight.NotificationSettingsRepository
 import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRepository
 import io.pm.finlight.SmsRuleSettingsRepository
+import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
+import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 
@@ -113,10 +130,37 @@ object ServiceLocator {
     private var mergeTransactionsUseCase: MergeTransactionsUseCase? = null
 
     @Volatile
+    private var autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null
+
+    @Volatile
+    private var getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase? = null
+
+    @Volatile
+    private var scheduleRecurringTransactionWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase? = null
+
+    @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
 
     @Volatile
+    private var budgetRepository: IBudgetRepository? = null
+
+    @Volatile
     private var recurringTransactionRepository: IRecurringTransactionRepository? = null
+
+    @Volatile
+    private var splitTransactionRepository: ISplitTransactionRepository? = null
+
+    @Volatile
+    private var merchantRenameRuleRepository: IMerchantRenameRuleRepository? = null
+
+    @Volatile
+    private var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository? = null
+
+    @Volatile
+    private var customSmsRuleRepository: ICustomSmsRuleRepository? = null
+
+    @Volatile
+    private var ignoreRuleRepository: IIgnoreRuleRepository? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -381,6 +425,74 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [AutoSaveSmsTransactionUseCase] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideAutoSaveSmsTransactionUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): AutoSaveSmsTransactionUseCase {
+        return autoSaveSmsTransactionUseCase ?: synchronized(this) {
+            autoSaveSmsTransactionUseCase ?: run {
+                val tagRepository = provideTagRepository(context)
+                AutoSaveSmsTransactionUseCase(
+                    transactionRepository = provideTransactionRepository(context),
+                    accountRepository = provideAccountRepository(context),
+                    merchantMappingRepository = provideMerchantMappingRepository(context, resolvedDb),
+                    travelSettingsRepository = provideTravelSettingsRepository(context),
+                    resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    autoSaveSmsTransactionUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [GetMonthlyConsistencyDataUseCase] instance.
+     */
+    fun provideGetMonthlyConsistencyDataUseCase(context: Context): GetMonthlyConsistencyDataUseCase {
+        return getMonthlyConsistencyDataUseCase ?: synchronized(this) {
+            getMonthlyConsistencyDataUseCase ?: run {
+                GetMonthlyConsistencyDataUseCase(
+                    settingsRepository = provideSettingsRepository(context),
+                    transactionRepository = provideTransactionRepository(context),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    getMonthlyConsistencyDataUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ScheduleRecurringTransactionWorkerUseCase] instance.
+     */
+    fun provideScheduleRecurringTransactionWorkerUseCase(
+        context: Context,
+    ): ScheduleRecurringTransactionWorkerUseCase {
+        return scheduleRecurringTransactionWorkerUseCase ?: synchronized(this) {
+            scheduleRecurringTransactionWorkerUseCase ?: DefaultScheduleRecurringTransactionWorkerUseCase(
+                context.applicationContext,
+            ).also {
+                scheduleRecurringTransactionWorkerUseCase = it
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IMerchantMappingRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -402,6 +514,37 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves the singleton [IBudgetRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideBudgetRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IBudgetRepository {
+        return budgetRepository ?: synchronized(this) {
+            budgetRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                BudgetRepository(
+                    budgetDao = db.budgetDao(),
+                ).also {
+                    budgetRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IRecurringTransactionRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
      *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
      *   call. Defaults to null, in which case the instance is resolved internally.
@@ -415,8 +558,139 @@ object ServiceLocator {
                 val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 RecurringTransactionRepository(
                     recurringTransactionDao = db.recurringTransactionDao(),
+                    recurringPatternDao = db.recurringPatternDao(),
                 ).also {
                     recurringTransactionRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ISplitTransactionRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideSplitTransactionRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ISplitTransactionRepository {
+        return splitTransactionRepository ?: synchronized(this) {
+            splitTransactionRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                SplitTransactionRepository(
+                    splitTransactionDao = db.splitTransactionDao(),
+                ).also {
+                    splitTransactionRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IMerchantRenameRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMerchantRenameRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IMerchantRenameRuleRepository {
+        return merchantRenameRuleRepository ?: synchronized(this) {
+            merchantRenameRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MerchantRenameRuleRepository(
+                    dao = db.merchantRenameRuleDao(),
+                ).also {
+                    merchantRenameRuleRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IMerchantCategoryMappingRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideMerchantCategoryMappingRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IMerchantCategoryMappingRepository {
+        return merchantCategoryMappingRepository ?: synchronized(this) {
+            merchantCategoryMappingRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                MerchantCategoryMappingRepository(
+                    dao = db.merchantCategoryMappingDao(),
+                ).also {
+                    merchantCategoryMappingRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ICustomSmsRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideCustomSmsRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ICustomSmsRuleRepository {
+        return customSmsRuleRepository ?: synchronized(this) {
+            customSmsRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                CustomSmsRuleRepository(
+                    dao = db.customSmsRuleDao(),
+                ).also {
+                    customSmsRuleRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IIgnoreRuleRepository] instance.
+     *
+     * Note: Once initialized, the cached singleton instance is returned on subsequent calls
+     * and [resolvedDb] is not re-evaluated.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideIgnoreRuleRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): IIgnoreRuleRepository {
+        return ignoreRuleRepository ?: synchronized(this) {
+            ignoreRuleRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                IgnoreRuleRepository(
+                    dao = db.ignoreRuleDao(),
+                ).also {
+                    ignoreRuleRepository = it
                 }
             }
         }
@@ -523,13 +797,58 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setAutoSaveSmsTransactionUseCase(useCase: AutoSaveSmsTransactionUseCase?) {
+        autoSaveSmsTransactionUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setGetMonthlyConsistencyDataUseCase(useCase: GetMonthlyConsistencyDataUseCase?) {
+        getMonthlyConsistencyDataUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setScheduleRecurringTransactionWorkerUseCase(useCase: ScheduleRecurringTransactionWorkerUseCase?) {
+        scheduleRecurringTransactionWorkerUseCase = useCase
+    }
+
+    @VisibleForTesting
     fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
         merchantMappingRepository = repository
     }
 
     @VisibleForTesting
+    fun setBudgetRepository(repository: IBudgetRepository?) {
+        budgetRepository = repository
+    }
+
+    @VisibleForTesting
     fun setRecurringTransactionRepository(repository: IRecurringTransactionRepository?) {
         recurringTransactionRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setSplitTransactionRepository(repository: ISplitTransactionRepository?) {
+        splitTransactionRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setMerchantRenameRuleRepository(repository: IMerchantRenameRuleRepository?) {
+        merchantRenameRuleRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setMerchantCategoryMappingRepository(repository: IMerchantCategoryMappingRepository?) {
+        merchantCategoryMappingRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setCustomSmsRuleRepository(repository: ICustomSmsRuleRepository?) {
+        customSmsRuleRepository = repository
+    }
+
+    @VisibleForTesting
+    fun setIgnoreRuleRepository(repository: IIgnoreRuleRepository?) {
+        ignoreRuleRepository = repository
     }
 
     @VisibleForTesting
@@ -554,7 +873,16 @@ object ServiceLocator {
         mergeAccountsUseCase = null
         manageReimbursementUseCase = null
         mergeTransactionsUseCase = null
+        autoSaveSmsTransactionUseCase = null
+        getMonthlyConsistencyDataUseCase = null
+        scheduleRecurringTransactionWorkerUseCase = null
         merchantMappingRepository = null
+        budgetRepository = null
         recurringTransactionRepository = null
+        splitTransactionRepository = null
+        merchantRenameRuleRepository = null
+        merchantCategoryMappingRepository = null
+        customSmsRuleRepository = null
+        ignoreRuleRepository = null
     }
 }

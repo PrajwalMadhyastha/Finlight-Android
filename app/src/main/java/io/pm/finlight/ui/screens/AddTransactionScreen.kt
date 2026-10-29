@@ -73,6 +73,7 @@ import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight

@@ -14,19 +14,8 @@
       <clip-path
           android:pathData="M17.141,10.517L15.431,13.482H12.002L10.29,16.451H17.146L20.573,10.517H17.141Z"/>
       <path
-          android:pathData="M12.86,6.066L23.142,12.001L18.001,20.904L7.72,14.968L12.86,6.066Z">
-        <aapt:attr name="android:fillColor">
-          <gradient 
-              android:startX="12.86"
-              android:startY="11.999"
-              android:endX="18.005"
-              android:endY="14.969"
-              android:type="linear">
-            <item android:offset="0" android:color="#FFE40521"/>
-            <item android:offset="1" android:color="#FFE40521"/>
-          </gradient>
-        </aapt:attr>
-      </path>
+          android:pathData="M12.86,6.066L23.142,12.001L18.001,20.904L7.72,14.968L12.86,6.066Z"
+          android:fillColor="#FFE40521"/>
     </group>
   </group>
   <group>
@@ -36,19 +25,8 @@
       <clip-path
           android:pathData="M5.147,7.542L6.867,10.517H10.285L12.002,13.482H15.431L12.002,7.542H5.147Z"/>
       <path
-          android:pathData="M18.354,9.997L11.182,18.546L2.223,11.028L9.396,2.479L18.354,9.997Z">
-        <aapt:attr name="android:fillColor">
-          <gradient 
-              android:startX="12.457"
-              android:startY="7.923"
-              android:endX="8.871"
-              android:endY="12.197"
-              android:type="linear">
-            <item android:offset="0" android:color="#FFE40521"/>
-            <item android:offset="1" android:color="#FFE40521"/>
-          </gradient>
-        </aapt:attr>
-      </path>
+          android:pathData="M18.354,9.997L11.182,18.546L2.223,11.028L9.396,2.479L18.354,9.997Z"
+          android:fillColor="#FFE40521"/>
     </group>
   </group>
   <group>
@@ -58,19 +36,8 @@
       <clip-path
           android:pathData="M6.858,16.451L10.286,22.392L11.999,19.415L10.289,16.451L12.002,13.482L10.285,10.517L6.858,16.451Z"/>
       <path
-          android:pathData="M8.983,7.984L17.85,15.424L9.877,24.925L1.011,17.485L8.983,7.984Z">
-        <aapt:attr name="android:fillColor">
-          <gradient 
-              android:startX="7.004"
-              android:startY="14.423"
-              android:endX="12.852"
-              android:endY="19.331"
-              android:type="linear">
-            <item android:offset="0" android:color="#FFE40521"/>
-            <item android:offset="1" android:color="#FFE40521"/>
-          </gradient>
-        </aapt:attr>
-      </path>
+          android:pathData="M8.983,7.984L17.85,15.424L9.877,24.925L1.011,17.485L8.983,7.984Z"
+          android:fillColor="#FFE40521"/>
     </group>
   </group>
   <path

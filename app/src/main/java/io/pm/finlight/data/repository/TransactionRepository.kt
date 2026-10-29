@@ -10,11 +10,14 @@ package io.pm.finlight
 import android.util.Log
 import androidx.room.withTransaction
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.db.dao.DeletedSmsHashDao
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
+import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.data.model.MerchantPrediction
+import io.pm.finlight.data.model.SearchFilter
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -38,6 +41,7 @@ class TransactionRepository(
             db = db,
             dispatcherProvider = dispatcherProvider,
         ),
+    private val deletedSmsHashDao: DeletedSmsHashDao = db.deletedSmsHashDao(),
 ) : ITransactionRepository {
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
@@ -60,6 +64,7 @@ class TransactionRepository(
         db = db,
         dispatcherProvider = dispatcherProvider,
         manageReimbursementUseCase = manageReimbursementUseCase,
+        deletedSmsHashDao = db.deletedSmsHashDao(),
     )
 
     // --- NEW: Function for Spending Velocity feature ---
@@ -361,6 +366,25 @@ class TransactionRepository(
         transactionWriteDao.setSmsHash(transactionId, smsHash)
     }
 
+    override suspend fun existsBySmsHash(hash: String): Boolean {
+        return transactionQueryDao.existsBySmsHash(hash)
+    }
+
+    override suspend fun updateSmsHashByLegacy(
+        oldHash: String,
+        newHash: String,
+    ) {
+        transactionWriteDao.updateSmsHashByLegacy(oldHash = oldHash, newHash = newHash)
+    }
+
+    override suspend fun existsDeletedSmsHash(hash: String): Boolean {
+        return deletedSmsHashDao.existsByHash(hash)
+    }
+
+    override suspend fun insertDeletedSmsHash(hash: String) {
+        deletedSmsHashDao.insert(DeletedSmsHash(hash))
+    }
+
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }
@@ -566,5 +590,64 @@ class TransactionRepository(
         withContext(dispatcherProvider.io) {
             transactionWriteDao.skipTransaction(transactionId)
         }
+    }
+
+    override fun searchTransactions(
+        query: String,
+        filter: SearchFilter,
+    ): Flow<List<TransactionDetails>> {
+        return transactionQueryDao.searchTransactions(
+            keyword = query,
+            accountId = filter.accountId,
+            categoryId = filter.categoryId,
+            transactionType = filter.transactionType,
+            startDate = filter.startDate,
+            endDate = filter.endDate,
+            tagId = filter.tagId,
+        )
+    }
+
+    override suspend fun getFinancialSummaryForRange(
+        startDate: Long,
+        endDate: Long,
+    ): FinancialSummary? {
+        return transactionAnalyticsDao.getFinancialSummaryForRange(startDate, endDate)
+    }
+
+    override suspend fun getTopSpendingCategoriesForRange(
+        startDate: Long,
+        endDate: Long,
+    ): List<CategorySpending> {
+        return transactionAnalyticsDao.getTopSpendingCategoriesForRange(startDate, endDate)
+    }
+
+    override fun getDailyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<DailyTrend>> {
+        return transactionAnalyticsDao.getDailyTrends(startDate, endDate)
+    }
+
+    override fun getWeeklyTrends(
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<WeeklyTrend>> {
+        return transactionAnalyticsDao.getWeeklyTrends(startDate, endDate)
+    }
+
+    override fun getTransactionsForCategoryName(
+        categoryName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>> {
+        return transactionAnalyticsDao.getTransactionsForCategoryName(categoryName, startDate, endDate)
+    }
+
+    override fun getTransactionsForMerchantName(
+        merchantName: String,
+        startDate: Long,
+        endDate: Long,
+    ): Flow<List<TransactionDetails>> {
+        return transactionAnalyticsDao.getTransactionsForMerchantName(merchantName, startDate, endDate)
     }
 }

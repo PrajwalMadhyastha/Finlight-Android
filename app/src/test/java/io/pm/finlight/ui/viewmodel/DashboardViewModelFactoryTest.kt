@@ -15,6 +15,7 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -55,10 +56,14 @@ class DashboardViewModelFactoryTest {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
         val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
         val mockMergeTransactionsUseCase: MergeTransactionsUseCase = mockk(relaxed = true)
+        val mockBudgetRepo: io.pm.finlight.IBudgetRepository = mockk(relaxed = true)
+        val mockRecurringRepo: io.pm.finlight.IRecurringTransactionRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxnRepo)
         ServiceLocator.setAccountRepository(mockAccountRepo)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactionsUseCase)
+        ServiceLocator.setBudgetRepository(mockBudgetRepo)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
 
         val viewModel = factory.create(DashboardViewModel::class.java)
 
@@ -75,11 +80,35 @@ class DashboardViewModelFactoryTest {
             }.get(viewModel)
         assertSame(mockAccountRepo, accField)
 
+        val budgetField =
+            DashboardViewModel::class.java.getDeclaredField("budgetRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockBudgetRepo, budgetField)
+
+        val recurringField =
+            DashboardViewModel::class.java.getDeclaredField("recurringTransactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRecurringRepo, recurringField)
+
         val mergeUseCaseField =
             DashboardViewModel::class.java.getDeclaredField("mergeTransactionsUseCase").apply {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockMergeTransactionsUseCase, mergeUseCaseField)
+
+        val useCase =
+            DashboardViewModel::class.java.getDeclaredField("getMonthlyConsistencyDataUseCase").apply {
+                isAccessible = true
+            }.get(viewModel) as GetMonthlyConsistencyDataUseCase
+        assertNotNull(useCase)
+
+        val useCaseTxnRepo =
+            GetMonthlyConsistencyDataUseCase::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(useCase)
+        assertSame(mockTxnRepo, useCaseTxnRepo)
 
         verify { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) }
         verify { mockAccountRepo.accountsWithBalance }

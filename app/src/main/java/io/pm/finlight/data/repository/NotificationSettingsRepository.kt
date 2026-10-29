@@ -5,7 +5,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.utils.FormatUtils
@@ -13,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import java.io.IOException
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -50,15 +48,15 @@ class NotificationSettingsRepository(
 
     override fun getDailyReportEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_DAILY_REPORT_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_DAILY_REPORT_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -75,18 +73,18 @@ class NotificationSettingsRepository(
 
     override fun getDailyReportTime(): Flow<Pair<Int, Int>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    Pair(
+                        preferences[KEY_DAILY_REPORT_HOUR] ?: 23,
+                        preferences[KEY_DAILY_REPORT_MINUTE] ?: 0,
+                    )
+                } catch (_: ClassCastException) {
+                    Pair(23, 0)
                 }
             }
-            .map { preferences ->
-                Pair(
-                    preferences[KEY_DAILY_REPORT_HOUR] ?: 23,
-                    preferences[KEY_DAILY_REPORT_MINUTE] ?: 0,
-                )
+            .catch {
+                emit(Pair(23, 0))
             }
             .distinctUntilChanged()
     }
@@ -99,15 +97,15 @@ class NotificationSettingsRepository(
 
     override fun getWeeklySummaryEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_WEEKLY_SUMMARY_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_WEEKLY_SUMMARY_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -126,19 +124,19 @@ class NotificationSettingsRepository(
 
     override fun getWeeklyReportTime(): Flow<Triple<Int, Int, Int>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    Triple(
+                        preferences[KEY_WEEKLY_REPORT_DAY] ?: Calendar.SUNDAY,
+                        preferences[KEY_WEEKLY_REPORT_HOUR] ?: 9,
+                        preferences[KEY_WEEKLY_REPORT_MINUTE] ?: 0,
+                    )
+                } catch (_: ClassCastException) {
+                    Triple(Calendar.SUNDAY, 9, 0)
                 }
             }
-            .map { preferences ->
-                Triple(
-                    preferences[KEY_WEEKLY_REPORT_DAY] ?: Calendar.SUNDAY,
-                    preferences[KEY_WEEKLY_REPORT_HOUR] ?: 9,
-                    preferences[KEY_WEEKLY_REPORT_MINUTE] ?: 0,
-                )
+            .catch {
+                emit(Triple(Calendar.SUNDAY, 9, 0))
             }
             .distinctUntilChanged()
     }
@@ -151,15 +149,15 @@ class NotificationSettingsRepository(
 
     override fun getMonthlySummaryEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_MONTHLY_SUMMARY_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_MONTHLY_SUMMARY_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -178,19 +176,19 @@ class NotificationSettingsRepository(
 
     override fun getMonthlyReportTime(): Flow<Triple<Int, Int, Int>> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    Triple(
+                        preferences[KEY_MONTHLY_REPORT_DAY] ?: 1,
+                        preferences[KEY_MONTHLY_REPORT_HOUR] ?: 9,
+                        preferences[KEY_MONTHLY_REPORT_MINUTE] ?: 0,
+                    )
+                } catch (_: ClassCastException) {
+                    Triple(1, 9, 0)
                 }
             }
-            .map { preferences ->
-                Triple(
-                    preferences[KEY_MONTHLY_REPORT_DAY] ?: 1,
-                    preferences[KEY_MONTHLY_REPORT_HOUR] ?: 9,
-                    preferences[KEY_MONTHLY_REPORT_MINUTE] ?: 0,
-                )
+            .catch {
+                emit(Triple(1, 9, 0))
             }
             .distinctUntilChanged()
     }
@@ -203,15 +201,15 @@ class NotificationSettingsRepository(
 
     override fun getAutoCaptureNotificationEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_AUTOCAPTURE_NOTIFICATION_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -224,15 +222,15 @@ class NotificationSettingsRepository(
 
     override fun getUnknownTransactionPopupEnabled(): Flow<Boolean> {
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] ?: true
+                } catch (_: ClassCastException) {
+                    true
                 }
             }
-            .map { preferences ->
-                preferences[KEY_UNKNOWN_TRANSACTION_POPUP_ENABLED] ?: true
+            .catch {
+                emit(true)
             }
             .distinctUntilChanged()
     }
@@ -249,15 +247,15 @@ class NotificationSettingsRepository(
         val monthKey = FormatUtils.getFormatter("yyyy-MM", Locale.getDefault()).format(Date())
         val prefKey = booleanPreferencesKey(KEY_LAST_MONTH_SUMMARY_DISMISSED_PREFIX + monthKey)
         return dataStore.data
-            .catch { exception ->
-                if (exception is IOException) {
-                    emit(emptyPreferences())
-                } else {
-                    throw exception
+            .map { preferences ->
+                try {
+                    preferences[prefKey] ?: false
+                } catch (_: ClassCastException) {
+                    false
                 }
             }
-            .map { preferences ->
-                preferences[prefKey] ?: false
+            .catch {
+                emit(false)
             }
             .distinctUntilChanged()
     }

@@ -14,7 +14,8 @@ object BankLogoHelper {
      * @return The resource ID for the matching logo, or a default bank icon if no match is found.
      */
     @DrawableRes
-    fun getLogoForAccount(accountName: String): Int {
+    fun getLogoForAccount(accountName: String?): Int {
+        if (accountName.isNullOrBlank()) return R.drawable.ic_default_bank_logo
         val lowerCaseName = accountName.lowercase()
         return when {
             "amazon" in lowerCaseName -> R.drawable.ic_amazon_logo

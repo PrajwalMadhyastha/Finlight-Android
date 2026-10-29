@@ -21,6 +21,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
@@ -88,7 +89,7 @@ class SettingsViewModelFactoryTest {
         val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
         val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
         val mockSmsRepo: ISmsRepository = mockk(relaxed = true)
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
+        val mockAutoSaveUseCase: io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
 
         mockkObject(MlModelFactory)
         val mockClassifier: SmsClassifier = mockk(relaxed = true)
@@ -102,8 +103,9 @@ class SettingsViewModelFactoryTest {
         ServiceLocator.setAccountRepository(mockAccountRepo)
         ServiceLocator.setCategoryRepository(mockCategoryRepo)
         ServiceLocator.setSmsRepository(mockSmsRepo)
+        ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSaveUseCase)
 
-        val factory = SettingsViewModelFactory(application, mockTransactionViewModel)
+        val factory = SettingsViewModelFactory(application)
         val viewModel = factory.create(SettingsViewModel::class.java)
 
         assertNotNull(viewModel)
@@ -144,11 +146,11 @@ class SettingsViewModelFactoryTest {
             }.get(viewModel)
         assertSame(mockSmsRepo, smsRepoField)
 
-        val txnVmField =
-            SettingsViewModel::class.java.getDeclaredField("transactionViewModel").apply {
+        val autoSaveUseCaseField =
+            SettingsViewModel::class.java.getDeclaredField("autoSaveSmsTransactionUseCase").apply {
                 isAccessible = true
             }.get(viewModel)
-        assertSame(mockTransactionViewModel, txnVmField)
+        assertSame(mockAutoSaveUseCase, autoSaveUseCaseField)
 
         val classifierField =
             SettingsViewModel::class.java.getDeclaredField("smsClassifier").apply {
@@ -202,7 +204,12 @@ class SettingsViewModelFactoryTest {
         val customExtractor: NerExtractor = mockk(relaxed = true)
         val customProvider: () -> NerExtractor = { customExtractor }
 
-        val factory = SettingsViewModelFactory(application, mockk(relaxed = true), nerExtractorProvider = customProvider)
+        val factory =
+            SettingsViewModelFactory(
+                application,
+                mockk<AutoSaveSmsTransactionUseCase>(relaxed = true),
+                nerExtractorProvider = customProvider,
+            )
         val viewModel = factory.create(SettingsViewModel::class.java)
 
         assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())

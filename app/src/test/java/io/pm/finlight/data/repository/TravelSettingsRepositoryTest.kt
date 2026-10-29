@@ -141,15 +141,15 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getTravelModeSettings rethrows non-IOException`() =
+    fun `getTravelModeSettings catches non-IOException and emits null`() =
         runTest {
             val mockDataStore: DataStore<Preferences> = mockk()
             every { mockDataStore.data } returns flow { throw IllegalStateException("Unexpected crash") }
             val repo = TravelSettingsRepository(mockDataStore)
 
             repo.getTravelModeSettings().test {
-                val error = awaitError()
-                kotlin.test.assertTrue(error is IllegalStateException)
+                assertNull(awaitItem())
+                awaitComplete()
             }
         }
 
@@ -211,6 +211,19 @@ class TravelSettingsRepositoryTest : BaseViewModelTest() {
 
             assertFailsWith<CancellationException> {
                 repo.getCurrentTravelModeSettings()
+            }
+        }
+
+    @Test
+    fun `getTravelModeSettings emits null when dataStore throws exception`() =
+        runTest {
+            val mockDataStore: DataStore<Preferences> = mockk()
+            every { mockDataStore.data } returns flow { throw IOException("DataStore corrupted") }
+            val repo = TravelSettingsRepository(mockDataStore)
+
+            repo.getTravelModeSettings().test {
+                assertNull(awaitItem())
+                awaitComplete()
             }
         }
 

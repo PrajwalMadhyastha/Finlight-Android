@@ -136,7 +136,7 @@ fun TransactionDetailScreen(
     val context = LocalContext.current
     val settingsViewModel: SettingsViewModel =
         viewModel(
-            factory = SettingsViewModelFactory(context.applicationContext as android.app.Application, viewModel),
+            factory = SettingsViewModelFactory(context.applicationContext as android.app.Application),
         )
 
     val detailsState by viewModel.findTransactionDetailsById(transactionId).collectAsState(initial = null)

@@ -9,7 +9,6 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.GoalRepository
-import io.pm.finlight.GoalViewModel
 import io.pm.finlight.data.db.AppDatabase
 
 class GoalViewModelFactory(private val application: Application) : ViewModelProvider.Factory {

@@ -30,6 +30,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.ui.viewmodel.MonthlyBreakdown
+import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
+import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModelFactory
 import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.ModernTrendChart

@@ -51,4 +51,16 @@ interface IRecurringTransactionRepository {
         lastRunDate: Long,
         skipCount: Int,
     )
+
+    /**
+     * Returns all recurring pattern suggestions that have not been dismissed yet, as a reactive [Flow].
+     */
+    fun getUnacknowledgedPatterns(): Flow<List<RecurringPattern>>
+
+    /**
+     * Marks a suggested recurring pattern as dismissed so it no longer surfaces as a suggestion.
+     *
+     * @param pattern The [RecurringPattern] to dismiss.
+     */
+    suspend fun dismissPatternSuggestion(pattern: RecurringPattern)
 }
