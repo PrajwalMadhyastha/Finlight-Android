@@ -50,8 +50,8 @@ fun AnnualSimulatorScreen(
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    val projectedImpact = viewModel.calculateProjectedAnnualImpact()
-    val projectedDeficitSurplus = baseAnnualIncome - baseAnnualBudget - projectedImpact
+    val projectedImpact by viewModel.projectedImpact.collectAsState()
+    val projectedDeficitSurplus by viewModel.projectedDeficitSurplus.collectAsState()
 
     Scaffold(
         topBar = {

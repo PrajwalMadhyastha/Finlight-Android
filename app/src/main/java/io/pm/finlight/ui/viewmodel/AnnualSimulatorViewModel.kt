@@ -8,9 +8,12 @@ import io.pm.finlight.utils.SystemTimeProvider
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -50,7 +53,19 @@ class AnnualSimulatorViewModel(
 
     val privacyModeEnabled =
         settingsRepository.getSimulatorPrivacyModeEnabled()
-            .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5000), false)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val projectedImpact: StateFlow<Double> =
+        _lifeEvents.map { events ->
+            calculateProjectedAnnualImpact(events)
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val projectedDeficitSurplus: StateFlow<Double> =
+        combine(_baseAnnualIncome, _baseAnnualBudget, projectedImpact) { income, budget, impact ->
+            income - budget - impact
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    val projectedBalance: StateFlow<Double> = projectedDeficitSurplus
 
     private var loadMetricsJob: Job? = null
 
@@ -184,9 +199,9 @@ class AnnualSimulatorViewModel(
         _lifeEvents.value = _lifeEvents.value.filter { it.id != id }
     }
 
-    fun calculateProjectedAnnualImpact(): Double {
+    fun calculateProjectedAnnualImpact(events: List<LifeEvent> = _lifeEvents.value): Double {
         var totalImpact = 0.0
-        for (event in _lifeEvents.value) {
+        for (event in events) {
             if (event.isRecurring) {
                 val monthsActive = (12 - event.startMonthIndex).coerceAtLeast(0)
                 totalImpact += event.amount * monthsActive

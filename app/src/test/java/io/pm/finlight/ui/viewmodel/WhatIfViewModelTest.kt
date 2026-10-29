@@ -14,6 +14,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.verify
@@ -181,5 +182,38 @@ class WhatIfViewModelTest : BaseViewModelTest() {
             assertEquals(0L, viewModel.simulatedAmountRemaining.first())
             assertFalse(viewModel.isDeficitSpending.first())
             assertEquals(0L, viewModel.simulatedSafeToSpendPerDay.first())
+        }
+
+    @Test
+    fun `initialization queries financial summary with exact month boundaries`() =
+        runTest {
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+
+            createViewModel()
+            viewModel.actualMonthlyIncome.first()
+
+            verify(transactionRepository).getFinancialSummaryForRangeFlow(
+                startCaptor.capture(),
+                endCaptor.capture()
+            )
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2026, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JUNE, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2026, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JUNE, endCal.get(Calendar.MONTH))
+            assertEquals(30, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
         }
 }

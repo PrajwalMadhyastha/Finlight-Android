@@ -58,9 +58,12 @@ class SimulatorFeatureTests {
 
         // Confirm
         composeTestRule.onAllNodesWithText("Add").onLast().performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify expense is added to the list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Test Expense").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("what_if_lazy_column").performScrollToNode(hasText("Test Expense"))
         composeTestRule.onNodeWithText("Test Expense").assertIsDisplayed()
         composeTestRule.onAllNodes(hasText("500", substring = true)).onFirst().assertIsDisplayed()
@@ -93,9 +96,12 @@ class SimulatorFeatureTests {
 
         // Confirm
         composeTestRule.onAllNodesWithText("Add").onLast().performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify event is added to the list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Test Event").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("annual_lazy_column").performScrollToNode(hasText("Test Event"))
         composeTestRule.onNodeWithText("Test Event").assertIsDisplayed()
         composeTestRule.onAllNodes(hasText("1,000", substring = true)).onFirst().assertIsDisplayed()
@@ -123,9 +129,12 @@ class SimulatorFeatureTests {
 
         // Click Privacy Toggle
         composeTestRule.onNode(hasContentDescription("Toggle Privacy")).performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify it is obfuscated
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("****", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onAllNodes(hasText("****", substring = true)).onFirst().assertExists()
     }
 
@@ -148,9 +157,12 @@ class SimulatorFeatureTests {
 
         // Click Privacy Toggle
         composeTestRule.onNode(hasContentDescription("Toggle Privacy")).performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify it is obfuscated
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("****", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onAllNodes(hasText("****", substring = true)).onFirst().assertExists()
     }
 
@@ -214,9 +226,12 @@ class SimulatorFeatureTests {
 
         // Confirm
         composeTestRule.onAllNodesWithText("Add").onLast().performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify deficit display without double negatives
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("Deficit:", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNode(hasText("Deficit:", substring = true)).assertIsDisplayed()
         composeTestRule.onAllNodes(hasText("Deficit: -", substring = true)).assertCountEquals(0)
         composeTestRule.onNode(hasText("Simulated Deficit per Day", substring = true)).assertIsDisplayed()

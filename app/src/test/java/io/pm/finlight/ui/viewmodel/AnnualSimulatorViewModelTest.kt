@@ -17,6 +17,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
@@ -357,5 +358,76 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             viewModel.togglePrivacyMode()
 
             verify(settingsRepository).saveSimulatorPrivacyModeEnabled(true)
+        }
+
+    @Test
+    fun `loadBaseAnnualMetrics queries income transactions with exact calendar year boundaries`() =
+        runTest {
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+
+            createViewModel(simulationYear = 2026)
+            viewModel.baseAnnualIncome.first()
+
+            verify(transactionRepository).getIncomeTransactionsForRange(
+                startCaptor.capture(),
+                endCaptor.capture(),
+                anyString(),
+                anyObject(),
+                anyObject()
+            )
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2026, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
+            val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
+            assertEquals(2026, endCal.get(Calendar.YEAR))
+            assertEquals(Calendar.DECEMBER, endCal.get(Calendar.MONTH))
+            assertEquals(31, endCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, endCal.get(Calendar.MINUTE))
+            assertEquals(59, endCal.get(Calendar.SECOND))
+            assertEquals(999, endCal.get(Calendar.MILLISECOND))
+        }
+
+    @Test
+    fun `projectedImpact and projectedDeficitSurplus update when life events are added or removed`() =
+        runTest {
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(flowOf(listOf(createIncomeTxn(10000.0))))
+
+            createViewModel(simulationYear = 2026)
+
+            // Base annual budget is 12000.0, base annual income is (10000 / 6) * 12 = 20000.0
+            assertEquals(20000.0, viewModel.baseAnnualIncome.first(), 0.0)
+            assertEquals(12000.0, viewModel.baseAnnualBudget.first(), 0.0)
+            assertEquals(0.0, viewModel.projectedImpact.first(), 0.0)
+            assertEquals(8000.0, viewModel.projectedDeficitSurplus.first(), 0.0)
+            assertEquals(8000.0, viewModel.projectedBalance.first(), 0.0)
+
+            // Add one-time life event of 3000
+            viewModel.addLifeEvent("Car Repair", 3000.0, false, 5)
+            assertEquals(3000.0, viewModel.projectedImpact.first(), 0.0)
+            assertEquals(5000.0, viewModel.projectedDeficitSurplus.first(), 0.0)
+            assertEquals(5000.0, viewModel.projectedBalance.first(), 0.0)
+
+            // Add recurring life event of 500 starting from month 6 (July, 6 months) -> 3000
+            viewModel.addLifeEvent("Gym", 500.0, true, 6)
+            assertEquals(6000.0, viewModel.projectedImpact.first(), 0.0)
+            assertEquals(2000.0, viewModel.projectedDeficitSurplus.first(), 0.0)
+            assertEquals(2000.0, viewModel.projectedBalance.first(), 0.0)
+
+            // Remove car repair event
+            val carEventId = viewModel.lifeEvents.first().first { it.name == "Car Repair" }.id
+            viewModel.removeLifeEvent(carEventId)
+            assertEquals(3000.0, viewModel.projectedImpact.first(), 0.0)
+            assertEquals(5000.0, viewModel.projectedDeficitSurplus.first(), 0.0)
+            assertEquals(5000.0, viewModel.projectedBalance.first(), 0.0)
         }
 }
