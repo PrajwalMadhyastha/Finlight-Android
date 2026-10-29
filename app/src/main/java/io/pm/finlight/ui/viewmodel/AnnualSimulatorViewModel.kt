@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -35,11 +34,16 @@ class AnnualSimulatorViewModel(
     private val timeProvider: TimeProvider = SystemTimeProvider(),
     simulationYear: Int? = null
 ) : ViewModel() {
+    private val baseCalendarYear = timeProvider.now().get(Calendar.YEAR)
+    val minYear: Int = minOf(baseCalendarYear - 5, simulationYear ?: (baseCalendarYear - 5))
+    val maxYear: Int = maxOf(baseCalendarYear + 5, simulationYear ?: (baseCalendarYear + 5))
+
+    private val _lifeEventsByYear = MutableStateFlow<Map<Int, List<LifeEvent>>>(emptyMap())
     private val _lifeEvents = MutableStateFlow<List<LifeEvent>>(emptyList())
     val lifeEvents: StateFlow<List<LifeEvent>> = _lifeEvents.asStateFlow()
 
     private val _currentYear =
-        MutableStateFlow(simulationYear ?: timeProvider.now().get(Calendar.YEAR))
+        MutableStateFlow((simulationYear ?: baseCalendarYear).coerceIn(minYear, maxYear))
     val currentYear = _currentYear.asStateFlow()
 
     private val _baseAnnualIncome = MutableStateFlow(0.0)
@@ -74,9 +78,10 @@ class AnnualSimulatorViewModel(
     }
 
     fun setYear(year: Int) {
-        if (_currentYear.value != year) {
-            _currentYear.value = year
-            _lifeEvents.value = emptyList()
+        val clampedYear = year.coerceIn(minYear, maxYear)
+        if (_currentYear.value != clampedYear) {
+            _currentYear.value = clampedYear
+            _lifeEvents.value = _lifeEventsByYear.value[clampedYear] ?: emptyList()
             _validationError.value = null
             loadBaseAnnualMetrics()
         }
@@ -89,7 +94,7 @@ class AnnualSimulatorViewModel(
                 val year = _currentYear.value
 
                 // Calculate Base Annual Budget
-                val existingBudgets = settingsRepository.getOverallBudgetsForYear(year)
+                val existingBudgets = settingsRepository.getOverallBudgetsForYear(year) ?: emptyMap()
                 var totalBudget = 0.0
 
                 // Default budget if not explicitly set for all months
@@ -118,42 +123,49 @@ class AnnualSimulatorViewModel(
                 cal.set(Calendar.MILLISECOND, 999)
                 val endOfYear = cal.timeInMillis
 
-                // Get YTD income
-                val incomeTransactions =
-                    transactionRepository.getIncomeTransactionsForRange(
-                        startOfYear,
-                        endOfYear,
-                        "",
-                        null,
-                        null
-                    ).firstOrNull() ?: emptyList()
-                val ytdIncome = incomeTransactions.sumOf { it.transaction.amount.toDouble() }
-
                 val today = timeProvider.now()
                 val currentCalendarYear = today.get(Calendar.YEAR)
                 val currentMonthIndex = today.get(Calendar.MONTH) + 1
 
-                val projectedAnnualIncome =
-                    when {
-                        year < currentCalendarYear -> {
-                            // Past year: full-year income without monthly extrapolation
-                            ytdIncome
-                        }
-                        year == currentCalendarYear -> {
-                            // Current year: extrapolate based on elapsed months
-                            if (currentMonthIndex > 0 && ytdIncome > 0) {
-                                (ytdIncome / currentMonthIndex) * 12.0
-                            } else {
-                                0.0
-                            }
-                        }
-                        else -> {
-                            // Future year: actual transactions entered so far without extrapolation
-                            ytdIncome
-                        }
+                val queryEndTime =
+                    if (year == currentCalendarYear) {
+                        minOf(endOfYear, today.timeInMillis)
+                    } else {
+                        endOfYear
                     }
 
-                _baseAnnualIncome.value = projectedAnnualIncome
+                // Observe income reactively
+                transactionRepository.getIncomeTransactionsForRange(
+                    startOfYear,
+                    queryEndTime,
+                    "",
+                    null,
+                    null
+                ).collect { incomeTransactions ->
+                    val ytdIncome = incomeTransactions.sumOf { it.transaction.amount.toDouble() }
+
+                    val projectedAnnualIncome =
+                        when {
+                            year < currentCalendarYear -> {
+                                // Past year: full-year income without monthly extrapolation
+                                ytdIncome
+                            }
+                            year == currentCalendarYear -> {
+                                // Current year: extrapolate based on elapsed months
+                                if (currentMonthIndex > 0 && ytdIncome > 0) {
+                                    (ytdIncome / currentMonthIndex) * 12.0
+                                } else {
+                                    0.0
+                                }
+                            }
+                            else -> {
+                                // Future year: actual transactions entered so far without extrapolation
+                                ytdIncome
+                            }
+                        }
+
+                    _baseAnnualIncome.value = projectedAnnualIncome
+                }
             }
     }
 
@@ -187,7 +199,10 @@ class AnnualSimulatorViewModel(
                 isRecurring = isRecurring,
                 startMonthIndex = startMonthIndex.coerceIn(0, 11)
             )
-        _lifeEvents.value = _lifeEvents.value + event
+        val year = _currentYear.value
+        val updatedEvents = (_lifeEventsByYear.value[year] ?: emptyList()) + event
+        _lifeEventsByYear.value = _lifeEventsByYear.value + (year to updatedEvents)
+        _lifeEvents.value = updatedEvents
         return Result.success(Unit)
     }
 
@@ -196,7 +211,10 @@ class AnnualSimulatorViewModel(
     }
 
     fun removeLifeEvent(id: String) {
-        _lifeEvents.value = _lifeEvents.value.filter { it.id != id }
+        val year = _currentYear.value
+        val updatedEvents = (_lifeEventsByYear.value[year] ?: emptyList()).filter { it.id != id }
+        _lifeEventsByYear.value = _lifeEventsByYear.value + (year to updatedEvents)
+        _lifeEvents.value = updatedEvents
     }
 
     fun calculateProjectedAnnualImpact(events: List<LifeEvent> = _lifeEvents.value): Double {

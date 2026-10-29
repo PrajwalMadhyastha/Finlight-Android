@@ -47,6 +47,9 @@ class WhatIfViewModel(
     val privacyModeEnabled: StateFlow<Boolean>
     val monthYear: String
 
+    private val _validationError = MutableStateFlow<String?>(null)
+    val validationError: StateFlow<String?> = _validationError.asStateFlow()
+
     init {
         val calendar = timeProvider.now()
         monthYear = FormatUtils.getFormatter("MMMM", Locale.getDefault()).format(calendar.time)
@@ -104,10 +107,25 @@ class WhatIfViewModel(
     fun addHypotheticalExpense(
         name: String,
         amount: Long
-    ) {
-        if (name.isNotBlank() && amount > 0L) {
-            _hypotheticalExpenses.update { it + HypotheticalExpense(name = name.trim(), amount = amount) }
+    ): Result<Unit> {
+        if (name.isBlank()) {
+            val error = "Expense name cannot be blank"
+            _validationError.value = error
+            return Result.failure(IllegalArgumentException(error))
         }
+        if (amount <= 0L) {
+            val error = "Amount must be greater than 0"
+            _validationError.value = error
+            return Result.failure(IllegalArgumentException(error))
+        }
+
+        _validationError.value = null
+        _hypotheticalExpenses.update { it + HypotheticalExpense(name = name.trim(), amount = amount) }
+        return Result.success(Unit)
+    }
+
+    fun clearValidationError() {
+        _validationError.value = null
     }
 
     fun removeHypotheticalExpense(id: String) {

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -87,12 +88,14 @@ class WhatIfViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `addHypotheticalExpense adds an expense correctly`() =
+    fun `addHypotheticalExpense adds an expense correctly and returns success`() =
         runTest {
             createViewModel()
 
-            viewModel.addHypotheticalExpense("New Phone", 800L)
+            val result = viewModel.addHypotheticalExpense("New Phone", 800L)
 
+            assertTrue(result.isSuccess)
+            assertNull(viewModel.validationError.first())
             val expenses = viewModel.hypotheticalExpenses.first()
             assertEquals(1, expenses.size)
             assertEquals("New Phone", expenses[0].name)
@@ -100,14 +103,28 @@ class WhatIfViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `addHypotheticalExpense ignores invalid expense`() =
+    fun `addHypotheticalExpense returns failure and sets validation error for invalid input`() =
         runTest {
             createViewModel()
 
-            viewModel.addHypotheticalExpense("", 800L)
-            viewModel.addHypotheticalExpense("   ", 800L)
-            viewModel.addHypotheticalExpense("Valid", 0L)
-            viewModel.addHypotheticalExpense("Invalid", -100L)
+            val resultEmpty = viewModel.addHypotheticalExpense("", 800L)
+            assertTrue(resultEmpty.isFailure)
+            assertEquals("Expense name cannot be blank", viewModel.validationError.first())
+
+            val resultWhitespace = viewModel.addHypotheticalExpense("   ", 800L)
+            assertTrue(resultWhitespace.isFailure)
+            assertEquals("Expense name cannot be blank", viewModel.validationError.first())
+
+            val resultZero = viewModel.addHypotheticalExpense("Valid", 0L)
+            assertTrue(resultZero.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            val resultNegative = viewModel.addHypotheticalExpense("Invalid", -100L)
+            assertTrue(resultNegative.isFailure)
+            assertEquals("Amount must be greater than 0", viewModel.validationError.first())
+
+            viewModel.clearValidationError()
+            assertNull(viewModel.validationError.first())
 
             val expenses = viewModel.hypotheticalExpenses.first()
             assertTrue(expenses.isEmpty())

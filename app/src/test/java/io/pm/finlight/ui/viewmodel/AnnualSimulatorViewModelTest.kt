@@ -9,6 +9,7 @@ import io.pm.finlight.TransactionType
 import io.pm.finlight.anyObject
 import io.pm.finlight.utils.TimeProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -19,6 +20,7 @@ import org.junit.Before
 import org.junit.Test
 import org.mockito.ArgumentCaptor
 import org.mockito.Mock
+import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.anyString
 import org.mockito.Mockito.verify
@@ -58,6 +60,7 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         // Mock SettingsRepository
         val mockBudgets = mapOf(1 to 1000f, 2 to 1000f, 3 to 1000f, 4 to 1000f, 5 to 1000f, 6 to 1000f)
         runTest {
+            `when`(settingsRepository.getOverallBudgetsForYear(anyInt())).thenReturn(emptyMap())
             `when`(settingsRepository.getOverallBudgetsForYear(2026)).thenReturn(mockBudgets)
             `when`(settingsRepository.getOverallBudgetsForYear(2025)).thenReturn(mapOf(1 to 500f))
             `when`(settingsRepository.getOverallBudgetsForYear(2027)).thenReturn(mapOf(1 to 1200f))
@@ -193,7 +196,7 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setYear clears life events and validation errors`() =
+    fun `setYear retains life events per year and clears validation errors`() =
         runTest {
             createViewModel(simulationYear = 2026)
 
@@ -206,6 +209,11 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             viewModel.setYear(2025)
             assertTrue(viewModel.lifeEvents.first().isEmpty())
             assertNull(viewModel.validationError.first())
+
+            // Navigating back to 2026 retains the previously added life event
+            viewModel.setYear(2026)
+            assertEquals(1, viewModel.lifeEvents.first().size)
+            assertEquals("Buy Car", viewModel.lifeEvents.first()[0].name)
         }
 
     @Test
@@ -361,11 +369,12 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `loadBaseAnnualMetrics queries income transactions with exact calendar year boundaries`() =
+    fun `loadBaseAnnualMetrics queries income transactions with true YTD for current year`() =
         runTest {
             val startCaptor = ArgumentCaptor.forClass(Long::class.java)
             val endCaptor = ArgumentCaptor.forClass(Long::class.java)
 
+            // Current year (2026): query end should be strictly bounded to timeProvider.now()
             createViewModel(simulationYear = 2026)
             viewModel.baseAnnualIncome.first()
 
@@ -386,14 +395,76 @@ class AnnualSimulatorViewModelTest : BaseViewModelTest() {
             assertEquals(0, startCal.get(Calendar.SECOND))
             assertEquals(0, startCal.get(Calendar.MILLISECOND))
 
+            assertEquals(testCalendar.timeInMillis, endCaptor.value)
+        }
+
+    @Test
+    fun `loadBaseAnnualMetrics queries income transactions with full year boundaries for past year`() =
+        runTest {
+            val startCaptor = ArgumentCaptor.forClass(Long::class.java)
+            val endCaptor = ArgumentCaptor.forClass(Long::class.java)
+
+            // Past year (2025): query end should be Dec 31 23:59:59.999
+            createViewModel(simulationYear = 2025)
+            viewModel.baseAnnualIncome.first()
+
+            verify(transactionRepository).getIncomeTransactionsForRange(
+                startCaptor.capture(),
+                endCaptor.capture(),
+                anyString(),
+                anyObject(),
+                anyObject()
+            )
+
+            val startCal = Calendar.getInstance().apply { timeInMillis = startCaptor.value }
+            assertEquals(2025, startCal.get(Calendar.YEAR))
+            assertEquals(Calendar.JANUARY, startCal.get(Calendar.MONTH))
+            assertEquals(1, startCal.get(Calendar.DAY_OF_MONTH))
+            assertEquals(0, startCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, startCal.get(Calendar.MINUTE))
+            assertEquals(0, startCal.get(Calendar.SECOND))
+            assertEquals(0, startCal.get(Calendar.MILLISECOND))
+
             val endCal = Calendar.getInstance().apply { timeInMillis = endCaptor.value }
-            assertEquals(2026, endCal.get(Calendar.YEAR))
+            assertEquals(2025, endCal.get(Calendar.YEAR))
             assertEquals(Calendar.DECEMBER, endCal.get(Calendar.MONTH))
             assertEquals(31, endCal.get(Calendar.DAY_OF_MONTH))
             assertEquals(23, endCal.get(Calendar.HOUR_OF_DAY))
             assertEquals(59, endCal.get(Calendar.MINUTE))
             assertEquals(59, endCal.get(Calendar.SECOND))
             assertEquals(999, endCal.get(Calendar.MILLISECOND))
+        }
+
+    @Test
+    fun `loadBaseAnnualMetrics reactively updates baseAnnualIncome when income flow emits new transactions`() =
+        runTest {
+            val incomeFlow = MutableStateFlow(listOf(createIncomeTxn(6000.0)))
+            `when`(transactionRepository.getIncomeTransactionsForRange(anyLong(), anyLong(), anyString(), anyObject(), anyObject()))
+                .thenReturn(incomeFlow)
+
+            createViewModel(simulationYear = 2026)
+            // Month 6 (June) with 6000 -> (6000 / 6) * 12 = 12000.0
+            assertEquals(12000.0, viewModel.baseAnnualIncome.first(), 0.0)
+
+            // New transactions imported in background
+            incomeFlow.value = listOf(createIncomeTxn(6000.0), createIncomeTxn(6000.0))
+            // New total = 12000 -> (12000 / 6) * 12 = 24000.0
+            assertEquals(24000.0, viewModel.baseAnnualIncome.value, 0.0)
+        }
+
+    @Test
+    fun `setYear clamps year within minYear and maxYear bounds`() =
+        runTest {
+            createViewModel(simulationYear = 2026)
+
+            assertEquals(2021, viewModel.minYear)
+            assertEquals(2031, viewModel.maxYear)
+
+            viewModel.setYear(1990)
+            assertEquals(2021, viewModel.currentYear.first())
+
+            viewModel.setYear(2050)
+            assertEquals(2031, viewModel.currentYear.first())
         }
 
     @Test

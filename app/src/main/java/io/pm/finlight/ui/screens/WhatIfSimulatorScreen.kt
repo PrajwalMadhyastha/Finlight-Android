@@ -135,7 +135,12 @@ fun WhatIfSimulatorScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    TextButton(onClick = { showAddDialog = true }) {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearValidationError()
+                            showAddDialog = true
+                        }
+                    ) {
                         Icon(
                             Icons.Default.Add,
                             contentDescription = "Add Expense",
@@ -172,16 +177,30 @@ fun WhatIfSimulatorScreen(
     if (showAddDialog) {
         var name by remember { mutableStateOf("") }
         var amountStr by remember { mutableStateOf("") }
+        val validationError by viewModel.validationError.collectAsState()
 
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+            onDismissRequest = {
+                viewModel.clearValidationError()
+                showAddDialog = false
+            },
             title = { Text("Add Hypothetical Expense") },
             containerColor = popupContainerColor,
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (validationError != null) {
+                        Text(
+                            text = validationError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = {
+                            name = it
+                            if (validationError != null) viewModel.clearValidationError()
+                        },
                         label = { Text("Expense Name (e.g., Car EMI)") },
                         singleLine = true,
                         colors =
@@ -202,6 +221,7 @@ fun WhatIfSimulatorScreen(
                         onValueChange = { str ->
                             if (str.all { it.isDigit() }) {
                                 amountStr = str
+                                if (validationError != null) viewModel.clearValidationError()
                             }
                         },
                         label = { Text("Amount") },
@@ -226,9 +246,9 @@ fun WhatIfSimulatorScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = amountStr.toLongOrNull()
-                        if (name.isNotBlank() && amount != null && amount > 0) {
-                            viewModel.addHypotheticalExpense(name, amount)
+                        val amount = amountStr.toLongOrNull() ?: 0L
+                        val result = viewModel.addHypotheticalExpense(name, amount)
+                        if (result.isSuccess) {
                             showAddDialog = false
                         }
                     },
@@ -238,7 +258,12 @@ fun WhatIfSimulatorScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(
+                    onClick = {
+                        viewModel.clearValidationError()
+                        showAddDialog = false
+                    }
+                ) {
                     Text("Cancel")
                 }
             }

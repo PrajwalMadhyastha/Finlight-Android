@@ -112,6 +112,7 @@ fun AnnualSimulatorScreen(
                         ) {
                             IconButton(
                                 onClick = { viewModel.setYear(currentYear - 1) },
+                                enabled = currentYear > viewModel.minYear,
                                 modifier = Modifier.testTag("btn_prev_year")
                             ) {
                                 Icon(
@@ -128,6 +129,7 @@ fun AnnualSimulatorScreen(
                             )
                             IconButton(
                                 onClick = { viewModel.setYear(currentYear + 1) },
+                                enabled = currentYear < viewModel.maxYear,
                                 modifier = Modifier.testTag("btn_next_year")
                             ) {
                                 Icon(
