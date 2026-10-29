@@ -279,7 +279,7 @@ interface ITransactionRepository {
     )
 
     /**
-     * Observes all draft pending transactions requiring user review, sorted by date descending.
+     * Observes all draft pending transactions requiring user review, sorted by date ascending (oldest/most overdue first).
      *
      * @return A cold [Flow] emitting the current list of [Transaction]s with [TransactionStatus.PENDING].
      */
@@ -294,7 +294,7 @@ interface ITransactionRepository {
      *
      * @param transactionId The ID of the pending draft transaction to confirm.
      * @param confirmedAmount The verified transaction amount if modified by the user, or null to keep existing draft amount.
-     * @throws IllegalArgumentException If [confirmedAmount] is non-null and is not positive or finite.
+     * @throws IllegalArgumentException If [transactionId] is not positive, or if [confirmedAmount] is non-null and not positive or finite.
      */
     suspend fun confirmTransaction(
         transactionId: Int,
@@ -307,6 +307,7 @@ interface ITransactionRepository {
      * Executed on the IO dispatcher.
      *
      * @param transactionId The ID of the pending draft transaction to skip.
+     * @throws IllegalArgumentException If [transactionId] is not positive.
      */
     suspend fun skipTransaction(transactionId: Int)
 }

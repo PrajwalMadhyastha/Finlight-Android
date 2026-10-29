@@ -30,6 +30,7 @@ interface IRecurringTransactionRepository {
      *
      * @param ruleId The primary key ID of the recurring transaction rule.
      * @param lastRunDate The epoch millisecond timestamp representing when the rule was last executed or snoozed.
+     * @throws IllegalArgumentException If [ruleId] or [lastRunDate] is not positive.
      */
     suspend fun updateLastRunDate(
         ruleId: Int,
@@ -43,6 +44,7 @@ interface IRecurringTransactionRepository {
      * @param ruleId The primary key ID of the recurring transaction rule.
      * @param lastRunDate The epoch millisecond timestamp representing the new last run date.
      * @param skipCount The updated consecutive skip counter for this rule.
+     * @throws IllegalArgumentException If [ruleId] or [lastRunDate] is not positive, or if [skipCount] is negative.
      */
     suspend fun updateLastRunAndSkipCount(
         ruleId: Int,
