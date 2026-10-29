@@ -22,9 +22,6 @@ import io.mockk.unmockkAll
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.*
-import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -68,8 +65,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var settingsRepository: SettingsRepository
 
-    @Mock private lateinit var db: AppDatabase
-
     @Mock private lateinit var transactionRepository: TransactionRepository
 
     @Mock private lateinit var merchantMappingRepository: MerchantMappingRepository
@@ -85,54 +80,22 @@ class SettingsViewModelTest : BaseViewModelTest() {
     @Mock private lateinit var smsClassifier: SmsClassifier
 
     @Mock private lateinit var nerExtractor: SmsEntityExtractor
+
     private lateinit var transactionRunner: TransactionRunner
 
     @Mock private lateinit var tagRepository: ITagRepository
+
     @Mock private lateinit var splitTransactionRepository: ISplitTransactionRepository
+
     @Mock private lateinit var merchantRenameRuleRepository: IMerchantRenameRuleRepository
+
     @Mock private lateinit var merchantCategoryMappingRepository: IMerchantCategoryMappingRepository
+
     @Mock private lateinit var customSmsRuleRepository: ICustomSmsRuleRepository
+
     @Mock private lateinit var ignoreRuleRepository: IIgnoreRuleRepository
+
     @Mock private lateinit var smsParseTemplateProvider: SmsParseTemplateProvider
-
-    // Mocks for all DAOs called by DataExportService and ViewModel
-    @Mock private lateinit var transactionQueryDao: TransactionQueryDao
-
-    @Mock private lateinit var transactionWriteDao: TransactionWriteDao
-
-    @Mock private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
-
-    @Mock private lateinit var transactionReimbursementDao: TransactionReimbursementDao
-
-    @Mock private lateinit var accountDao: AccountDao
-
-    @Mock private lateinit var categoryDao: CategoryDao
-
-    @Mock private lateinit var budgetDao: BudgetDao
-
-    @Mock private lateinit var merchantMappingDao: MerchantMappingDao
-
-    @Mock private lateinit var splitTransactionDao: SplitTransactionDao
-
-    @Mock private lateinit var customSmsRuleDao: CustomSmsRuleDao
-
-    @Mock private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
-
-    @Mock private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
-
-    @Mock private lateinit var ignoreRuleDao: IgnoreRuleDao
-
-    @Mock private lateinit var smsParseTemplateDao: SmsParseTemplateDao
-
-    @Mock private lateinit var tagDao: TagDao
-
-    @Mock private lateinit var goalDao: GoalDao
-
-    @Mock private lateinit var tripDao: TripDao
-
-    @Mock private lateinit var accountAliasDao: AccountAliasDao
-
-    @Mock private lateinit var deletedSmsHashDao: DeletedSmsHashDao
 
     private lateinit var viewModel: SettingsViewModel
 
@@ -177,29 +140,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
         coEvery { ReminderManager.scheduleMonthlySummary(any()) } just runs
         coEvery { ReminderManager.cancelMonthlySummary(any()) } just runs
 
-        // Stub the db mock to return all the mocked DAOs
-        `when`(db.transactionQueryDao()).thenReturn(transactionQueryDao)
-        `when`(db.transactionWriteDao()).thenReturn(transactionWriteDao)
-        `when`(db.transactionAnalyticsDao()).thenReturn(transactionAnalyticsDao)
-        `when`(db.transactionReimbursementDao()).thenReturn(transactionReimbursementDao)
-        `when`(db.accountDao()).thenReturn(accountDao)
-        `when`(db.categoryDao()).thenReturn(categoryDao)
-        `when`(db.budgetDao()).thenReturn(budgetDao)
-        `when`(db.merchantMappingDao()).thenReturn(merchantMappingDao)
-        `when`(db.splitTransactionDao()).thenReturn(splitTransactionDao)
-        `when`(db.customSmsRuleDao()).thenReturn(customSmsRuleDao)
-        `when`(db.merchantRenameRuleDao()).thenReturn(merchantRenameRuleDao)
-        `when`(db.merchantCategoryMappingDao()).thenReturn(merchantCategoryMappingDao)
-        `when`(db.ignoreRuleDao()).thenReturn(ignoreRuleDao)
-        `when`(db.smsParseTemplateDao()).thenReturn(smsParseTemplateDao)
-        `when`(db.tagDao()).thenReturn(tagDao)
-        `when`(db.goalDao()).thenReturn(goalDao)
-        `when`(db.tripDao()).thenReturn(tripDao)
-        `when`(db.accountAliasDao()).thenReturn(accountAliasDao)
-        `when`(db.deletedSmsHashDao()).thenReturn(deletedSmsHashDao)
-        // FIX: Provide an executor for Room's withTransaction block to use in tests.
-        // `when`(db.transactionExecutor).thenReturn(testDispatcher.asExecutor()) // Not needed with TransactionRunner
-
         // --- NEW: Mock TransactionRunner to execute immediately ---
         transactionRunner = io.mockk.mockk()
         // Match generic arguments using MockK
@@ -219,30 +159,10 @@ class SettingsViewModelTest : BaseViewModelTest() {
         mockkStatic(ContextCompat::class)
         io.mockk.every { ContextCompat.checkSelfPermission(any(), any()) } returns PackageManager.PERMISSION_GRANTED
 
-        // REMOVED withTransaction mock to let it run naturally with the mocked executor.
-
         runTest {
-            `when`(transactionQueryDao.getAllTransactionsSimple()).thenReturn(flowOf(emptyList()))
-            `when`(accountDao.getAllAccounts()).thenReturn(flowOf(emptyList()))
             `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(emptyList())
-            `when`(categoryDao.getAllCategories()).thenReturn(flowOf(emptyList()))
-            `when`(categoryDao.getAllCategoriesSnapshot()).thenReturn(emptyList())
             `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
-            `when`(budgetDao.getAllBudgets()).thenReturn(flowOf(emptyList()))
-            `when`(merchantMappingDao.getAllMappings()).thenReturn(flowOf(emptyList()))
-            `when`(splitTransactionDao.getAllSplits()).thenReturn(flowOf(emptyList()))
-            `when`(customSmsRuleDao.getAllRulesList()).thenReturn(emptyList())
-            `when`(merchantRenameRuleDao.getAllRulesList()).thenReturn(emptyList())
-            `when`(merchantCategoryMappingDao.getAll()).thenReturn(emptyList())
-            `when`(ignoreRuleDao.getAllList()).thenReturn(emptyList())
-            `when`(smsParseTemplateDao.getAllTemplates()).thenReturn(emptyList())
-            `when`(tagDao.getAllTagsList()).thenReturn(emptyList())
-            `when`(transactionQueryDao.getAllCrossRefs()).thenReturn(emptyList())
-            `when`(goalDao.getAll()).thenReturn(emptyList())
-            `when`(tripDao.getAll()).thenReturn(emptyList())
-            `when`(accountAliasDao.getAll()).thenReturn(emptyList())
-            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(emptyList())
             `when`(tagRepository.findByName(anyString())).thenReturn(null)
             `when`(tagRepository.allTags).thenReturn(flowOf(emptyList()))
             `when`(splitTransactionRepository.getSplitsForParent(any())).thenReturn(flowOf(emptyList()))
@@ -326,8 +246,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             // Add a custom rule that matches the SMS
             val rule =
@@ -407,7 +325,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             shadowContentResolver.registerInputStream(mockUri, ByteArrayInputStream(csvContent.toByteArray()))
 
             `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
-            `when`(categoryDao.getAllCategories()).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
 
             initializeViewModel()
@@ -484,7 +401,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             val correctedData = listOf("", "", "2025-10-09 10:00:00", "a", "10", "expense", "Food", "Savings", "", "false", "")
             `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
-            `when`(categoryDao.getAllCategories()).thenReturn(flowOf(listOf(Category(1, "Food", "", ""))))
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(listOf(Category(1, "Food", "", "")))
 
             // Act
@@ -599,6 +515,89 @@ class SettingsViewModelTest : BaseViewModelTest() {
             ).insertTransactionWithTags(capture(transactionCaptor), anyObject())
 
             assertEquals(2, transactionCaptor.value.accountId)
+        }
+
+    @Test
+    fun `commitCsvImport inserts split transactions and persists learned merchant category mappings`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val header = "Id,ParentId,Date,Description,Amount,Type,Category,Account,Notes,IsExcluded,Tags".split(',')
+            val parentRow =
+                ReviewableRow(
+                    lineNumber = 2,
+                    rowData = "10,,2025-10-09 10:00:00,Supermarket,300.0,expense,Split Transaction,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val splitChildRow1 =
+                ReviewableRow(
+                    lineNumber = 3,
+                    rowData = "11,10,2025-10-09 10:00:00,Food Items,200.0,expense,Groceries,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val splitChildRow2 =
+                ReviewableRow(
+                    lineNumber = 4,
+                    rowData = "12,10,2025-10-09 10:00:00,Cleaning Items,100.0,expense,Household,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val normalRow =
+                ReviewableRow(
+                    lineNumber = 5,
+                    rowData = "13,,2025-10-09 11:00:00,Starbucks,150.0,expense,Coffee,Savings,,false,".split(','),
+                    status = CsvRowStatus.VALID,
+                    statusMessage = "",
+                )
+            val rowsToImport = listOf(parentRow, splitChildRow1, splitChildRow2, normalRow)
+
+            setCsvValidationReport(
+                viewModel,
+                CsvValidationReport(
+                    header = header,
+                    reviewableRows = rowsToImport,
+                ),
+            )
+
+            val groceriesCat = Category(id = 1, name = "Groceries", iconKey = "category", colorKey = "green")
+            val householdCat = Category(id = 2, name = "Household", iconKey = "category", colorKey = "blue")
+            val coffeeCat = Category(id = 3, name = "Coffee", iconKey = "category", colorKey = "brown")
+            val allCats = listOf(groceriesCat, householdCat, coffeeCat)
+
+            `when`(categoryRepository.allCategories).thenReturn(flowOf(allCats))
+            `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(allCats)
+            `when`(categoryRepository.findByName("Groceries")).thenReturn(groceriesCat)
+            `when`(categoryRepository.findByName("Household")).thenReturn(householdCat)
+            `when`(categoryRepository.findByName("Coffee")).thenReturn(coffeeCat)
+            `when`(accountRepository.getAllAccountsSnapshot()).thenReturn(listOf(Account(1, "Savings", "Bank")))
+            `when`(transactionRepository.insertTransactionWithTags(anyObject(), anyObject())).thenReturn(100L)
+
+            // Act
+            viewModel.commitCsvImport(rowsToImport)
+            advanceUntilIdle()
+
+            // Assert
+            val splitsCaptor = argumentCaptor<List<SplitTransaction>>()
+            verify(
+                splitTransactionRepository,
+                org.mockito.Mockito.timeout(5000).atLeastOnce(),
+            ).insertAll(capture(splitsCaptor))
+
+            val allCapturedSplits = splitsCaptor.allValues.flatten()
+            assertEquals(2, allCapturedSplits.size)
+            assertTrue(allCapturedSplits.any { it.parentTransactionId == 100 && it.amount == 200.0 && it.categoryId == 1 })
+            assertTrue(allCapturedSplits.any { it.parentTransactionId == 100 && it.amount == 100.0 && it.categoryId == 2 })
+
+            val mappingsCaptor = argumentCaptor<List<MerchantCategoryMapping>>()
+            verify(
+                merchantCategoryMappingRepository,
+                org.mockito.Mockito.timeout(5000),
+            ).insertAll(capture(mappingsCaptor))
+
+            val learnedList = mappingsCaptor.value
+            assertTrue(learnedList.any { it.parsedName == "Starbucks" && it.categoryId == 3 })
         }
 
     @Test
@@ -802,6 +801,29 @@ class SettingsViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @Test
+    fun `uiEvent buffers multiple events without suspending when no collector is active`() =
+        runTest {
+            val failureMessage = "No backup snapshot found or restore failed."
+            mockkObject(DataExportService)
+            coEvery { DataExportService.restoreFromBackupSnapshot(applicationContext) } returns false
+
+            initializeViewModel()
+
+            // Trigger multiple events while no collectors are listening
+            viewModel.restoreFromBackupSnapshot()
+            advanceUntilIdle()
+            viewModel.restoreFromBackupSnapshot()
+            advanceUntilIdle()
+
+            // Attach collector afterwards and verify all buffered events are drained in FIFO order
+            viewModel.uiEvent.test {
+                assertEquals(failureMessage, awaitItem())
+                assertEquals(failureMessage, awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     // --- NEW: Tests for the objective ---
 
     @Test
@@ -822,8 +844,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             // Mock the parser to successfully parse the transaction
             // We can do this by mocking the one rule it needs
@@ -871,8 +891,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -910,8 +928,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -948,8 +964,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -985,8 +999,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1021,8 +1033,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1071,8 +1081,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1121,8 +1129,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1171,8 +1177,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1221,8 +1225,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1814,8 +1816,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             org.robolectric.shadows.ShadowApplication.getInstance().grantPermissions(Manifest.permission.READ_SMS)
 
@@ -1951,8 +1951,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "at (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))
@@ -1986,8 +1984,6 @@ class SettingsViewModelTest : BaseViewModelTest() {
             `when`(merchantCategoryMappingRepository.getCategoryIdForMerchant(anyString())).thenReturn(null)
             `when`(smsParseTemplateProvider.getAllTemplates()).thenReturn(emptyList())
             `when`(smsParseTemplateProvider.getTemplatesBySignature(anyString())).thenReturn(emptyList())
-            `when`(accountAliasDao.findByAlias(anyString())).thenReturn(null)
-            `when`(accountDao.findByName(anyString())).thenReturn(null)
 
             val rule = CustomSmsRule(1, "spent Rs", "on (.*)", "spent Rs ([\\d.]+)", null, null, null, null, 10, "")
             `when`(customSmsRuleRepository.getAllRules()).thenReturn(flowOf(listOf(rule)))

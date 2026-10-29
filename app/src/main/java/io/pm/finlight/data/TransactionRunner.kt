@@ -23,12 +23,12 @@ interface TransactionRunner {
  * Default implementation that delegates to Room's withTransaction extension function.
  */
 class RoomTransactionRunner(
-    private val db: RoomDatabase? = null,
+    private val db: RoomDatabase,
 ) : TransactionRunner {
     override suspend fun <R> run(
         block: suspend () -> R,
     ): R {
-        return checkNotNull(db) { "RoomDatabase must be provided to RoomTransactionRunner" }.withTransaction(block)
+        return db.withTransaction(block)
     }
 
     override suspend fun <R> run(

@@ -50,50 +50,27 @@ class SettingsViewModelFactory(
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
-                if (nerExtractorProvider != null) {
-                    SettingsViewModel(
-                        application = application,
-                        settingsRepository = settingsRepository,
-                        transactionRepository = transactionRepository,
-                        merchantMappingRepository = merchantMappingRepository,
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        smsRepository = smsRepository,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                        smsClassifier = smsClassifier,
-                        tagRepository = tagRepository,
-                        splitTransactionRepository = splitTransactionRepository,
-                        merchantRenameRuleRepository = merchantRenameRuleRepository,
-                        merchantCategoryMappingRepository = merchantCategoryMappingRepository,
-                        customSmsRuleRepository = customSmsRuleRepository,
-                        ignoreRuleRepository = ignoreRuleRepository,
-                        smsParseTemplateProvider = smsParseTemplateProvider,
-                        nerExtractorProvider = nerExtractorProvider,
-                        transactionRunner = transactionRunner,
-                        dispatchers = dispatcherProvider,
-                    )
-                } else {
-                    SettingsViewModel(
-                        application = application,
-                        settingsRepository = settingsRepository,
-                        transactionRepository = transactionRepository,
-                        merchantMappingRepository = merchantMappingRepository,
-                        accountRepository = accountRepository,
-                        categoryRepository = categoryRepository,
-                        smsRepository = smsRepository,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                        smsClassifier = smsClassifier,
-                        tagRepository = tagRepository,
-                        splitTransactionRepository = splitTransactionRepository,
-                        merchantRenameRuleRepository = merchantRenameRuleRepository,
-                        merchantCategoryMappingRepository = merchantCategoryMappingRepository,
-                        customSmsRuleRepository = customSmsRuleRepository,
-                        ignoreRuleRepository = ignoreRuleRepository,
-                        smsParseTemplateProvider = smsParseTemplateProvider,
-                        transactionRunner = transactionRunner,
-                        dispatchers = dispatcherProvider,
-                    )
-                }
+                SettingsViewModel(
+                    application = application,
+                    settingsRepository = settingsRepository,
+                    transactionRepository = transactionRepository,
+                    merchantMappingRepository = merchantMappingRepository,
+                    accountRepository = accountRepository,
+                    categoryRepository = categoryRepository,
+                    smsRepository = smsRepository,
+                    autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                    smsClassifier = smsClassifier,
+                    tagRepository = tagRepository,
+                    splitTransactionRepository = splitTransactionRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
+                    transactionRunner = transactionRunner,
+                    dispatchers = dispatcherProvider,
+                )
             return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

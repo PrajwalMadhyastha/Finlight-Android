@@ -41,24 +41,14 @@ class SmsDebugViewModelFactory(
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
-                if (nerExtractorProvider != null) {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        nerExtractorProvider = nerExtractorProvider,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                } else {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                }
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    db = db,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
+                    autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                )
             return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
