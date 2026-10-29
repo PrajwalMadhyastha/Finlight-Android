@@ -1275,8 +1275,8 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
-            val factory = WhatIfViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
-            val whatIfViewModel: WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
+            val factory = io.pm.finlight.ui.viewmodel.WhatIfViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val whatIfViewModel: io.pm.finlight.ui.viewmodel.WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             io.pm.finlight.ui.screens.WhatIfSimulatorScreen(navController, whatIfViewModel)
         }
         composable(
