@@ -103,7 +103,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         viewModel =
             TransactionViewModel(
                 application = context,
-                db = db,
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
@@ -114,7 +113,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 merchantCategoryMappingRepository = merchantCategoryMappingRepository,
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
-                smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )

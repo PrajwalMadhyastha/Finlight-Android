@@ -1,11 +1,9 @@
 package io.pm.finlight.ui.viewmodel
 
-import androidx.room.withTransaction
 import app.cash.turbine.test
 import io.mockk.*
 import io.pm.finlight.*
 import io.pm.finlight.core.*
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.*
 import kotlinx.coroutines.flow.flowOf
@@ -21,6 +19,7 @@ import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.capture
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -483,13 +482,6 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             var onCompleteCalled = false
 
             whenever(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
-
-            // Mock the withTransaction block
-            mockkStatic("androidx.room.RoomDatabaseKt")
-            coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
-                val block = secondArg<suspend () -> Any?>()
-                block()
-            }
             val listCaptor = argumentCaptor<List<SplitTransaction>>()
 
             // Act
@@ -497,10 +489,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             advanceUntilIdle()
 
             // Assert
-            coVerify { db.withTransaction<Unit>(any()) }
-            verify(transactionWriteDao).markAsSplit(transactionId, true)
-            verify(splitTransactionDao).deleteSplitsForParent(transactionId)
-            verify(splitTransactionDao).insertAll(listCaptor.capture())
+            verify(splitTransactionRepository).saveSplits(eq(transactionId), listCaptor.capture())
 
             val capturedSplits = listCaptor.firstValue
             assertEquals(2, capturedSplits.size)
@@ -511,7 +500,6 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             assertNull(capturedSplits[1].categoryId)
 
             assertTrue(onCompleteCalled)
-            unmockkStatic("androidx.room.RoomDatabaseKt")
         }
 
     @Test
@@ -523,7 +511,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             val newAccount = Account(1, newAccountName, newAccountType)
             var createdAccount: Account? = null
 
-            whenever(db.accountDao().findByName(newAccountName)).thenReturn(null)
+            whenever(accountRepository.findByName(newAccountName)).thenReturn(null)
             whenever(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
             whenever(accountRepository.getAccountByIdSync(1)).thenReturn(newAccount)
 
@@ -543,7 +531,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             val newAccountType = "Bank"
             var callbackInvoked = false
 
-            whenever(db.accountDao().findByName(newAccountName)).thenReturn(null)
+            whenever(accountRepository.findByName(newAccountName)).thenReturn(null)
             whenever(accountRepository.insert(Account(name = newAccountName, type = newAccountType))).thenReturn(1L)
             whenever(accountRepository.getAccountByIdSync(1)).thenReturn(null)
 
@@ -561,7 +549,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             val existingAccount = Account(1, existingAccountName, "Bank")
             var createdAccount: Account? = null
 
-            whenever(db.accountDao().findByName(existingAccountName)).thenReturn(existingAccount)
+            whenever(accountRepository.findByName(existingAccountName)).thenReturn(existingAccount)
 
             // Act & Assert
             viewModel.validationError.test {
@@ -745,7 +733,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
     fun `createAccount fails for existing account name`() =
         runTest {
             // Arrange
-            whenever(db.accountDao().findByName("Savings")).thenReturn(Account(1, "Savings", "Bank"))
+            whenever(accountRepository.findByName("Savings")).thenReturn(Account(1, "Savings", "Bank"))
 
             // Act
             viewModel.createAccount("Savings", "Bank") { fail("Should not be called") }
@@ -948,7 +936,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         runTest {
             // Arrange: simulate a default account being loaded by mocking accountDao
             val defaultAccount = Account(id = 1, name = "Cash Spends", type = "Cash")
-            whenever(db.accountDao().findByName("Cash Spends")).thenReturn(defaultAccount)
+            whenever(accountRepository.findByName("Cash Spends")).thenReturn(defaultAccount)
             initializeViewModel()
             advanceUntilIdle()
 
@@ -1173,7 +1161,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                 )
 
             val existingAccount = Account(1, "HDFC", "Bank")
-            whenever(db.accountDao().findByName("HDFC")).thenReturn(existingAccount)
+            whenever(accountRepository.findByName("HDFC")).thenReturn(existingAccount)
             whenever(accountRepository.allAccounts).thenReturn(flowOf(listOf(existingAccount)))
             whenever(transactionRepository.insertTransactionWithTags(any(), any())).thenReturn(10L)
 

@@ -290,9 +290,11 @@ class ServiceLocatorTest {
     @Test
     fun provideSplitTransactionRepository_withResolvedDb_usesSuppliedDatabase() {
         val customDao: SplitTransactionDao = mockk(relaxed = true)
+        val customWriteDao: io.pm.finlight.data.db.dao.TransactionWriteDao = mockk(relaxed = true)
         val customDb: AppDatabase =
             mockk {
                 every { splitTransactionDao() } returns customDao
+                every { transactionWriteDao() } returns customWriteDao
             }
 
         val repo = ServiceLocator.provideSplitTransactionRepository(application, customDb)
@@ -369,6 +371,20 @@ class ServiceLocatorTest {
         assertNotNull(repo)
         verify(exactly = 1) { customDb.ignoreRuleDao() }
         assertSame(repo, ServiceLocator.provideIgnoreRuleRepository(application))
+    }
+
+    @Test
+    fun provideSmsParseTemplateRepository_withResolvedDb_usesSuppliedDatabase() {
+        val customDao: io.pm.finlight.SmsParseTemplateDao = mockk(relaxed = true)
+        val customDb: AppDatabase =
+            mockk {
+                every { smsParseTemplateDao() } returns customDao
+            }
+
+        val repo = ServiceLocator.provideSmsParseTemplateRepository(application, customDb)
+        assertNotNull(repo)
+        verify(exactly = 1) { customDb.smsParseTemplateDao() }
+        assertSame(repo, ServiceLocator.provideSmsParseTemplateRepository(application))
     }
 
     // --- VisibleForTesting Overriding Setter Tests ---
@@ -499,6 +515,22 @@ class ServiceLocatorTest {
         val defaultUseCase = ServiceLocator.provideMergeTransactionsUseCase(application)
         assertNotNull(defaultUseCase)
         assertNotSame(mockUseCase2, defaultUseCase)
+    }
+
+    @Test
+    fun setSmsParseTemplateRepository_overridesInstance() {
+        val mockRepo: io.pm.finlight.ISmsParseTemplateRepository = mockk(relaxed = true)
+        ServiceLocator.setSmsParseTemplateRepository(mockRepo)
+        assertSame(mockRepo, ServiceLocator.provideSmsParseTemplateRepository(application))
+
+        val mockRepo2: io.pm.finlight.ISmsParseTemplateRepository = mockk(relaxed = true)
+        ServiceLocator.setSmsParseTemplateRepository(mockRepo2)
+        assertSame(mockRepo2, ServiceLocator.provideSmsParseTemplateRepository(application))
+
+        ServiceLocator.setSmsParseTemplateRepository(null)
+        val defaultRepo = ServiceLocator.provideSmsParseTemplateRepository(application)
+        assertNotNull(defaultRepo)
+        assertNotSame(mockRepo2, defaultRepo)
     }
 
     @Test

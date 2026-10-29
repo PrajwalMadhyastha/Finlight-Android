@@ -4,6 +4,8 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.data.TransactionRunner
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -53,6 +55,41 @@ class SplitTransactionRepositoryTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
             verify(splitTransactionDao).getSplitsForParent(parentId)
+        }
+
+    @Test
+    fun `saveSplits executes transactionRunner and delegates to DAOs`() =
+        runTest {
+            val mockWriteDao: TransactionWriteDao = org.mockito.Mockito.mock(TransactionWriteDao::class.java)
+            val runner =
+                object : TransactionRunner {
+                    override suspend fun <R> run(block: suspend () -> R): R = block()
+                }
+            val repo = SplitTransactionRepository(splitTransactionDao, mockWriteDao, runner)
+            val splits = listOf(SplitTransaction(id = 1, parentTransactionId = 10, amount = 25.0, categoryId = 1, notes = "Snack"))
+
+            repo.saveSplits(10, splits)
+
+            verify(mockWriteDao).markAsSplit(10, true)
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(splitTransactionDao).insertAll(splits)
+        }
+
+    @Test
+    fun `unmarkSplit executes transactionRunner and delegates to DAOs`() =
+        runTest {
+            val mockWriteDao: TransactionWriteDao = org.mockito.Mockito.mock(TransactionWriteDao::class.java)
+            val runner =
+                object : TransactionRunner {
+                    override suspend fun <R> run(block: suspend () -> R): R = block()
+                }
+            val repo = SplitTransactionRepository(splitTransactionDao, mockWriteDao, runner)
+            `when`(splitTransactionDao.getSplitsForParentSimple(10)).thenReturn(emptyList())
+
+            repo.unmarkSplit(10, "Original Desc")
+
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(mockWriteDao).unmarkAsSplit(10, "Original Desc", null)
         }
 
     @Test
