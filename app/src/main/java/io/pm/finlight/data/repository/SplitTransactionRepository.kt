@@ -14,4 +14,8 @@ class SplitTransactionRepository(
     override fun getSplitsForParent(parentTransactionId: Int): Flow<List<SplitTransactionDetails>> {
         return splitTransactionDao.getSplitsForParent(parentTransactionId)
     }
+
+    override suspend fun insertAll(splits: List<SplitTransaction>) {
+        splitTransactionDao.insertAll(splits)
+    }
 }

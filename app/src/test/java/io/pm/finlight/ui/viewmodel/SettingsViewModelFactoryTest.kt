@@ -13,12 +13,18 @@ import io.mockk.unmockkAll
 import io.mockk.verify
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
+import io.pm.finlight.ISplitTransactionRepository
+import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
-import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
@@ -90,6 +96,13 @@ class SettingsViewModelFactoryTest {
         val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
         val mockSmsRepo: ISmsRepository = mockk(relaxed = true)
         val mockAutoSaveUseCase: io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        val mockTagRepo: ITagRepository = mockk(relaxed = true)
+        val mockSplitRepo: ISplitTransactionRepository = mockk(relaxed = true)
+        val mockMerchantRenameRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        val mockMerchantCategoryMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
+        val mockCustomSmsRuleRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
+        val mockIgnoreRuleRepo: IIgnoreRuleRepository = mockk(relaxed = true)
+        val mockTransactionRunner: TransactionRunner = mockk(relaxed = true)
 
         mockkObject(MlModelFactory)
         val mockClassifier: SmsClassifier = mockk(relaxed = true)
@@ -104,6 +117,13 @@ class SettingsViewModelFactoryTest {
         ServiceLocator.setCategoryRepository(mockCategoryRepo)
         ServiceLocator.setSmsRepository(mockSmsRepo)
         ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSaveUseCase)
+        ServiceLocator.setTagRepository(mockTagRepo)
+        ServiceLocator.setSplitTransactionRepository(mockSplitRepo)
+        ServiceLocator.setMerchantRenameRuleRepository(mockMerchantRenameRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockMerchantCategoryMappingRepo)
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRuleRepo)
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
+        ServiceLocator.setTransactionRunner(mockTransactionRunner)
 
         val factory = SettingsViewModelFactory(application)
         val viewModel = factory.create(SettingsViewModel::class.java)
@@ -157,6 +177,48 @@ class SettingsViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockClassifier, classifierField)
+
+        val tagRepoField =
+            SettingsViewModel::class.java.getDeclaredField("tagRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTagRepo, tagRepoField)
+
+        val splitRepoField =
+            SettingsViewModel::class.java.getDeclaredField("splitTransactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSplitRepo, splitRepoField)
+
+        val merchantRenameRepoField =
+            SettingsViewModel::class.java.getDeclaredField("merchantRenameRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantRenameRepo, merchantRenameRepoField)
+
+        val merchantCatMappingRepoField =
+            SettingsViewModel::class.java.getDeclaredField("merchantCategoryMappingRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantCategoryMappingRepo, merchantCatMappingRepoField)
+
+        val customSmsRuleRepoField =
+            SettingsViewModel::class.java.getDeclaredField("customSmsRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockCustomSmsRuleRepo, customSmsRuleRepoField)
+
+        val ignoreRuleRepoField =
+            SettingsViewModel::class.java.getDeclaredField("ignoreRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockIgnoreRuleRepo, ignoreRuleRepoField)
+
+        val transactionRunnerField =
+            SettingsViewModel::class.java.getDeclaredField("transactionRunner").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTransactionRunner, transactionRunnerField)
 
         // NerExtractor is NOT eagerly instantiated on creation
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
@@ -218,8 +280,7 @@ class SettingsViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
-        val factory = SettingsViewModelFactory(application, mockTransactionViewModel)
+        val factory = SettingsViewModelFactory(application)
 
         class UnknownViewModel : ViewModel()
 

@@ -28,14 +28,12 @@ import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.viewmodel.SmsDebugViewModelFactory
-import kotlinx.coroutines.launch
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SmsDebugScreen(
     navController: NavController,
-    transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
     val factory = SmsDebugViewModelFactory(application)
@@ -105,7 +103,7 @@ fun SmsDebugScreen(
                 }
             } else {
                 items(filteredResults, key = { it.smsMessage.id }) { result ->
-                    SmsDebugItem(result = result, navController = navController, transactionViewModel = transactionViewModel)
+                    SmsDebugItem(result = result, navController = navController, viewModel = viewModel)
                 }
             }
 
@@ -131,9 +129,8 @@ fun SmsDebugScreen(
 internal fun SmsDebugItem(
     result: SmsDebugResult,
     navController: NavController,
-    transactionViewModel: TransactionViewModel,
+    viewModel: SmsDebugViewModel,
 ) {
-    val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current
     // --- UPDATED: Handle the new IgnoredByClassifier state ---
     val statusColor =
@@ -200,8 +197,7 @@ internal fun SmsDebugItem(
                     Spacer(Modifier.height(8.dp))
                     Button(
                         onClick = {
-                            coroutineScope.launch {
-                                val success = transactionViewModel.autoSaveSmsTransaction(txn, source = "Manual Import")
+                            viewModel.forceSaveTransaction(txn) { success ->
                                 if (success) {
                                     android.widget.Toast.makeText(
                                         context,

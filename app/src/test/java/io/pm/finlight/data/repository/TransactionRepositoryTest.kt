@@ -841,4 +841,17 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             }
             verify(transactionDao).getTransactionsForMerchantName("Amazon", 100L, 200L)
         }
+
+    @Test
+    fun `getAllDeletedSmsHashes delegates to deletedSmsHashDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val expectedHashes = listOf("hash1", "hash2")
+            `when`(deletedSmsHashDao.getAllHashes()).thenReturn(expectedHashes)
+
+            val actualHashes = repository.getAllDeletedSmsHashes()
+            assertEquals(expectedHashes, actualHashes)
+            verify(deletedSmsHashDao).getAllHashes()
+        }
 }

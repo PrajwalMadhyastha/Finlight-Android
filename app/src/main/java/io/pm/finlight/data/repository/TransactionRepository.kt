@@ -385,6 +385,10 @@ class TransactionRepository(
         deletedSmsHashDao.insert(DeletedSmsHash(hash))
     }
 
+    override suspend fun getAllDeletedSmsHashes(): List<String> {
+        return deletedSmsHashDao.getAllHashes()
+    }
+
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }

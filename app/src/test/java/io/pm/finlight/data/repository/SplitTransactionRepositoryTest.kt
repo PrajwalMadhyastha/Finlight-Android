@@ -54,4 +54,15 @@ class SplitTransactionRepositoryTest : BaseViewModelTest() {
             }
             verify(splitTransactionDao).getSplitsForParent(parentId)
         }
+
+    @Test
+    fun `insertAll proxies call to DAO`() =
+        runTest {
+            val splits =
+                listOf(
+                    SplitTransaction(id = 1, parentTransactionId = 10, amount = 25.0, categoryId = 1, notes = "Snack"),
+                )
+            repository.insertAll(splits)
+            verify(splitTransactionDao).insertAll(splits)
+        }
 }

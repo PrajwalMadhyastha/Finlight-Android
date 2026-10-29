@@ -10,12 +10,12 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.SmsDebugViewModel
-import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.utils.SmsProviderHelper
 
 class SmsDebugViewModelFactory(
     private val application: Application,
@@ -31,45 +31,38 @@ class SmsDebugViewModelFactory(
         nerExtractorProvider = nerExtractorProvider,
     )
 
-    constructor(
-        application: Application,
-        transactionViewModel: TransactionViewModel,
-        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
-    ) : this(
-        application = application,
-        autoSaveSmsTransactionUseCase = null,
-        nerExtractorProvider = nerExtractorProvider,
-    )
-
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
-            val smsRepository = ServiceLocator.provideSmsRepository(application)
             val db = AppDatabase.getInstance(application)
+            val smsRepository = ServiceLocator.provideSmsRepository(application)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(application, db)
+            val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db)
+            val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
+            val merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db)
+            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
             val smsClassifier = MlModelFactory.getClassifier(application)
             val autoSaveUseCase =
                 autoSaveSmsTransactionUseCase
                     ?: ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             val viewModel =
-                if (nerExtractorProvider != null) {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        nerExtractorProvider = nerExtractorProvider,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                } else {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                }
+                SmsDebugViewModel(
+                    application = application,
+                    smsRepository = smsRepository,
+                    transactionRepository = transactionRepository,
+                    customSmsRuleRepository = customSmsRuleRepository,
+                    merchantRenameRuleRepository = merchantRenameRuleRepository,
+                    ignoreRuleRepository = ignoreRuleRepository,
+                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                    smsParseTemplateProvider = smsParseTemplateProvider,
+                    smsClassifier = smsClassifier,
+                    nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
+                    autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                    dispatchers = dispatcherProvider,
+                )
             return viewModel as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
