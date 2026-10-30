@@ -2,13 +2,13 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flowOf
@@ -52,11 +52,11 @@ class CurrencyViewModelTest : BaseViewModelTest() {
 
         viewModel =
             CurrencyViewModel(
-                ApplicationProvider.getApplicationContext(),
-                settingsRepository,
-                tripRepository,
-                transactionRepository,
-                tagRepository,
+                settingsRepository = settingsRepository,
+                tripRepository = tripRepository,
+                transactionRepository = transactionRepository,
+                tagRepository = tagRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
             )
     }
 
@@ -388,11 +388,11 @@ class CurrencyViewModelTest : BaseViewModelTest() {
     private fun initializeViewModel() {
         viewModel =
             CurrencyViewModel(
-                ApplicationProvider.getApplicationContext(),
-                settingsRepository,
-                tripRepository,
-                transactionRepository,
-                tagRepository,
+                settingsRepository = settingsRepository,
+                tripRepository = tripRepository,
+                transactionRepository = transactionRepository,
+                tagRepository = tagRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
             )
     }
 }

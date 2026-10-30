@@ -1,14 +1,4 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/OnboardingViewModel.kt
-// REASON: FEATURE - The ViewModel is updated to detect the user's home
-// currency from their device locale. It exposes this currency and provides a
-// function to save the final selection, integrating currency setup into the
-// onboarding flow.
-// FIX - The currency detection logic is now more robust. It uses a tiered
-// approach, prioritizing the network country over the device's locale to
-// provide a more accurate suggestion for the user's home currency.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.content.Context
@@ -16,9 +6,13 @@ import android.os.Build
 import android.telephony.TelephonyManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -30,6 +24,7 @@ class OnboardingViewModel(
     private val application: Application,
     private val categoryRepository: ICategoryRepository,
     private val settingsRepository: ISettingsRepository,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val _userName = MutableStateFlow("")
     val userName = _userName.asStateFlow()
@@ -61,7 +56,7 @@ class OnboardingViewModel(
     }
 
     private fun detectHomeCurrency() {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 val telephonyManager = application.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
@@ -119,24 +114,28 @@ class OnboardingViewModel(
     }
 
     fun finishOnboarding() {
-        viewModelScope.launch {
-            if (_userName.value.isNotBlank()) {
-                settingsRepository.saveUserName(_userName.value)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                if (_userName.value.isNotBlank()) {
+                    settingsRepository.saveUserName(_userName.value)
+                }
+
+                _homeCurrency.value?.let {
+                    settingsRepository.saveHomeCurrency(it.currencyCode)
+                }
+
+                categoryRepository.insertAll(CategoryIconHelper.predefinedCategories)
+
+                val budgetFloat = _monthlyBudget.value.toFloatOrNull() ?: 0f
+                if (budgetFloat > 0) {
+                    settingsRepository.saveOverallBudgetForCurrentMonth(budgetFloat)
+                }
+
+                // --- FIX: Schedule all default-enabled background workers ---
+                ReminderManager.rescheduleAllWork(application)
+            } catch (_: Exception) {
+                // Ignore or handle
             }
-
-            _homeCurrency.value?.let {
-                settingsRepository.saveHomeCurrency(it.currencyCode)
-            }
-
-            categoryRepository.insertAll(CategoryIconHelper.predefinedCategories)
-
-            val budgetFloat = _monthlyBudget.value.toFloatOrNull() ?: 0f
-            if (budgetFloat > 0) {
-                settingsRepository.saveOverallBudgetForCurrentMonth(budgetFloat)
-            }
-
-            // --- FIX: Schedule all default-enabled background workers ---
-            ReminderManager.rescheduleAllWork(application)
         }
     }
 }

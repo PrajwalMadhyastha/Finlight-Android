@@ -50,6 +50,9 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SplitItem
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import java.text.NumberFormat

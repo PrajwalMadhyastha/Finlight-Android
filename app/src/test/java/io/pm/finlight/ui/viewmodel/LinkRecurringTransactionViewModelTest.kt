@@ -9,6 +9,7 @@ import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -69,7 +70,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
                 )
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
 
             viewModel.linkableTransactions.test {
                 assertEquals(mockTransactions, awaitItem())
@@ -82,7 +83,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
     fun `linkTransaction updates sms hash and rule lastRunDate`() =
         runTest {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -104,7 +105,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             val txnWithoutHash = potentialTxn.copy(sourceSmsHash = null)
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, txnWithoutHash)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, txnWithoutHash, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -119,7 +120,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
     fun `remindTomorrow updates rule lastRunDate to yesterday`() =
         runTest {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             var onCompleteCalled = false
 
             viewModel.remindTomorrow { onCompleteCalled = true }

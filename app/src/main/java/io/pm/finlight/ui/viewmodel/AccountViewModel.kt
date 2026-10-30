@@ -21,11 +21,13 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -36,8 +38,28 @@ class AccountViewModel(
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
     private val mergeAccountsUseCase: MergeAccountsUseCase,
-    private val computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    constructor(
+        repository: IAccountRepository,
+        transactionRepository: ITransactionRepository,
+        settingsRepository: ISettingsRepository,
+        mergeAccountsUseCase: MergeAccountsUseCase,
+        computationDispatcher: CoroutineDispatcher,
+    ) : this(
+        repository = repository,
+        transactionRepository = transactionRepository,
+        settingsRepository = settingsRepository,
+        mergeAccountsUseCase = mergeAccountsUseCase,
+        dispatcherProvider =
+            object : DispatcherProvider {
+                override val main: CoroutineDispatcher get() = computationDispatcher
+                override val io: CoroutineDispatcher get() = computationDispatcher
+                override val default: CoroutineDispatcher get() = computationDispatcher
+                override val unconfined: CoroutineDispatcher get() = computationDispatcher
+            },
+    )
+
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -53,7 +75,7 @@ class AccountViewModel(
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
     init {
-        viewModelScope.launch(computationDispatcher) {
+        viewModelScope.launch(dispatcherProvider.default) {
             combine(
                 repository.accountsWithBalance,
                 settingsRepository.getDismissedMergeSuggestions(),
@@ -193,7 +215,7 @@ class AccountViewModel(
     }
 
     fun mergeSelectedAccounts(destinationAccountId: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             val sourceAccountIds = _selectedAccountIds.value.filter { it != destinationAccountId }
 
             // 1. Perform validation first.
@@ -255,14 +277,14 @@ class AccountViewModel(
         sourceAccountIds: List<Int>,
         onComplete: (Boolean) -> Unit = {},
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 mergeAccountsUseCase(destinationAccountId, sourceAccountIds)
                 _uiEvent.send("Accounts merged successfully.")
-                onComplete(true)
+                withContext(dispatcherProvider.main) { onComplete(true) }
             } catch (e: Exception) {
                 _uiEvent.send("Error merging accounts: ${e.message}")
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             }
         }
     }
@@ -271,43 +293,43 @@ class AccountViewModel(
         name: String,
         type: String,
         onComplete: (Boolean) -> Unit = {},
-    ) = viewModelScope.launch {
+    ) = viewModelScope.launch(dispatcherProvider.io) {
         try {
             if (name.isNotBlank() && type.isNotBlank()) {
                 val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(name, ignoreCase = true) }
                 if (existingAccount != null) {
                     _uiEvent.send("An account named '$name' already exists.")
-                    onComplete(false)
+                    withContext(dispatcherProvider.main) { onComplete(false) }
                 } else {
                     repository.insert(Account(name = name, type = type))
                     _uiEvent.send("Account '$name' created.")
-                    onComplete(true)
+                    withContext(dispatcherProvider.main) { onComplete(true) }
                 }
             } else {
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             }
         } catch (e: Exception) {
             _uiEvent.send("Error creating account: ${e.message}")
-            onComplete(false)
+            withContext(dispatcherProvider.main) { onComplete(false) }
         }
     }
 
     fun updateAccount(
         account: Account,
         onComplete: (Boolean) -> Unit = {},
-    ) = viewModelScope.launch {
+    ) = viewModelScope.launch(dispatcherProvider.io) {
         try {
             val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(account.name, ignoreCase = true) && it.id != account.id }
             if (existingAccount != null) {
                 _uiEvent.send("An account named '${account.name}' already exists.")
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             } else {
                 repository.update(account)
-                onComplete(true)
+                withContext(dispatcherProvider.main) { onComplete(true) }
             }
         } catch (e: Exception) {
             _uiEvent.send("Error updating account: ${e.message}")
-            onComplete(false)
+            withContext(dispatcherProvider.main) { onComplete(false) }
         }
     }
 
@@ -316,16 +338,20 @@ class AccountViewModel(
         newName: String,
     ) {
         if (newName.isBlank()) return
-        viewModelScope.launch {
-            val accountToUpdate = repository.getAccountByIdSync(accountId)
-            accountToUpdate?.let {
-                updateAccount(it.copy(name = newName))
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val accountToUpdate = repository.getAccountByIdSync(accountId)
+                accountToUpdate?.let {
+                    updateAccount(it.copy(name = newName))
+                }
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating account: ${e.message}")
             }
         }
     }
 
     fun deleteAccount(account: Account) =
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 repository.delete(account)
                 _uiEvent.send("Account '${account.name}' deleted.")

@@ -27,10 +27,19 @@
 // `StateFlow<List<Pair<Calendar, Float?>>>` that correctly fetches the
 // *budget* for each month from the SettingsRepository, including carry-over logic.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.Budget
+import io.pm.finlight.BudgetWithSpending
+import io.pm.finlight.Category
+import io.pm.finlight.IBudgetRepository
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
@@ -44,8 +53,8 @@ class BudgetViewModel(
     private val budgetRepository: IBudgetRepository,
     private val settingsRepository: ISettingsRepository,
     private val categoryRepository: ICategoryRepository,
-    // --- NEW: Add TransactionRepository dependency ---
     transactionRepository: ITransactionRepository,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
 
@@ -186,7 +195,7 @@ class BudgetViewModel(
         categoryName: String,
         amountStr: String,
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 val amount = amountStr.toDoubleOrNull()
                 if (amount == null || amount <= 0 || categoryName.isBlank()) {
@@ -220,8 +229,12 @@ class BudgetViewModel(
         val year = forCalendar.get(Calendar.YEAR)
         val month = forCalendar.get(Calendar.MONTH) + 1
 
-        viewModelScope.launch {
-            settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                settingsRepository.saveOverallBudgetForMonth(year, month, budgetFloat)
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving overall budget: ${e.message}")
+            }
         }
     }
 
@@ -230,7 +243,7 @@ class BudgetViewModel(
     }
 
     fun updateBudget(budget: Budget) =
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 budgetRepository.update(budget)
                 _uiEvent.send("Budget for '${budget.categoryName}' updated.")
@@ -240,7 +253,7 @@ class BudgetViewModel(
         }
 
     fun deleteBudget(budget: Budget) =
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 budgetRepository.delete(budget)
                 _uiEvent.send("Budget for '${budget.categoryName}' deleted.")
@@ -273,33 +286,37 @@ class BudgetViewModel(
     val annualCategorySummaries: StateFlow<List<AnnualCategorySummary>> = _annualCategorySummaries.asStateFlow()
 
     private fun refreshAnnualSummaries() {
-        viewModelScope.launch {
-            val year = _selectedPlanningYear.value
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val year = _selectedPlanningYear.value
 
-            // Overall
-            val existingOverall = settingsRepository.getOverallBudgetsForYear(year)
-            val totalOverall = existingOverall.values.sum()
-            _annualOverallSummary.value =
-                AnnualOverallSummary(
-                    totalBudget = totalOverall,
-                    overrideCount = existingOverall.size
-                )
-
-            // Categories
-            val categories = categoryRepository.getAllCategoriesSnapshot()
-            val categorySummaries =
-                categories.map { category ->
-                    val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)
-                    AnnualCategorySummary(
-                        categoryName = category.name,
-                        totalBudget = existingCatBudgets.sumOf { it.amount },
-                        overrideCount = existingCatBudgets.size,
-                        iconKey = category.iconKey,
-                        colorKey = category.colorKey
+                // Overall
+                val existingOverall = settingsRepository.getOverallBudgetsForYear(year)
+                val totalOverall = existingOverall.values.sum()
+                _annualOverallSummary.value =
+                    AnnualOverallSummary(
+                        totalBudget = totalOverall,
+                        overrideCount = existingOverall.size,
                     )
-                }.sortedByDescending { it.totalBudget }
 
-            _annualCategorySummaries.value = categorySummaries
+                // Categories
+                val categories = categoryRepository.getAllCategoriesSnapshot()
+                val categorySummaries =
+                    categories.map { category ->
+                        val existingCatBudgets = budgetRepository.getBudgetsForCategoryAndYear(category.name, year)
+                        AnnualCategorySummary(
+                            categoryName = category.name,
+                            totalBudget = existingCatBudgets.sumOf { it.amount },
+                            overrideCount = existingCatBudgets.size,
+                            iconKey = category.iconKey,
+                            colorKey = category.colorKey,
+                        )
+                    }.sortedByDescending { it.totalBudget }
+
+                _annualCategorySummaries.value = categorySummaries
+            } catch (e: Exception) {
+                _uiEvent.send("Error refreshing annual summaries: ${e.message}")
+            }
         }
     }
 
@@ -310,9 +327,9 @@ class BudgetViewModel(
 
     fun saveAnnualOverallBudget(
         amountStr: String,
-        isStrict: Boolean
+        isStrict: Boolean,
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 val amount = amountStr.toFloatOrNull()
                 if (amount == null || amount <= 0) {
@@ -355,9 +372,9 @@ class BudgetViewModel(
     fun saveAnnualCategoryBudget(
         categoryName: String,
         amountStr: String,
-        isStrict: Boolean
+        isStrict: Boolean,
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 val amount = amountStr.toDoubleOrNull()
                 if (amount == null || amount <= 0 || categoryName.isBlank()) {
@@ -394,8 +411,8 @@ class BudgetViewModel(
                                 categoryName = categoryName,
                                 amount = valToSave,
                                 month = month,
-                                year = year
-                            )
+                                year = year,
+                            ),
                         )
                     }
                 }

@@ -14,6 +14,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -45,7 +46,7 @@ class HistoricTripsViewModelTest : BaseViewModelTest() {
 
     private fun initializeViewModel(initialTrips: List<TripWithStats> = emptyList()) {
         `when`(tripRepository.getAllTripsWithStats()).thenReturn(flowOf(initialTrips))
-        viewModel = HistoricTripsViewModel(tripRepository, transactionRepository)
+        viewModel = HistoricTripsViewModel(tripRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @Test

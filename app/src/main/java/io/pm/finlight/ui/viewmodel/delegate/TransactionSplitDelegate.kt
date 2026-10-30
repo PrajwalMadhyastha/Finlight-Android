@@ -6,7 +6,7 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction
-import io.pm.finlight.SplitItem
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope

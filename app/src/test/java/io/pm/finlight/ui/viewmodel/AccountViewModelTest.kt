@@ -456,6 +456,20 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `renameAccount failure sends error event`() =
+        runTest {
+            val accountId = 1
+            `when`(accountRepository.getAccountByIdSync(accountId)).thenThrow(RuntimeException("Sync error"))
+
+            viewModel.uiEvent.test {
+                viewModel.renameAccount(accountId, "New Name")
+                val event = awaitItem()
+                assertTrue(event.contains("Sync error"))
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `dismissMergeSuggestion calls settings repository`() =
         runTest {
             // Arrange

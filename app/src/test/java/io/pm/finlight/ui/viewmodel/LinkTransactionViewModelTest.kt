@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -63,7 +64,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
             // Act
-            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.linkableTransactions.test {
@@ -78,7 +79,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -96,7 +97,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             // Arrange
             val txnWithoutHash = potentialTxn.copy(sourceSmsHash = null)
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, txnWithoutHash)
+            viewModel = LinkTransactionViewModel(transactionRepository, txnWithoutHash, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 

@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.LinkTransactionViewModelFactory
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator

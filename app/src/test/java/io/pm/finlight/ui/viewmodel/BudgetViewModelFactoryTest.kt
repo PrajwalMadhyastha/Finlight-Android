@@ -8,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISettingsRepository

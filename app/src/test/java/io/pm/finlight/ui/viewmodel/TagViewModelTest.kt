@@ -14,9 +14,9 @@ import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.Tag
 import io.pm.finlight.TagRepository
-import io.pm.finlight.TagViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -51,7 +51,7 @@ class TagViewModelTest : BaseViewModelTest() {
 
     private fun initializeViewModel(initialTags: List<Tag> = emptyList()) {
         `when`(tagRepository.allTags).thenReturn(flowOf(initialTags))
-        viewModel = TagViewModel(application, tagRepository, tripRepository)
+        viewModel = TagViewModel(tagRepository, tripRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @Test
@@ -173,6 +173,33 @@ class TagViewModelTest : BaseViewModelTest() {
             verify(tagRepository, never()).delete(tagInUse)
             viewModel.uiEvent.test {
                 assertEquals("Cannot delete '${tagInUse.name}'. It is linked to a trip in your travel history.", awaitItem())
+            }
+        }
+
+    @Test
+    fun `addTag failure sends error event`() =
+        runTest {
+            initializeViewModel()
+            `when`(tagRepository.findByName("NewTag")).thenThrow(RuntimeException("DB error"))
+
+            viewModel.uiEvent.test {
+                viewModel.addTag("NewTag")
+                val event = awaitItem()
+                assertEquals("Error creating tag: DB error", event)
+            }
+        }
+
+    @Test
+    fun `deleteTag failure sends error event`() =
+        runTest {
+            val tag = Tag(1, "Tag1")
+            initializeViewModel()
+            `when`(tagRepository.isTagInUse(tag.id)).thenThrow(RuntimeException("Check error"))
+
+            viewModel.uiEvent.test {
+                viewModel.deleteTag(tag)
+                val event = awaitItem()
+                assertEquals("Error deleting tag: Check error", event)
             }
         }
 }

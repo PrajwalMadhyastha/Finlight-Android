@@ -12,13 +12,15 @@ class AccountViewModelFactory(private val application: Application) : ViewModelP
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val mergeAccountsUseCase = ServiceLocator.provideMergeAccountsUseCase(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             return AccountViewModel(
-                accountRepository,
-                transactionRepository,
-                settingsRepository,
-                mergeAccountsUseCase,
+                repository = accountRepository,
+                transactionRepository = transactionRepository,
+                settingsRepository = settingsRepository,
+                mergeAccountsUseCase = mergeAccountsUseCase,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

@@ -24,11 +24,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Budget
-import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.Category
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)

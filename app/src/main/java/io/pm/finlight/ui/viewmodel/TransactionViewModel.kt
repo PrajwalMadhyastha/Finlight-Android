@@ -17,6 +17,7 @@ import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.ui.viewmodel.delegate.TransactionBatchOperationDelegate
 import io.pm.finlight.ui.viewmodel.delegate.TransactionMergeDelegate
 import io.pm.finlight.ui.viewmodel.delegate.TransactionReimbursementDelegate

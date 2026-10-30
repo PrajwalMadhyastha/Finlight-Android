@@ -1,7 +1,6 @@
 package io.pm.finlight.ui.viewmodel
 
 import app.cash.turbine.test
-import io.pm.finlight.SplitItem
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction

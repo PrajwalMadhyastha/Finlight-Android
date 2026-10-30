@@ -29,9 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import io.pm.finlight.ManageMerchantRulesViewModel
 import io.pm.finlight.MerchantRenameRule
-import io.pm.finlight.MerchantRuleUiItem
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.ConfirmationDialog
@@ -39,6 +37,8 @@ import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
+import io.pm.finlight.ui.viewmodel.MerchantRuleUiItem
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
 import java.util.Date

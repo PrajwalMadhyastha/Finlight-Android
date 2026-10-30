@@ -12,13 +12,15 @@ class IncomeViewModelFactory(private val application: Application) : ViewModelPr
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             return IncomeViewModel(
-                transactionRepository,
-                accountRepository,
-                categoryRepository,
-                settingsRepository,
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                settingsRepository = settingsRepository,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

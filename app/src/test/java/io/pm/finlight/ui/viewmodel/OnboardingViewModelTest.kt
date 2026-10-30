@@ -29,6 +29,7 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -72,7 +73,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         mockkObject(ReminderManager)
         coEvery { ReminderManager.rescheduleAllWork(any()) } just runs
 
-        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @After
@@ -94,7 +95,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
             // Act
             // Re-init viewModel to trigger init block
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.homeCurrency.test {
@@ -122,7 +123,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             res.updateConfiguration(config, res.displayMetrics)
 
             // Act
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.homeCurrency.test {
@@ -159,7 +160,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             java.util.Locale.setDefault(java.util.Locale.UK)
 
             // Act
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository)
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.homeCurrency.test {
@@ -179,7 +180,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
 
             // Act
-            viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository)
+            viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.homeCurrency.test {

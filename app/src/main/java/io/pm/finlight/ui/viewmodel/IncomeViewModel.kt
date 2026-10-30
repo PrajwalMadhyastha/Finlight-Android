@@ -13,6 +13,8 @@ package io.pm.finlight.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -26,8 +28,8 @@ class IncomeViewModel(
     private val transactionRepository: ITransactionRepository,
     val accountRepository: IAccountRepository,
     val categoryRepository: ICategoryRepository,
-    // --- NEW: Add SettingsRepository dependency ---
     private val settingsRepository: ISettingsRepository,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()

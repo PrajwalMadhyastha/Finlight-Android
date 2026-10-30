@@ -27,11 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
-import io.pm.finlight.LinkTransactionViewModelFactory
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkTransactionViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.util.*

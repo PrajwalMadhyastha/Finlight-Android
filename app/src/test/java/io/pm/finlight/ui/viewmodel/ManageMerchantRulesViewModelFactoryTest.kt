@@ -11,7 +11,6 @@ import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.ManageMerchantRulesViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.flow.flowOf

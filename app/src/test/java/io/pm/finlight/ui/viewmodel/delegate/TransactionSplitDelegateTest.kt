@@ -3,10 +3,10 @@ package io.pm.finlight.ui.viewmodel.delegate
 import io.pm.finlight.Category
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SplitItem
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
