@@ -60,8 +60,12 @@ class TransactionSplitDelegate(
 
     fun unsplitTransaction(transaction: Transaction) {
         coroutineScope.launch(dispatcherProvider.io) {
-            val originalDescription = transaction.originalDescription ?: transaction.description
-            splitTransactionRepository.unmarkSplit(transaction.id, originalDescription)
+            try {
+                val originalDescription = transaction.originalDescription ?: transaction.description
+                splitTransactionRepository.unmarkSplit(transaction.id, originalDescription)
+            } catch (e: Exception) {
+                Log.e("TransactionSplitDelegate", "Error unmarking transaction split", e)
+            }
         }
     }
 }

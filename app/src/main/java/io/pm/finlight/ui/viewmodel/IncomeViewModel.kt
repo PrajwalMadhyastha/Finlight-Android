@@ -81,7 +81,8 @@ class IncomeViewModel(
                 filters.account?.id,
                 filters.category?.id,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(dispatcherProvider.io)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalIncomeForSelectedMonth: StateFlow<Long> =
         incomeTransactionsForSelectedMonth.map { transactions ->
@@ -115,7 +116,8 @@ class IncomeViewModel(
                 filters.account?.id,
                 filters.category?.id,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(dispatcherProvider.io)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val monthlySummaries: StateFlow<List<MonthlySummaryItem>>
 
@@ -154,7 +156,8 @@ class IncomeViewModel(
                         }
                         monthList.reversed()
                     }
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            }.flowOn(dispatcherProvider.io)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
 
     fun setSelectedMonth(calendar: Calendar) {

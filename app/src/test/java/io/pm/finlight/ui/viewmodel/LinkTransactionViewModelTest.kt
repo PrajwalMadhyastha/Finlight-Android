@@ -108,4 +108,22 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             verify(transactionRepository, never()).setSmsHash(anyLong().toInt(), org.mockito.Mockito.anyString())
             assertTrue("onComplete lambda should be called", onCompleteCalled)
         }
+
+    @Test
+    fun `linkTransaction on repository failure emits error to uiEvent and calls onComplete with false`() =
+        runTest {
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
+            val selectedTxnId = 99
+            org.mockito.Mockito.doThrow(RuntimeException("Linking failed")).`when`(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
+            var completionResult: Boolean? = null
+
+            viewModel.uiEvent.test {
+                viewModel.linkTransaction(selectedTxnId) { success -> completionResult = success }
+                val event = awaitItem()
+                assertEquals("Error linking transaction: Linking failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(false, completionResult)
+        }
 }

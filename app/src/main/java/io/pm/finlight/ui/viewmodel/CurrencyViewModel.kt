@@ -14,6 +14,7 @@ import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -27,6 +28,9 @@ class CurrencyViewModel(
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val mutex = Mutex()
+
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     val homeCurrency: StateFlow<String> =
         settingsRepository.getHomeCurrency()
@@ -92,8 +96,8 @@ class CurrencyViewModel(
                 tripRepository.getTripWithStatsById(tripId).collect {
                     _tripToEdit.value = it
                 }
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error loading trip: ${e.message}")
             }
         }
     }
@@ -110,8 +114,8 @@ class CurrencyViewModel(
             try {
                 transactionRepository.removeAllTransactionsForTag(tagId)
                 tripRepository.deleteTripById(tripId)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting trip: ${e.message}")
             }
         }
     }
@@ -120,8 +124,8 @@ class CurrencyViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 settingsRepository.saveHomeCurrency(currencyCode)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving home currency: ${e.message}")
             }
         }
     }
@@ -162,8 +166,8 @@ class CurrencyViewModel(
                         )
                     tripRepository.insert(tripRecord)
                 }
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving travel plan: ${e.message}")
             }
         }
     }
@@ -202,8 +206,8 @@ class CurrencyViewModel(
                         conversionRate = updatedSettings.conversionRate,
                     )
                 tripRepository.insert(updatedTripRecord)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating trip: ${e.message}")
             }
         }
     }
@@ -212,8 +216,8 @@ class CurrencyViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 settingsRepository.saveTravelModeSettings(null)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error completing trip: ${e.message}")
             }
         }
     }
@@ -231,8 +235,8 @@ class CurrencyViewModel(
                 }
 
                 settingsRepository.saveTravelModeSettings(null)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error cancelling trip: ${e.message}")
             }
         }
     }

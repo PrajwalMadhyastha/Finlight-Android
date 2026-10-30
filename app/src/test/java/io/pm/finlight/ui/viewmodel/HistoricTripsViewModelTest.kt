@@ -85,4 +85,22 @@ class HistoricTripsViewModelTest : BaseViewModelTest() {
             verify(transactionRepository).removeAllTransactionsForTag(tagId)
             verify(tripRepository).deleteTripById(tripId)
         }
+
+    @Test
+    fun `deleteTrip on repository failure emits error to uiEvent`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val tripId = 1
+            val tagId = 10
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure")).`when`(tripRepository).deleteTripById(tripId)
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.deleteTrip(tripId, tagId)
+                val event = awaitItem()
+                assertEquals("Error deleting trip: DB failure", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

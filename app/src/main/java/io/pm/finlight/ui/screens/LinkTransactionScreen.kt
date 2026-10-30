@@ -12,6 +12,7 @@
 package io.pm.finlight.ui.screens
 
 import android.app.Application
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,6 +50,13 @@ fun LinkTransactionScreen(
     val application = LocalContext.current.applicationContext as Application
     val factory = LinkTransactionViewModelFactory(application, potentialTxn)
     val viewModel: LinkTransactionViewModel = viewModel(factory = factory)
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val candidates by viewModel.linkableTransactions.collectAsState()
     var showConfirmationDialog by remember { mutableStateOf(false) }
@@ -111,12 +119,14 @@ fun LinkTransactionScreen(
             isDestructive = false,
             onDismiss = { showConfirmationDialog = false },
             onConfirm = {
-                viewModel.linkTransaction(transactionToLink!!.id) {
-                    // Pass the ID of the linked SMS back to the review screen
-                    navController.previousBackStackEntry
-                        ?.savedStateHandle
-                        ?.set("linked_sms_id", potentialTxn.sourceSmsId)
-                    navController.popBackStack()
+                viewModel.linkTransaction(transactionToLink!!.id) { success ->
+                    if (success) {
+                        // Pass the ID of the linked SMS back to the review screen
+                        navController.previousBackStackEntry
+                            ?.savedStateHandle
+                            ?.set("linked_sms_id", potentialTxn.sourceSmsId)
+                        navController.popBackStack()
+                    }
                 }
                 showConfirmationDialog = false
             },

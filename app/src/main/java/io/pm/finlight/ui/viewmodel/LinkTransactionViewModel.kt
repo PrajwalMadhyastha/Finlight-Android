@@ -7,8 +7,10 @@ import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Calendar
@@ -18,6 +20,9 @@ open class LinkTransactionViewModel(
     val potentialTransaction: PotentialTransaction,
     protected val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    protected val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     private val _linkableTransactions = MutableStateFlow<List<Transaction>>(emptyList())
     val linkableTransactions = _linkableTransactions.asStateFlow()
 
@@ -53,7 +58,7 @@ open class LinkTransactionViewModel(
 
     open fun linkTransaction(
         selectedTransactionId: Int,
-        onComplete: () -> Unit,
+        onComplete: (Boolean) -> Unit = {},
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
             try {
@@ -61,9 +66,10 @@ open class LinkTransactionViewModel(
                 potentialTransaction.sourceSmsHash?.let { hash ->
                     transactionRepository.setSmsHash(selectedTransactionId, hash)
                 }
-                withContext(dispatcherProvider.main) { onComplete() }
-            } catch (_: Exception) {
-                withContext(dispatcherProvider.main) { onComplete() }
+                withContext(dispatcherProvider.main) { onComplete(true) }
+            } catch (e: Exception) {
+                _uiEvent.send("Error linking transaction: ${e.message}")
+                withContext(dispatcherProvider.main) { onComplete(false) }
             }
         }
     }

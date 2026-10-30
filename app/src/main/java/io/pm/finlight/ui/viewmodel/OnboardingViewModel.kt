@@ -14,8 +14,10 @@ import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 import java.util.Currency
 import java.util.Locale
@@ -26,6 +28,8 @@ class OnboardingViewModel(
     private val settingsRepository: ISettingsRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
     private val _userName = MutableStateFlow("")
     val userName = _userName.asStateFlow()
 
@@ -133,8 +137,8 @@ class OnboardingViewModel(
 
                 // --- FIX: Schedule all default-enabled background workers ---
                 ReminderManager.rescheduleAllWork(application)
-            } catch (_: Exception) {
-                // Ignore or handle
+            } catch (e: Exception) {
+                _uiEvent.send("Error completing onboarding: ${e.message}")
             }
         }
     }

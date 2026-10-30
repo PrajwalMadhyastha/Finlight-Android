@@ -370,4 +370,21 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             // Assert
             coVerify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
         }
+
+    @Test
+    fun `finishOnboarding on repository failure emits error to uiEvent`() =
+        runTest {
+            // Arrange
+            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel.onNameChanged("Alice")
+            doThrow(RuntimeException("DB save failed")).`when`(settingsRepository).saveUserName("Alice")
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.finishOnboarding()
+                val event = awaitItem()
+                assertEquals("Error completing onboarding: DB save failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

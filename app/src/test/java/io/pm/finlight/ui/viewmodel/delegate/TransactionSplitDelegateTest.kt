@@ -136,4 +136,26 @@ class TransactionSplitDelegateTest {
 
             verify(splitTransactionRepository).unmarkSplit(15, "Supermarket")
         }
+
+    @Test
+    fun `unsplitTransaction catches exception gracefully without crashing`() =
+        runTest(testDispatcher) {
+            val txn =
+                Transaction(
+                    id = 15,
+                    description = "Groceries",
+                    categoryId = 1,
+                    amount = 50.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Supermarket",
+                )
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure")).`when`(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+
+            delegate.unsplitTransaction(txn)
+            testScope.advanceUntilIdle()
+
+            verify(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+        }
 }

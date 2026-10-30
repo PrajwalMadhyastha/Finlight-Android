@@ -7,8 +7,10 @@ import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,6 +19,9 @@ class HistoricTripsViewModel(
     private val transactionRepository: ITransactionRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     val historicTrips: StateFlow<List<TripWithStats>> =
         tripRepository.getAllTripsWithStats()
             .stateIn(
@@ -35,8 +40,8 @@ class HistoricTripsViewModel(
                 transactionRepository.removeAllTransactionsForTag(tagId)
                 // Then, delete the trip record itself
                 tripRepository.deleteTripById(tripId)
-            } catch (_: Exception) {
-                // Catch potential repository failures
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting trip: ${e.message}")
             }
         }
     }
