@@ -5,11 +5,13 @@ import android.os.Build
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DispatcherProvider
 import org.junit.After
@@ -26,16 +28,23 @@ import org.robolectric.annotation.Config
 class RuleCreationViewModelFactoryTest {
     private lateinit var application: Application
     private lateinit var factory: RuleCreationViewModelFactory
+    private lateinit var db: AppDatabase
 
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
+        db =
+            Room.inMemoryDatabaseBuilder(application, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+        AppDatabase.setTestInstance(db)
         factory = RuleCreationViewModelFactory(application)
         ServiceLocator.reset()
     }
 
     @After
     fun tearDown() {
+        db.close()
         ServiceLocator.reset()
     }
 

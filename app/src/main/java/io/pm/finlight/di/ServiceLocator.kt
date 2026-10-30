@@ -58,6 +58,7 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.RoomTransactionRunner
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.data.health.IDatabaseHealthChecker
@@ -185,6 +186,9 @@ object ServiceLocator {
 
     @Volatile
     private var dashboardViewModel: DashboardViewModel? = null
+
+    @Volatile
+    private var ruleCreationViewModel: RuleCreationViewModel? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -866,6 +870,32 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves a [RuleCreationViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param savedStateHandle Optional [SavedStateHandle] for state restoration.
+     */
+    fun provideRuleCreationViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        savedStateHandle: SavedStateHandle? = null,
+    ): RuleCreationViewModel {
+        return ruleCreationViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val repository = provideCustomSmsRuleRepository(app, resolvedDb)
+            val dispatchers = provideDispatcherProvider(app)
+            RuleCreationViewModel(
+                customSmsRuleRepository = repository,
+                dispatcherProvider = dispatchers,
+                savedStateHandle = savedStateHandle ?: SavedStateHandle(),
+            )
+        }
+    }
+
+    /**
      * Resolves the centralized [ViewModelProvider.Factory].
      *
      * @param context Optional context fallback.
@@ -1050,6 +1080,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setRuleCreationViewModel(viewModel: RuleCreationViewModel?) {
+        ruleCreationViewModel = viewModel
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -1086,5 +1121,6 @@ object ServiceLocator {
         transactionRunner = null
         transactionViewModel = null
         dashboardViewModel = null
+        ruleCreationViewModel = null
     }
 }

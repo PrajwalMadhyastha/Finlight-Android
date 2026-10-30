@@ -569,6 +569,10 @@ class TransactionViewModel(
         }
     }
 
+    fun hasRestoredManualTransactionState(): Boolean {
+        return savedStateHandle.contains(KEY_MANUAL_DESCRIPTION) || savedStateHandle.contains(KEY_MANUAL_AMOUNT)
+    }
+
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
         _addTransactionDescription.value = ""

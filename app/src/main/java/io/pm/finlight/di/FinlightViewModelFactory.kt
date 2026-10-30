@@ -35,6 +35,11 @@ class FinlightViewModelFactory(
                 val app = resolveApplication(this, context)
                 ServiceLocator.provideDashboardViewModel(app)
             }
+            initializer {
+                val app = resolveApplication(this, context)
+                val handle = runCatching { this.createSavedStateHandle() }.getOrElse { SavedStateHandle() }
+                ServiceLocator.provideRuleCreationViewModel(app, savedStateHandle = handle)
+            }
         }
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

@@ -1274,4 +1274,22 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             assertEquals("", viewModel.addTransactionDescription.value)
             assertEquals("", viewModel.addTransactionAmount.value)
         }
+
+    @Test
+    fun `hasRestoredManualTransactionState reflects presence of keys in SavedStateHandle`() =
+        runTest {
+            assertFalse(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.onAddTransactionDescriptionChanged("Draft Merchant")
+            advanceUntilIdle()
+            assertTrue(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.clearAddTransactionState()
+            advanceUntilIdle()
+            assertFalse(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.onAddTransactionAmountChanged("99.99")
+            advanceUntilIdle()
+            assertTrue(viewModel.hasRestoredManualTransactionState())
+        }
 }
