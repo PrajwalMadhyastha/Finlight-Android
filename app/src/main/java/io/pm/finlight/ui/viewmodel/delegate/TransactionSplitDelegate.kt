@@ -6,7 +6,7 @@ import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction
-import io.pm.finlight.SplitItem
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
@@ -28,11 +28,17 @@ class TransactionSplitDelegate(
     fun saveTransactionSplits(
         parentTransactionId: Int,
         splitItems: List<SplitItem>,
-        onComplete: () -> Unit,
+        onComplete: (Boolean) -> Unit = {},
     ) {
         coroutineScope.launch(dispatcherProvider.io) {
             try {
-                val parentTxn = transactionRepository.getTransactionById(parentTransactionId).firstOrNull() ?: return@launch
+                val parentTxn =
+                    transactionRepository.getTransactionById(parentTransactionId).firstOrNull() ?: run {
+                        withContext(dispatcherProvider.main) {
+                            onComplete(false)
+                        }
+                        return@launch
+                    }
                 val conversionRate = parentTxn.conversionRate ?: 1.0
 
                 val newSplits =
@@ -50,18 +56,40 @@ class TransactionSplitDelegate(
                 splitTransactionRepository.saveSplits(parentTransactionId, newSplits)
 
                 withContext(dispatcherProvider.main) {
-                    onComplete()
+                    onComplete(true)
                 }
             } catch (e: Exception) {
                 Log.e("TransactionSplitDelegate", "Error saving transaction splits", e)
+                withContext(dispatcherProvider.main) {
+                    onComplete(false)
+                }
             }
         }
     }
 
-    fun unsplitTransaction(transaction: Transaction) {
+    fun unsplitTransaction(
+        transaction: Transaction,
+        onError: (suspend (String) -> Unit)? = null,
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) {
         coroutineScope.launch(dispatcherProvider.io) {
-            val originalDescription = transaction.originalDescription ?: transaction.description
-            splitTransactionRepository.unmarkSplit(transaction.id, originalDescription)
+            try {
+                val originalDescription = transaction.originalDescription ?: transaction.description
+                splitTransactionRepository.unmarkSplit(transaction.id, originalDescription)
+                if (onComplete != null) {
+                    withContext(dispatcherProvider.main) {
+                        onComplete(true)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("TransactionSplitDelegate", "Error unmarking transaction split", e)
+                onError?.invoke("Failed to un-split transaction.")
+                if (onComplete != null) {
+                    withContext(dispatcherProvider.main) {
+                        onComplete(false)
+                    }
+                }
+            }
         }
     }
 }

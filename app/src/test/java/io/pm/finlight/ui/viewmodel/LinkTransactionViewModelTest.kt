@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -63,7 +64,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
             // Act
-            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.linkableTransactions.test {
@@ -78,7 +79,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn)
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -96,7 +97,7 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             // Arrange
             val txnWithoutHash = potentialTxn.copy(sourceSmsHash = null)
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkTransactionViewModel(transactionRepository, txnWithoutHash)
+            viewModel = LinkTransactionViewModel(transactionRepository, txnWithoutHash, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -106,5 +107,23 @@ class LinkTransactionViewModelTest : BaseViewModelTest() {
             // Assert
             verify(transactionRepository, never()).setSmsHash(anyLong().toInt(), org.mockito.Mockito.anyString())
             assertTrue("onComplete lambda should be called", onCompleteCalled)
+        }
+
+    @Test
+    fun `linkTransaction on repository failure emits error to uiEvent and calls onComplete with false`() =
+        runTest {
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkTransactionViewModel(transactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
+            val selectedTxnId = 99
+            org.mockito.Mockito.doThrow(RuntimeException("Linking failed")).`when`(transactionRepository).setSmsHash(selectedTxnId, potentialTxn.sourceSmsHash!!)
+            var completionResult: Boolean? = null
+
+            viewModel.uiEvent.test {
+                viewModel.linkTransaction(selectedTxnId) { success -> completionResult = success }
+                val event = awaitItem()
+                assertEquals("Error linking transaction: Linking failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(false, completionResult)
         }
 }

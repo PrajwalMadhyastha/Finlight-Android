@@ -14,11 +14,13 @@ class LinkRecurringTransactionViewModelFactory(
         if (modelClass.isAssignableFrom(LinkRecurringTransactionViewModel::class.java)) {
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val recurringTransactionRepository = ServiceLocator.provideRecurringTransactionRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
             return LinkRecurringTransactionViewModel(
-                transactionRepository,
-                recurringTransactionRepository,
-                potentialTransaction,
+                transactionRepository = transactionRepository,
+                recurringTransactionRepository = recurringTransactionRepository,
+                potentialTransaction = potentialTransaction,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

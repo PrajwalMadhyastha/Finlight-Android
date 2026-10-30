@@ -1,16 +1,16 @@
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
 import android.os.Build
-import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,8 +28,6 @@ import kotlin.test.assertNull
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class CurrencyViewModelTest : BaseViewModelTest() {
-    @Mock private lateinit var application: Application
-
     @Mock private lateinit var settingsRepository: SettingsRepository
 
     @Mock private lateinit var tripRepository: TripRepository
@@ -52,11 +50,11 @@ class CurrencyViewModelTest : BaseViewModelTest() {
 
         viewModel =
             CurrencyViewModel(
-                ApplicationProvider.getApplicationContext(),
-                settingsRepository,
-                tripRepository,
-                transactionRepository,
-                tagRepository,
+                settingsRepository = settingsRepository,
+                tripRepository = tripRepository,
+                transactionRepository = transactionRepository,
+                tagRepository = tagRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
             )
     }
 
@@ -385,14 +383,100 @@ class CurrencyViewModelTest : BaseViewModelTest() {
             }
         }
 
+    @Test
+    fun `loadTripForEditing emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            `when`(tripRepository.getTripWithStatsById(99)).thenReturn(flow { throw RuntimeException("Trip not found") })
+
+            viewModel.uiEvent.test {
+                viewModel.loadTripForEditing(99)
+                val event = awaitItem()
+                assertEquals("Error loading trip: Trip not found", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `deleteTrip emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            doThrow(RuntimeException("Delete failed")).`when`(tripRepository).deleteTripById(anyInt())
+
+            viewModel.uiEvent.test {
+                viewModel.deleteTrip(1, 2)
+                val event = awaitItem()
+                assertEquals("Error deleting trip: Delete failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `saveHomeCurrency emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            doThrow(RuntimeException("Save failed")).`when`(settingsRepository).saveHomeCurrency(anyString())
+
+            viewModel.uiEvent.test {
+                viewModel.saveHomeCurrency("EUR")
+                val event = awaitItem()
+                assertEquals("Error saving home currency: Save failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `saveActiveTravelPlan emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            val newSettings = TravelModeSettings(true, "Trip", TripType.DOMESTIC, 1000L, 2000L, null, null)
+            doThrow(RuntimeException("DB error")).`when`(tagRepository).findOrCreateTag(anyString())
+
+            viewModel.uiEvent.test {
+                viewModel.saveActiveTravelPlan(newSettings)
+                val event = awaitItem()
+                assertEquals("Error saving travel plan: DB error", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `completeTrip emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            doThrow(RuntimeException("Complete error")).`when`(settingsRepository).saveTravelModeSettings(null)
+
+            viewModel.uiEvent.test {
+                viewModel.completeTrip()
+                val event = awaitItem()
+                assertEquals("Error completing trip: Complete error", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `cancelTrip emits error to uiEvent on failure`() =
+        runTest {
+            initializeViewModel()
+            val settings = TravelModeSettings(true, "Cancel Trip", TripType.DOMESTIC, 1000L, 2000L, null, null)
+            doThrow(RuntimeException("Cancel error")).`when`(tagRepository).findOrCreateTag(anyString())
+
+            viewModel.uiEvent.test {
+                viewModel.cancelTrip(settings)
+                val event = awaitItem()
+                assertEquals("Error cancelling trip: Cancel error", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
     private fun initializeViewModel() {
         viewModel =
             CurrencyViewModel(
-                ApplicationProvider.getApplicationContext(),
-                settingsRepository,
-                tripRepository,
-                transactionRepository,
-                tagRepository,
+                settingsRepository = settingsRepository,
+                tripRepository = tripRepository,
+                transactionRepository = transactionRepository,
+                tagRepository = tagRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
             )
     }
 }

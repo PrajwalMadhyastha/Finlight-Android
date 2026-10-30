@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -37,7 +38,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
         runTest {
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList())
         }
-        viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+        viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @Test
@@ -46,7 +47,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             // ARRANGE
             val categories = listOf(Category(1, "Food", "icon", "color"))
             `when`(categoryRepository.allCategories).thenReturn(flowOf(categories))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ACT & ASSERT
             viewModel.allCategories.test {
@@ -63,7 +64,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             `when`(categoryRepository.findByName(categoryName)).thenReturn(null)
             `when`(categoryRepository.getAllCategoriesSnapshot()).thenReturn(emptyList()) // For getNextAvailableColor
             val categoryCaptor = argumentCaptor<Category>()
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // Act & Assert
             viewModel.uiEvent.test {
@@ -84,7 +85,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             // ARRANGE
             val categoryToUpdate = Category(1, "Updated Name", "icon", "color")
             `when`(categoryRepository.allCategories).thenReturn(flowOf(emptyList()))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ACT
             viewModel.updateCategory(categoryToUpdate)
@@ -101,7 +102,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             val category = Category(1, "Deletable Category", "icon", "color")
             `when`(transactionRepository.countTransactionsForCategory(category.id)).thenReturn(0)
             `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(category)))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ACT
             viewModel.deleteCategory(category)
@@ -122,7 +123,7 @@ class CategoryViewModelTest : BaseViewModelTest() {
             val transactionCount = 3
             `when`(transactionRepository.countTransactionsForCategory(category.id)).thenReturn(transactionCount)
             `when`(categoryRepository.allCategories).thenReturn(flowOf(listOf(category)))
-            viewModel = CategoryViewModel(categoryRepository, transactionRepository)
+            viewModel = CategoryViewModel(categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ACT
             viewModel.deleteCategory(category)

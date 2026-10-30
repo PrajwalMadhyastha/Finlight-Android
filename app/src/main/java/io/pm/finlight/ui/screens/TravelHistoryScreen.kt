@@ -10,6 +10,7 @@
 package io.pm.finlight.ui.screens
 
 import android.app.Application
+import android.widget.Toast
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -43,6 +44,13 @@ fun TravelHistoryScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
     val factory = HistoricTripsViewModelFactory(application)
     val viewModel: HistoricTripsViewModel = viewModel(factory = factory)
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val trips by viewModel.historicTrips.collectAsState()
     var tripToDelete by remember { mutableStateOf<TripWithStats?>(null) }

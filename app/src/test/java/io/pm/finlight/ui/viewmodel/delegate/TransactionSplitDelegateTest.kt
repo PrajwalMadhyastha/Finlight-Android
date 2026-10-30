@@ -3,10 +3,10 @@ package io.pm.finlight.ui.viewmodel.delegate
 import io.pm.finlight.Category
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SplitItem
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.Transaction
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
@@ -19,9 +19,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
+import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when` as whenever
 import org.mockito.MockitoAnnotations
+import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -135,5 +137,124 @@ class TransactionSplitDelegateTest {
             testScope.advanceUntilIdle()
 
             verify(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+        }
+
+    @Test
+    fun `unsplitTransaction catches exception gracefully without crashing`() =
+        runTest(testDispatcher) {
+            val txn =
+                Transaction(
+                    id = 15,
+                    description = "Groceries",
+                    categoryId = 1,
+                    amount = 50.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Supermarket",
+                )
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure")).`when`(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+
+            delegate.unsplitTransaction(txn)
+            testScope.advanceUntilIdle()
+
+            verify(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+        }
+
+    @Test
+    fun `saveTransactionSplits passes false when parent transaction is null`() =
+        runTest(testDispatcher) {
+            whenever(transactionRepository.getTransactionById(10)).thenReturn(flowOf(null))
+
+            var successResult: Boolean? = null
+            delegate.saveTransactionSplits(10, emptyList()) {
+                successResult = it
+            }
+            testScope.advanceUntilIdle()
+
+            assertEquals(false, successResult)
+            verify(splitTransactionRepository, never()).saveSplits(any(), any())
+        }
+
+    @Test
+    fun `saveTransactionSplits passes false when repository throws exception`() =
+        runTest(testDispatcher) {
+            val parent =
+                Transaction(
+                    id = 10,
+                    description = "Dinner",
+                    categoryId = 1,
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                )
+            whenever(transactionRepository.getTransactionById(10)).thenReturn(flowOf(parent))
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure"))
+                .`when`(splitTransactionRepository).saveSplits(any(), any())
+
+            var successResult: Boolean? = null
+            delegate.saveTransactionSplits(10, emptyList()) {
+                successResult = it
+            }
+            testScope.advanceUntilIdle()
+
+            assertEquals(false, successResult)
+        }
+
+    @Test
+    fun `unsplitTransaction triggers onError and onComplete false on exception`() =
+        runTest(testDispatcher) {
+            val txn =
+                Transaction(
+                    id = 15,
+                    description = "Groceries",
+                    categoryId = 1,
+                    amount = 50.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Supermarket",
+                )
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure"))
+                .`when`(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+
+            var errorMessage: String? = null
+            var successResult: Boolean? = null
+            delegate.unsplitTransaction(
+                transaction = txn,
+                onError = { errorMessage = it },
+                onComplete = { successResult = it },
+            )
+            testScope.advanceUntilIdle()
+
+            assertEquals("Failed to un-split transaction.", errorMessage)
+            assertEquals(false, successResult)
+        }
+
+    @Test
+    fun `unsplitTransaction triggers onComplete true on success`() =
+        runTest(testDispatcher) {
+            val txn =
+                Transaction(
+                    id = 15,
+                    description = "Groceries",
+                    categoryId = 1,
+                    amount = 50.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                    originalDescription = "Supermarket",
+                )
+
+            var successResult: Boolean? = null
+            delegate.unsplitTransaction(
+                transaction = txn,
+                onComplete = { successResult = it },
+            )
+            testScope.advanceUntilIdle()
+
+            verify(splitTransactionRepository).unmarkSplit(15, "Supermarket")
+            assertEquals(true, successResult)
         }
 }

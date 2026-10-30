@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.*
@@ -64,8 +65,8 @@ class IncomeViewModelTest : BaseViewModelTest() {
                 transactionRepository,
                 accountRepository,
                 categoryRepository,
-                // --- NEW: Pass dependency ---
                 settingsRepository,
+                TestDispatcherProvider(testDispatcher),
             )
     }
 

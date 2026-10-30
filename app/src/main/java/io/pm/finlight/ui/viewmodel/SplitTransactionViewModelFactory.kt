@@ -1,4 +1,4 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
@@ -14,6 +14,7 @@ class SplitTransactionViewModelFactory(
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val splitTransactionRepository = ServiceLocator.provideSplitTransactionRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             return SplitTransactionViewModel(
@@ -21,6 +22,7 @@ class SplitTransactionViewModelFactory(
                 categoryRepository = categoryRepository,
                 splitTransactionRepository = splitTransactionRepository,
                 transactionId = transactionId,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

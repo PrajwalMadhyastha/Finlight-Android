@@ -9,6 +9,7 @@ import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -20,6 +21,7 @@ import org.junit.runner.RunWith
 import org.mockito.ArgumentCaptor
 import org.mockito.Captor
 import org.mockito.Mock
+import org.mockito.Mockito.anyInt
 import org.mockito.Mockito.anyLong
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
@@ -69,7 +71,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
                 )
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(mockTransactions))
 
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
 
             viewModel.linkableTransactions.test {
                 assertEquals(mockTransactions, awaitItem())
@@ -82,7 +84,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
     fun `linkTransaction updates sms hash and rule lastRunDate`() =
         runTest {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -104,7 +106,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
         runTest {
             val txnWithoutHash = potentialTxn.copy(sourceSmsHash = null)
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, txnWithoutHash)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, txnWithoutHash, TestDispatcherProvider(testDispatcher))
             val selectedTxnId = 99
             var onCompleteCalled = false
 
@@ -119,7 +121,7 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
     fun `remindTomorrow updates rule lastRunDate to yesterday`() =
         runTest {
             `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
-            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn)
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
             var onCompleteCalled = false
 
             viewModel.remindTomorrow { onCompleteCalled = true }
@@ -137,5 +139,40 @@ class LinkRecurringTransactionViewModelTest : BaseViewModelTest() {
                 kotlin.math.abs(capturedTimestamp - yesterday) < oneSecondInMillis,
             )
             assertTrue("onComplete lambda should be called", onCompleteCalled)
+        }
+
+    @Test
+    fun `linkTransaction on recurring repository failure emits error to uiEvent and calls onComplete with false`() =
+        runTest {
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
+            val selectedTxnId = 99
+            org.mockito.Mockito.doThrow(RuntimeException("Rule update failed")).`when`(recurringTransactionRepository).updateLastRunDate(anyInt(), anyLong())
+            var completionResult: Boolean? = null
+
+            viewModel.uiEvent.test {
+                viewModel.linkTransaction(selectedTxnId) { success -> completionResult = success }
+                val event = awaitItem()
+                assertEquals("Error updating recurring rule: Rule update failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(false, completionResult)
+        }
+
+    @Test
+    fun `remindTomorrow on repository failure emits error to uiEvent and calls onComplete with false`() =
+        runTest {
+            `when`(transactionRepository.getAllTransactionsForRange(anyLong(), anyLong())).thenReturn(flowOf(emptyList()))
+            viewModel = LinkRecurringTransactionViewModel(transactionRepository, recurringTransactionRepository, potentialTxn, TestDispatcherProvider(testDispatcher))
+            org.mockito.Mockito.doThrow(RuntimeException("Reminder update failed")).`when`(recurringTransactionRepository).updateLastRunDate(anyInt(), anyLong())
+            var completionResult: Boolean? = null
+
+            viewModel.uiEvent.test {
+                viewModel.remindTomorrow { success -> completionResult = success }
+                val event = awaitItem()
+                assertEquals("Error reminding tomorrow: Reminder update failed", event)
+                cancelAndIgnoreRemainingEvents()
+            }
+            assertEquals(false, completionResult)
         }
 }

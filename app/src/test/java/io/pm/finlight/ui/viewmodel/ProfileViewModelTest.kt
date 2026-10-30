@@ -15,9 +15,9 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
-import io.pm.finlight.ProfileViewModel
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -64,7 +64,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             val testName = "Test User"
             `when`(settingsRepository.getUserName()).thenReturn(flowOf(testName))
             `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(null))
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             viewModel.userName.test {
                 assertEquals(testName, awaitItem())
@@ -78,7 +78,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             val testUri = "content://test/uri"
             `when`(settingsRepository.getUserName()).thenReturn(flowOf("User"))
             `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(testUri))
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             viewModel.profilePictureUri.test {
                 assertEquals(testUri, awaitItem())
@@ -91,7 +91,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
         runTest {
             val newName = "New Name"
             setupDefaultRepo()
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             viewModel.updateUserName(newName)
             advanceUntilIdle()
@@ -103,7 +103,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
     fun `saveProfilePictureUri with null calls repository with null`() =
         runTest {
             setupDefaultRepo()
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             viewModel.saveProfilePictureUri(null)
             advanceUntilIdle()
@@ -114,7 +114,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
     @Test
     fun `appVersion returns BuildConfig VERSION_NAME`() {
         setupDefaultRepo()
-        viewModel = ProfileViewModel(application, settingsRepository)
+        viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
         assertEquals(io.pm.finlight.BuildConfig.VERSION_NAME, viewModel.appVersion)
     }
@@ -127,7 +127,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             setupDefaultRepo()
 
             // Act
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle()
 
             // Assert: saveProfilePictureUri should never be called during migration
@@ -143,7 +143,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(outsidePath))
 
             // Act
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle()
 
             // Assert: no migration should happen
@@ -160,7 +160,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(nonExistentFile.absolutePath))
 
             // Act
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle()
 
             // Assert: no migration attempted since the source file doesn't exist
@@ -177,7 +177,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getProfilePictureUri()).thenReturn(flowOf(oldFile.absolutePath))
 
             // Act
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
             // The migration dispatches to Dispatchers.IO (real thread pool); give it time to complete
             Thread.sleep(300)
 
@@ -193,7 +193,7 @@ class ProfileViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             setupDefaultRepo()
-            viewModel = ProfileViewModel(application, settingsRepository)
+            viewModel = ProfileViewModel(application, settingsRepository, TestDispatcherProvider(testDispatcher))
 
             // Write a tiny fake image to a temp file and expose it as a file URI
             val tempFile = File(application.cacheDir, "test_profile.jpg").also { it.writeText("fake") }

@@ -17,6 +17,7 @@ import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ui.components.ShareableField
 import io.pm.finlight.ui.viewmodel.AnalysisTransactionType
+import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.ui.viewmodel.delegate.TransactionBatchOperationDelegate
 import io.pm.finlight.ui.viewmodel.delegate.TransactionMergeDelegate
 import io.pm.finlight.ui.viewmodel.delegate.TransactionReimbursementDelegate
@@ -388,10 +389,14 @@ class TransactionViewModel(
     fun saveTransactionSplits(
         parentTransactionId: Int,
         splitItems: List<SplitItem>,
-        onComplete: () -> Unit,
+        onComplete: (Boolean) -> Unit = {},
     ) = splitDelegate.saveTransactionSplits(parentTransactionId, splitItems, onComplete)
 
-    fun unsplitTransaction(transaction: Transaction) = splitDelegate.unsplitTransaction(transaction)
+    fun unsplitTransaction(
+        transaction: Transaction,
+        onError: (suspend (String) -> Unit) = { _uiEvent.send(it) },
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) = splitDelegate.unsplitTransaction(transaction, onError, onComplete)
 
     // -------------------------------------------------------------------------
     // Add Transaction & Category / Merchant Search Logic

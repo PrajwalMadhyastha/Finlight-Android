@@ -1,18 +1,19 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ProfileViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/ProfileViewModel.kt
 // REASON: FIX (Profile Picture Backup) - Changed profile picture storage location
 // from 'filesDir/attachments/' (which is excluded from Auto Backup) to
 // 'filesDir/profile/' (which is included). Added a one-time migration that
 // transparently moves existing profile pictures to the new directory on first
 // launch after the update.
 // =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
@@ -51,7 +52,7 @@ class ProfileViewModel(
 
     init {
         // --- MIGRATION: Move profile picture from attachments/ to profile/ on first run ---
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             migrateProfilePictureIfNeeded()
         }
     }
@@ -93,23 +94,31 @@ class ProfileViewModel(
      * Saves the cropped image from the source URI to internal storage and persists its path.
      */
     fun saveProfilePictureUri(sourceUri: Uri?) {
-        viewModelScope.launch {
-            if (sourceUri == null) {
-                settingsRepository.saveProfilePictureUri(null)
-                return@launch
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                if (sourceUri == null) {
+                    settingsRepository.saveProfilePictureUri(null)
+                    return@launch
+                }
+                // Copy the file to internal storage and get the new path
+                val localPath = saveImageToInternalStorage(sourceUri)
+                // Save the path to our new local file
+                settingsRepository.saveProfilePictureUri(localPath)
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Error saving profile picture URI", e)
             }
-            // Copy the file to internal storage and get the new path
-            val localPath = saveImageToInternalStorage(sourceUri)
-            // Save the path to our new local file
-            settingsRepository.saveProfilePictureUri(localPath)
         }
     }
 
     // --- NEW: Function to save the updated user name ---
     fun updateUserName(name: String) {
-        viewModelScope.launch {
-            if (name.isNotBlank()) {
-                settingsRepository.saveUserName(name)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                if (name.isNotBlank()) {
+                    settingsRepository.saveUserName(name)
+                }
+            } catch (e: Exception) {
+                Log.e("ProfileViewModel", "Error updating user name", e)
             }
         }
     }
