@@ -87,7 +87,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-        splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao(), db.transactionWriteDao())
         mergeTransactionsUseCase =
             io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
                 transactionQueryDao = db.transactionQueryDao(),

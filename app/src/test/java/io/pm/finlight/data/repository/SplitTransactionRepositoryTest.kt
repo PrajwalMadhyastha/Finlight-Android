@@ -25,12 +25,15 @@ class SplitTransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var splitTransactionDao: SplitTransactionDao
 
+    @Mock
+    private lateinit var transactionWriteDao: TransactionWriteDao
+
     private lateinit var repository: SplitTransactionRepository
 
     @Before
     override fun setup() {
         super.setup()
-        repository = SplitTransactionRepository(splitTransactionDao)
+        repository = SplitTransactionRepository(splitTransactionDao, transactionWriteDao)
     }
 
     @Test

@@ -8,6 +8,7 @@ import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,6 +24,9 @@ class TransactionReimbursementDelegate(
     private val manageReimbursementUseCase: ManageReimbursementUseCase,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) {
+    private var reimbursementJob: Job? = null
+    private var pickerJob: Job? = null
+
     private val _reimbursementsForCurrentExpense = MutableStateFlow<List<TransactionDetails>>(emptyList())
     val reimbursementsForCurrentExpense: StateFlow<List<TransactionDetails>> = _reimbursementsForCurrentExpense.asStateFlow()
 
@@ -48,31 +52,38 @@ class TransactionReimbursementDelegate(
         }.stateIn(coroutineScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun loadReimbursementData(transaction: Transaction) {
+        reimbursementJob?.cancel()
         if (transaction.transactionType == TransactionType.EXPENSE) {
-            coroutineScope.launch {
-                transactionRepository.getReimbursementsForExpense(transaction.id).collect { reimbursements ->
-                    _reimbursementsForCurrentExpense.value = reimbursements
+            reimbursementJob =
+                coroutineScope.launch {
+                    transactionRepository.getReimbursementsForExpense(transaction.id).collect { reimbursements ->
+                        _reimbursementsForCurrentExpense.value = reimbursements
+                    }
                 }
-            }
         } else if (transaction.transactionType == TransactionType.INCOME && transaction.parentReimbursementId != null) {
-            coroutineScope.launch {
-                transactionRepository.getLinkedExpenseForReimbursement(transaction.id).collect { expense ->
-                    _linkedExpenseForCurrentIncome.value = expense
+            reimbursementJob =
+                coroutineScope.launch {
+                    transactionRepository.getLinkedExpenseForReimbursement(transaction.id).collect { expense ->
+                        _linkedExpenseForCurrentIncome.value = expense
+                    }
                 }
-            }
         }
     }
 
     fun openReimbursementPicker(expenseId: Int) {
-        coroutineScope.launch {
-            transactionRepository.getCandidateReimbursements(expenseId).collect { candidates ->
-                _candidateReimbursements.value = candidates
+        pickerJob?.cancel()
+        pickerJob =
+            coroutineScope.launch {
+                transactionRepository.getCandidateReimbursements(expenseId).collect { candidates ->
+                    _candidateReimbursements.value = candidates
+                }
             }
-        }
         _showReimbursementPicker.value = true
     }
 
     fun dismissReimbursementPicker() {
+        pickerJob?.cancel()
+        pickerJob = null
         _showReimbursementPicker.value = false
     }
 
@@ -82,6 +93,8 @@ class TransactionReimbursementDelegate(
     ) {
         coroutineScope.launch {
             manageReimbursementUseCase.linkReimbursement(incomeId, expenseId)
+            pickerJob?.cancel()
+            pickerJob = null
             _showReimbursementPicker.value = false
         }
     }
@@ -116,6 +129,8 @@ class TransactionReimbursementDelegate(
     }
 
     fun resetDetailReimbursementState() {
+        reimbursementJob?.cancel()
+        reimbursementJob = null
         _reimbursementsForCurrentExpense.value = emptyList()
         _linkedExpenseForCurrentIncome.value = null
     }

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 class SplitTransactionRepository(
     private val splitTransactionDao: SplitTransactionDao,
-    private val transactionWriteDao: TransactionWriteDao? = null,
+    private val transactionWriteDao: TransactionWriteDao,
     private val transactionRunner: TransactionRunner =
         object : TransactionRunner {
             override suspend fun <R> run(block: suspend () -> R): R = block()
@@ -25,7 +25,7 @@ class SplitTransactionRepository(
         splits: List<SplitTransaction>,
     ) {
         transactionRunner.run {
-            transactionWriteDao?.markAsSplit(parentTransactionId, true)
+            transactionWriteDao.markAsSplit(parentTransactionId, true)
             splitTransactionDao.deleteSplitsForParent(parentTransactionId)
             splitTransactionDao.insertAll(splits)
         }
@@ -39,7 +39,7 @@ class SplitTransactionRepository(
             val splits = splitTransactionDao.getSplitsForParentSimple(parentTransactionId)
             val firstSplitCategory = splits?.firstOrNull()?.splitTransaction?.categoryId
             splitTransactionDao.deleteSplitsForParent(parentTransactionId)
-            transactionWriteDao?.unmarkAsSplit(parentTransactionId, originalDescription, firstSplitCategory)
+            transactionWriteDao.unmarkAsSplit(parentTransactionId, originalDescription, firstSplitCategory)
         }
     }
 }

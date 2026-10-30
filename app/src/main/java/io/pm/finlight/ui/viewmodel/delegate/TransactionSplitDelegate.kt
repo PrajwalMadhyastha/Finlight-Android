@@ -30,7 +30,7 @@ class TransactionSplitDelegate(
         splitItems: List<SplitItem>,
         onComplete: () -> Unit,
     ) {
-        coroutineScope.launch {
+        coroutineScope.launch(dispatcherProvider.io) {
             try {
                 val parentTxn = transactionRepository.getTransactionById(parentTransactionId).firstOrNull() ?: return@launch
                 val conversionRate = parentTxn.conversionRate ?: 1.0
@@ -59,7 +59,7 @@ class TransactionSplitDelegate(
     }
 
     fun unsplitTransaction(transaction: Transaction) {
-        coroutineScope.launch {
+        coroutineScope.launch(dispatcherProvider.io) {
             val originalDescription = transaction.originalDescription ?: transaction.description
             splitTransactionRepository.unmarkSplit(transaction.id, originalDescription)
         }

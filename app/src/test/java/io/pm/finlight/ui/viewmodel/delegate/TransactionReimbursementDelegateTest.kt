@@ -145,4 +145,218 @@ class TransactionReimbursementDelegateTest {
 
             verify(manageReimbursementUseCase).unlinkReimbursement(2)
         }
+
+    @Test
+    fun `loadReimbursementData cancels previous collection job when called with a new transaction`() =
+        runTest(testDispatcher) {
+            val expenseFlow1 = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val expenseFlow2 = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val txn1 =
+                Transaction(
+                    id = 1,
+                    description = "Lunch",
+                    categoryId = 1,
+                    amount = 20.0,
+                    date = 100L,
+                    accountId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+            val txn2 =
+                Transaction(
+                    id = 2,
+                    description = "Dinner",
+                    categoryId = 1,
+                    amount = 40.0,
+                    date = 200L,
+                    accountId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+
+            whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(expenseFlow1)
+            whenever(transactionRepository.getReimbursementsForExpense(2)).thenReturn(expenseFlow2)
+
+            delegate.loadReimbursementData(txn1)
+            testScope.advanceUntilIdle()
+
+            delegate.loadReimbursementData(txn2)
+            testScope.advanceUntilIdle()
+
+            val details2 =
+                listOf(
+                    TransactionDetails(
+                        transaction =
+                            Transaction(
+                                id = 3,
+                                description = "Repayment",
+                                categoryId = null,
+                                amount = 40.0,
+                                date = 300L,
+                                accountId = 1,
+                                notes = null,
+                                transactionType = TransactionType.INCOME,
+                            ),
+                        images = emptyList(),
+                        accountName = "Bank",
+                        categoryName = null,
+                        categoryIconKey = null,
+                        categoryColorKey = null,
+                        tagNames = null,
+                    ),
+                )
+            expenseFlow2.emit(details2)
+            testScope.advanceUntilIdle()
+
+            assertEquals(details2, delegate.reimbursementsForCurrentExpense.value)
+
+            expenseFlow1.emit(emptyList())
+            testScope.advanceUntilIdle()
+
+            assertEquals(details2, delegate.reimbursementsForCurrentExpense.value)
+        }
+
+    @Test
+    fun `openReimbursementPicker cancels previous candidate collection job`() =
+        runTest(testDispatcher) {
+            val candidateFlow1 = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val candidateFlow2 = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+
+            whenever(transactionRepository.getCandidateReimbursements(1)).thenReturn(candidateFlow1)
+            whenever(transactionRepository.getCandidateReimbursements(2)).thenReturn(candidateFlow2)
+
+            delegate.openReimbursementPicker(1)
+            testScope.advanceUntilIdle()
+
+            delegate.openReimbursementPicker(2)
+            testScope.advanceUntilIdle()
+
+            val candidates2 =
+                listOf(
+                    TransactionDetails(
+                        transaction =
+                            Transaction(
+                                id = 4,
+                                description = "Candidate",
+                                categoryId = null,
+                                amount = 10.0,
+                                date = 400L,
+                                accountId = 1,
+                                notes = null,
+                                transactionType = TransactionType.INCOME,
+                            ),
+                        images = emptyList(),
+                        accountName = "Bank",
+                        categoryName = null,
+                        categoryIconKey = null,
+                        categoryColorKey = null,
+                        tagNames = null,
+                    ),
+                )
+            candidateFlow2.emit(candidates2)
+            testScope.advanceUntilIdle()
+
+            assertEquals(candidates2, delegate.candidateReimbursements.value)
+
+            candidateFlow1.emit(emptyList())
+            testScope.advanceUntilIdle()
+
+            assertEquals(candidates2, delegate.candidateReimbursements.value)
+        }
+
+    @Test
+    fun `dismissReimbursementPicker cancels candidate collection job`() =
+        runTest(testDispatcher) {
+            val candidateFlow = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            whenever(transactionRepository.getCandidateReimbursements(1)).thenReturn(candidateFlow)
+
+            delegate.openReimbursementPicker(1)
+            testScope.advanceUntilIdle()
+
+            delegate.dismissReimbursementPicker()
+            testScope.advanceUntilIdle()
+
+            assertFalse(delegate.showReimbursementPicker.value)
+
+            candidateFlow.emit(
+                listOf(
+                    TransactionDetails(
+                        transaction =
+                            Transaction(
+                                id = 5,
+                                description = "Candidate",
+                                categoryId = null,
+                                amount = 10.0,
+                                date = 500L,
+                                accountId = 1,
+                                notes = null,
+                                transactionType = TransactionType.INCOME,
+                            ),
+                        images = emptyList(),
+                        accountName = "Bank",
+                        categoryName = null,
+                        categoryIconKey = null,
+                        categoryColorKey = null,
+                        tagNames = null,
+                    ),
+                ),
+            )
+            testScope.advanceUntilIdle()
+
+            assertEquals(emptyList<TransactionDetails>(), delegate.candidateReimbursements.value)
+        }
+
+    @Test
+    fun `resetDetailReimbursementState cancels reimbursement job and clears state`() =
+        runTest(testDispatcher) {
+            val expenseFlow = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val expenseTxn =
+                Transaction(
+                    id = 1,
+                    description = "Team Lunch",
+                    categoryId = 1,
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+
+            whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(expenseFlow)
+
+            delegate.loadReimbursementData(expenseTxn)
+            testScope.advanceUntilIdle()
+
+            delegate.resetDetailReimbursementState()
+            testScope.advanceUntilIdle()
+
+            assertEquals(emptyList<TransactionDetails>(), delegate.reimbursementsForCurrentExpense.value)
+
+            expenseFlow.emit(
+                listOf(
+                    TransactionDetails(
+                        transaction =
+                            Transaction(
+                                id = 2,
+                                description = "Repayment",
+                                categoryId = null,
+                                amount = 50.0,
+                                date = 1100L,
+                                accountId = 1,
+                                notes = null,
+                                transactionType = TransactionType.INCOME,
+                            ),
+                        images = emptyList(),
+                        accountName = "Bank",
+                        categoryName = null,
+                        categoryIconKey = null,
+                        categoryColorKey = null,
+                        tagNames = null,
+                    ),
+                ),
+            )
+            testScope.advanceUntilIdle()
+
+            assertEquals(emptyList<TransactionDetails>(), delegate.reimbursementsForCurrentExpense.value)
+        }
 }
