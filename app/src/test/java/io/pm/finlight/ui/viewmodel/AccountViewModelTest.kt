@@ -495,11 +495,11 @@ class AccountViewModelTest : BaseViewModelTest() {
             val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
             `when`(settingsRepository.addDismissedMergeSuggestion(expectedKey)).thenThrow(RuntimeException("Storage error"))
 
-            // Act
-            viewModel.dismissMergeSuggestion(suggestion)
-            advanceUntilIdle()
-
-            // Assert
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.dismissMergeSuggestion(suggestion)
+                assertEquals("Error dismissing merge suggestion: Storage error", awaitItem())
+            }
             verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
         }
 

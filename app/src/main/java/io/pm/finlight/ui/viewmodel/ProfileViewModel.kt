@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ProfileViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/ProfileViewModel.kt
 // REASON: FIX (Profile Picture Backup) - Changed profile picture storage location
 // from 'filesDir/attachments/' (which is excluded from Auto Backup) to
 // 'filesDir/profile/' (which is included). Added a one-time migration that

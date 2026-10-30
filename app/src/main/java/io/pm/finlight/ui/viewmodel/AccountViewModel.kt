@@ -143,6 +143,7 @@ class AccountViewModel(
                 settingsRepository.addDismissedMergeSuggestion(key)
             } catch (e: Exception) {
                 Log.e("AccountViewModel", "Error dismissing merge suggestion", e)
+                _uiEvent.send("Error dismissing merge suggestion: ${e.message}")
             }
         }
     }

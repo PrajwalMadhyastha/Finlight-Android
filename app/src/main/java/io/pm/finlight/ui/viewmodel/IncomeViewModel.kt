@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/IncomeViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/IncomeViewModel.kt
 // REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
 // constructor dependency injection for its repository dependencies. It now extends
 // ViewModel instead of AndroidViewModel, decoupling it from the Android framework
