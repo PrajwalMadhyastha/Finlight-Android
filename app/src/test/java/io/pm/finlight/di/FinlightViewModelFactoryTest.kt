@@ -1,6 +1,7 @@
 package io.pm.finlight.di
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -9,6 +10,7 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.mockk.every
 import io.mockk.mockk
 import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.IAccountRepository
@@ -129,6 +131,29 @@ class FinlightViewModelFactoryTest {
         val factory = FinlightViewModelFactory.create(null)
         assertThrows(IllegalArgumentException::class.java) {
             factory.create(TransactionViewModel::class.java, CreationExtras.Empty)
+        }
+    }
+
+    @Test
+    fun create_withWrapperContext_resolvesApplicationFromApplicationContext() {
+        val mockContext =
+            mockk<Context>(relaxed = true) {
+                every { applicationContext } returns application
+            }
+        val factory = FinlightViewModelFactory.create(mockContext)
+        val viewModel = factory.create(TransactionViewModel::class.java)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withNonApplicationContext_throwsIllegalArgumentException() {
+        val mockContext =
+            mockk<Context>(relaxed = true) {
+                every { applicationContext } returns mockk<Context>(relaxed = true)
+            }
+        val factory = FinlightViewModelFactory.create(mockContext)
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(TransactionViewModel::class.java)
         }
     }
 

@@ -783,7 +783,9 @@ object ServiceLocator {
         resolvedDb: AppDatabase? = null,
     ): TransactionViewModel {
         return transactionViewModel ?: run {
-            val app = context.applicationContext as Application
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
             val db = resolvedDb ?: AppDatabase.getInstance(app)
             val tagRepo = provideTagRepository(app)
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepo)

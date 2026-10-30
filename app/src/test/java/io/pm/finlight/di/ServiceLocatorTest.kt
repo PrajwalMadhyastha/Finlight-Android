@@ -1,6 +1,7 @@
 package io.pm.finlight.di
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -917,6 +918,21 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideTransactionViewModel_withResolvedDb_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideTransactionViewModel(application, db)
+        assertNotNull(viewModel)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun provideTransactionViewModel_withNonApplicationContext_throwsIllegalArgumentException() {
+        val nonAppContext =
+            mockk<Context>(relaxed = true) {
+                every { applicationContext } returns mockk<Context>(relaxed = true)
+            }
+        ServiceLocator.provideTransactionViewModel(nonAppContext)
+    }
+
+    @Test
     fun provideDashboardViewModel_returnsConfiguredInstance() {
         val viewModel = ServiceLocator.provideDashboardViewModel(application)
         assertNotNull(viewModel)
@@ -925,6 +941,12 @@ class ServiceLocatorTest {
     @Test
     fun provideViewModelFactory_returnsFactoryInstance() {
         val factory = ServiceLocator.provideViewModelFactory(application)
+        assertNotNull(factory)
+    }
+
+    @Test
+    fun provideViewModelFactory_withNullContext_returnsFactoryInstance() {
+        val factory = ServiceLocator.provideViewModelFactory()
         assertNotNull(factory)
     }
 

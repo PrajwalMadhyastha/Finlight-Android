@@ -61,6 +61,7 @@ class FinlightViewModelFactory(
             context: Context?
         ): Application {
             return (extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as? Application)
+                ?: (context as? Application)
                 ?: (context?.applicationContext as? Application)
                 ?: throw IllegalArgumentException(
                     "Application not found in CreationExtras or FinlightViewModelFactory constructor"
