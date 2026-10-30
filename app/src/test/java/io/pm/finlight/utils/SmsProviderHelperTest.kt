@@ -13,6 +13,10 @@ import io.pm.finlight.SmsParseTemplate
 import io.pm.finlight.TestApplication
 import io.pm.finlight.CustomSmsRuleDao
 import io.pm.finlight.IgnoreRuleDao
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantCategoryMappingDao
 import io.pm.finlight.MerchantRenameRuleDao
@@ -270,5 +274,79 @@ class SmsProviderHelperTest : BaseViewModelTest() {
             assertEquals(listOf(template), provider.getAllTemplates())
             assertEquals(listOf(template), provider.getTemplatesBySignature("custom_sig"))
             assertTrue(provider.getTemplatesBySignature("non_existent").isEmpty())
+        }
+
+    // --- Repository-backed Providers ---
+
+    @Test
+    fun `getCustomSmsRuleProvider delegates to ICustomSmsRuleRepository`() =
+        runTest {
+            val repository = mockk<ICustomSmsRuleRepository>()
+            val rules =
+                listOf(
+                    CustomSmsRule(
+                        id = 1,
+                        triggerPhrase = "spent at",
+                        merchantRegex = null,
+                        amountRegex = null,
+                        accountRegex = null,
+                        merchantNameExample = null,
+                        amountExample = null,
+                        accountNameExample = null,
+                        priority = 1,
+                        sourceSmsBody = "spent at store",
+                    ),
+                )
+            coEvery { repository.getAllRules() } returns flowOf(rules)
+
+            val provider = SmsProviderHelper.getCustomSmsRuleProvider(repository)
+            assertEquals(rules, provider.getAllRules())
+        }
+
+    @Test
+    fun `getMerchantRenameRuleProvider delegates to IMerchantRenameRuleRepository`() =
+        runTest {
+            val repository = mockk<IMerchantRenameRuleRepository>()
+            val rules =
+                listOf(
+                    MerchantRenameRule(originalName = "AMZN", newName = "Amazon"),
+                )
+            val map = mapOf("amzn" to "Amazon")
+            coEvery { repository.getAllRules() } returns flowOf(rules)
+            coEvery { repository.getAliasesAsMap() } returns flowOf(map)
+
+            val provider = SmsProviderHelper.getMerchantRenameRuleProvider(repository)
+            assertEquals(rules, provider.getAllRules())
+            assertEquals(map, provider.getAllRulesMap())
+        }
+
+    @Test
+    fun `getIgnoreRuleProvider delegates to IIgnoreRuleRepository`() =
+        runTest {
+            val repository = mockk<IIgnoreRuleRepository>()
+            val rules =
+                listOf(
+                    IgnoreRule(id = 1, type = RuleType.BODY_PHRASE, pattern = "OTP", isEnabled = true),
+                )
+            coEvery { repository.getEnabledRules() } returns rules
+
+            val provider = SmsProviderHelper.getIgnoreRuleProvider(repository)
+            assertEquals(rules, provider.getEnabledRules())
+        }
+
+    @Test
+    fun `getMerchantCategoryMappingProvider delegates to IMerchantCategoryMappingRepository`() =
+        runTest {
+            val repository = mockk<IMerchantCategoryMappingRepository>()
+            val mappings =
+                listOf(
+                    MerchantCategoryMapping(parsedName = "Uber", categoryId = 3),
+                )
+            coEvery { repository.getCategoryIdForMerchant("Uber") } returns 3
+            coEvery { repository.getAllMappings() } returns flowOf(mappings)
+
+            val provider = SmsProviderHelper.getMerchantCategoryMappingProvider(repository)
+            assertEquals(3, provider.getCategoryIdForMerchant("Uber"))
+            assertEquals(mapOf("uber" to 3), provider.getAllMappings())
         }
 }

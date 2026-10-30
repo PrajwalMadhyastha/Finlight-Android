@@ -86,4 +86,30 @@ class SmsParseTemplateRepositoryTest {
             assertEquals(templates, result)
             verify(smsParseTemplateDao).getTemplatesBySignature("sig")
         }
+
+    @Test
+    fun `insertAll delegates to DAO`() =
+        runTest {
+            val templates =
+                listOf(
+                    SmsParseTemplate(
+                        templateSignature = "sig",
+                        correctedMerchantName = "Merchant",
+                        originalSmsBody = "body",
+                        originalMerchantStartIndex = 0,
+                        originalMerchantEndIndex = 8,
+                        originalAmountStartIndex = 10,
+                        originalAmountEndIndex = 15,
+                    ),
+                )
+            repository.insertAll(templates)
+            verify(smsParseTemplateDao).insertAll(templates)
+        }
+
+    @Test
+    fun `deleteAll delegates to DAO`() =
+        runTest {
+            repository.deleteAll()
+            verify(smsParseTemplateDao).deleteAll()
+        }
 }
