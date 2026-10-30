@@ -31,6 +31,7 @@ import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ISecuritySettingsRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
+import io.pm.finlight.ISmsParseTemplateRepository
 import io.pm.finlight.ISmsRuleSettingsRepository
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
@@ -45,6 +46,7 @@ import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
 import io.pm.finlight.SmsRepository
+import io.pm.finlight.SmsParseTemplateRepository
 import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
@@ -165,6 +167,9 @@ object ServiceLocator {
 
     @Volatile
     private var ignoreRuleRepository: IIgnoreRuleRepository? = null
+
+    @Volatile
+    private var smsParseTemplateRepository: ISmsParseTemplateRepository? = null
 
     @Volatile
     private var transactionRunner: TransactionRunner? = null
@@ -596,6 +601,8 @@ object ServiceLocator {
                 val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
                 SplitTransactionRepository(
                     splitTransactionDao = db.splitTransactionDao(),
+                    transactionWriteDao = db.transactionWriteDao(),
+                    transactionRunner = provideTransactionRunner(context, db),
                 ).also {
                     splitTransactionRepository = it
                 }
@@ -702,6 +709,29 @@ object ServiceLocator {
                     dao = db.ignoreRuleDao(),
                 ).also {
                     ignoreRuleRepository = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ISmsParseTemplateRepository] instance.
+     *
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance. Pass this from a caller
+     *   that already holds a [AppDatabase] reference to avoid a redundant [AppDatabase.getInstance]
+     *   call. Defaults to null, in which case the instance is resolved internally.
+     */
+    fun provideSmsParseTemplateRepository(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ISmsParseTemplateRepository {
+        return smsParseTemplateRepository ?: synchronized(this) {
+            smsParseTemplateRepository ?: run {
+                val db = resolvedDb ?: AppDatabase.getInstance(context.applicationContext)
+                SmsParseTemplateRepository(
+                    smsParseTemplateDao = db.smsParseTemplateDao(),
+                ).also {
+                    smsParseTemplateRepository = it
                 }
             }
         }
@@ -887,6 +917,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setSmsParseTemplateRepository(repository: ISmsParseTemplateRepository?) {
+        smsParseTemplateRepository = repository
+    }
+
+    @VisibleForTesting
     fun setTransactionRunner(runner: TransactionRunner?) {
         transactionRunner = runner
     }
@@ -924,6 +959,7 @@ object ServiceLocator {
         merchantCategoryMappingRepository = null
         customSmsRuleRepository = null
         ignoreRuleRepository = null
+        smsParseTemplateRepository = null
         transactionRunner = null
     }
 }

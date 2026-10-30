@@ -254,6 +254,18 @@ class AccountRepositoryTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `findByName delegates to accountDao`() =
+        runTest {
+            val account = Account(id = 1, name = "HDFC", type = "Bank")
+            `when`(accountDao.findByName("HDFC")).thenReturn(account)
+
+            val result = repository.findByName("HDFC")
+
+            assertEquals(account, result)
+            verify(accountDao).findByName("HDFC")
+        }
+
+    @Test
     fun `findOrCreateByName returns existing account when found by exact name`() =
         runTest {
             mockWithTransaction()

@@ -51,4 +51,6 @@ interface IAccountRepository {
         name: String,
         type: String,
     ): Account
+
+    suspend fun findByName(name: String): Account?
 }

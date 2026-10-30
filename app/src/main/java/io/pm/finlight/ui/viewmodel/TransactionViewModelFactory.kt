@@ -23,27 +23,35 @@ class TransactionViewModelFactory(private val application: Application) : ViewMo
             val accountRepository = ServiceLocator.provideAccountRepository(application)
             val categoryRepository = ServiceLocator.provideCategoryRepository(application)
             val smsRepository = ServiceLocator.provideSmsRepository(application)
+            val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db)
+            val merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db)
+            val merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(application, db)
+            val splitTransactionRepository = ServiceLocator.provideSplitTransactionRepository(application, db)
+            val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(application, db)
+            val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
+            val smsParseTemplateRepository = ServiceLocator.provideSmsParseTemplateRepository(application, db)
 
             @Suppress("UNCHECKED_CAST")
             return TransactionViewModel(
                 application = application,
-                db = db,
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
                 tagRepository = tagRepository,
                 settingsRepository = settingsRepository,
                 smsRepository = smsRepository,
-                merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db),
-                merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db),
-                merchantMappingRepository = ServiceLocator.provideMerchantMappingRepository(application, db),
-                splitTransactionRepository = ServiceLocator.provideSplitTransactionRepository(application, db),
-                smsParseTemplateDao = db.smsParseTemplateDao(),
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                splitTransactionRepository = splitTransactionRepository,
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
                 dispatcherProvider = dispatcherProvider,
                 manageReimbursementUseCase = manageReimbursementUseCase,
                 autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                customSmsRuleRepository = customSmsRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                smsParseTemplateRepository = smsParseTemplateRepository,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
