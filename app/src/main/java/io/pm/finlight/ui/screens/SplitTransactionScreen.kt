@@ -174,9 +174,13 @@ fun SplitTransactionScreen(
                     }
                     Button(
                         onClick = {
-                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) {
-                                Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
+                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) { success ->
+                                if (success) {
+                                    Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                } else {
+                                    Toast.makeText(context, "Failed to save transaction split", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f).height(48.dp),

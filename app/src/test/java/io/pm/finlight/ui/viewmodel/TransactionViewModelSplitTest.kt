@@ -66,4 +66,36 @@ class TransactionViewModelSplitTest : TransactionViewModelBaseSetup() {
             }
             verify(splitTransactionRepository).getSplitsForParent(transactionId)
         }
+
+    @Test
+    fun `saveTransactionSplits passes false and does not throw on error`() =
+        runTest {
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(null))
+            val splitItems = listOf(SplitItem(id = 1, amount = "50.0", category = null, notes = "Notes"))
+            var result: Boolean? = null
+
+            viewModel.saveTransactionSplits(1, splitItems) { success ->
+                result = success
+            }
+            advanceUntilIdle()
+
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `unsplitTransaction error emits message to uiEvent`() =
+        runTest {
+            val transaction =
+                Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure"))
+                .`when`(splitTransactionRepository).unmarkSplit(1, "Original Desc")
+
+            viewModel.uiEvent.test {
+                viewModel.unsplitTransaction(transaction)
+                advanceUntilIdle()
+
+                assertEquals("Failed to un-split transaction.", awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
 }

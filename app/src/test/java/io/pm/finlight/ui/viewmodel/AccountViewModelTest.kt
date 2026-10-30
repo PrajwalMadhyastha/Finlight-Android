@@ -486,6 +486,24 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `dismissMergeSuggestion handles repository exception gracefully`() =
+        runTest {
+            // Arrange
+            val account1 = Account(id = 1, name = "Acc 1", type = "Bank")
+            val account2 = Account(id = 2, name = "Acc 2", type = "Bank")
+            val suggestion = Pair(account1, account2)
+            val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
+            `when`(settingsRepository.addDismissedMergeSuggestion(expectedKey)).thenThrow(RuntimeException("Storage error"))
+
+            // Act
+            viewModel.dismissMergeSuggestion(suggestion)
+            advanceUntilIdle()
+
+            // Assert
+            verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
+        }
+
+    @Test
     fun `enterSelectionModeWithSuggestions sets state correctly`() =
         runTest {
             // Arrange

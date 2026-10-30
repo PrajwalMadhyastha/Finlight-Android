@@ -389,10 +389,14 @@ class TransactionViewModel(
     fun saveTransactionSplits(
         parentTransactionId: Int,
         splitItems: List<SplitItem>,
-        onComplete: () -> Unit,
+        onComplete: (Boolean) -> Unit = {},
     ) = splitDelegate.saveTransactionSplits(parentTransactionId, splitItems, onComplete)
 
-    fun unsplitTransaction(transaction: Transaction) = splitDelegate.unsplitTransaction(transaction)
+    fun unsplitTransaction(
+        transaction: Transaction,
+        onError: (suspend (String) -> Unit) = { _uiEvent.send(it) },
+        onComplete: ((Boolean) -> Unit)? = null,
+    ) = splitDelegate.unsplitTransaction(transaction, onError, onComplete)
 
     // -------------------------------------------------------------------------
     // Add Transaction & Category / Merchant Search Logic

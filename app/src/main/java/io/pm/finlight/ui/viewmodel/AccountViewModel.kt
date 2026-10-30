@@ -11,6 +11,7 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
@@ -137,8 +138,12 @@ class AccountViewModel(
 
     fun dismissMergeSuggestion(suggestion: Pair<Account, Account>) {
         val key = "${min(suggestion.first.id, suggestion.second.id)}|${max(suggestion.first.id, suggestion.second.id)}"
-        viewModelScope.launch {
-            settingsRepository.addDismissedMergeSuggestion(key)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                settingsRepository.addDismissedMergeSuggestion(key)
+            } catch (e: Exception) {
+                Log.e("AccountViewModel", "Error dismissing merge suggestion", e)
+            }
         }
     }
 

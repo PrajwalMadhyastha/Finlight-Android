@@ -197,6 +197,12 @@ fun TransactionDetailScreen(
         viewModel.navigateBackEvent.collect { navigateBack() }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     LaunchedEffect(validationError) {
         validationError?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
