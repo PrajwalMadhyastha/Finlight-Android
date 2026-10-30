@@ -88,6 +88,8 @@ class TransactionViewModel(
     companion object {
         const val KEY_MANUAL_DESCRIPTION = "manualDescription"
         const val KEY_MANUAL_AMOUNT = "manualAmount"
+        const val KEY_MANUAL_CATEGORY_ID = "manualCategoryId"
+        const val KEY_MANUAL_ACCOUNT_ID = "manualAccountId"
     }
 
     private val context = application
@@ -297,6 +299,19 @@ class TransactionViewModel(
 
         viewModelScope.launch {
             _defaultAccount.value = accountRepository.findByName("Cash Spends")
+            val savedAccountId = savedStateHandle.get<Int>(KEY_MANUAL_ACCOUNT_ID)
+            if (savedAccountId != null) {
+                accountRepository.getAccountByIdSync(savedAccountId)?.let { restoredAccount ->
+                    _addTransactionAccount.value = restoredAccount
+                }
+            }
+            val savedCategoryId = savedStateHandle.get<Int>(KEY_MANUAL_CATEGORY_ID)
+            if (savedCategoryId != null) {
+                categoryRepository.getCategoryById(savedCategoryId)?.let { restoredCategory ->
+                    _addTransactionCategory.value = restoredCategory
+                    _userManuallySelectedCategory.value = true
+                }
+            }
         }
     }
 
@@ -444,11 +459,21 @@ class TransactionViewModel(
 
     fun onAddTransactionCategoryChanged(category: Category?) {
         _addTransactionCategory.value = category
-        if (category != null) _userManuallySelectedCategory.value = true
+        if (category != null) {
+            _userManuallySelectedCategory.value = true
+            savedStateHandle[KEY_MANUAL_CATEGORY_ID] = category.id
+        } else {
+            savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
+        }
     }
 
     fun onAddTransactionAccountChanged(account: Account?) {
         _addTransactionAccount.value = account
+        if (account != null) {
+            savedStateHandle[KEY_MANUAL_ACCOUNT_ID] = account.id
+        } else {
+            savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
+        }
     }
 
     fun onUserManuallySelectedCategory() {
@@ -468,8 +493,18 @@ class TransactionViewModel(
             val category = transactionDetails.transaction.categoryId?.let { categoryRepository.getCategoryById(it) }
             val account = accountRepository.getAccountByIdSync(transactionDetails.transaction.accountId)
             _addTransactionCategory.value = category
+            if (category != null) {
+                savedStateHandle[KEY_MANUAL_CATEGORY_ID] = category.id
+            } else {
+                savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
+            }
             _userManuallySelectedCategory.value = true
             _addTransactionAccount.value = account
+            if (account != null) {
+                savedStateHandle[KEY_MANUAL_ACCOUNT_ID] = account.id
+            } else {
+                savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
+            }
             _selectedTags.value = transactionRepository.getTagsForTransactionSimple(transactionDetails.transaction.id).toSet()
         }
     }
@@ -570,7 +605,10 @@ class TransactionViewModel(
     }
 
     fun hasRestoredManualTransactionState(): Boolean {
-        return savedStateHandle.contains(KEY_MANUAL_DESCRIPTION) || savedStateHandle.contains(KEY_MANUAL_AMOUNT)
+        return savedStateHandle.contains(KEY_MANUAL_DESCRIPTION) ||
+            savedStateHandle.contains(KEY_MANUAL_AMOUNT) ||
+            savedStateHandle.contains(KEY_MANUAL_CATEGORY_ID) ||
+            savedStateHandle.contains(KEY_MANUAL_ACCOUNT_ID)
     }
 
     fun clearAddTransactionState() {
@@ -580,7 +618,9 @@ class TransactionViewModel(
         _addTransactionAmount.value = ""
         savedStateHandle.remove<String>(KEY_MANUAL_AMOUNT)
         _addTransactionCategory.value = null
+        savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
         if (_addTransactionAccount.value != _defaultAccount.value) _addTransactionAccount.value = null
+        savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
         _userManuallySelectedCategory.value = false
         _validationError.value = null
         _showCategoryNudge.value = null

@@ -1208,9 +1208,40 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
+    fun `manual category and account survive simulated process death via SavedStateHandle`() =
+        runTest {
+            val customCategory = Category(id = 55, name = "Groceries", iconKey = "cart", colorKey = "green")
+            val customAccount = Account(id = 88, name = "Chase Checking", type = "Bank")
+            whenever(categoryRepository.getCategoryById(55)).thenReturn(customCategory)
+            whenever(accountRepository.getAccountByIdSync(88)).thenReturn(customAccount)
+
+            viewModel.onAddTransactionCategoryChanged(customCategory)
+            viewModel.onAddTransactionAccountChanged(customAccount)
+            advanceUntilIdle()
+
+            assertEquals(customCategory, viewModel.addTransactionCategory.value)
+            assertEquals(customAccount, viewModel.addTransactionAccount.value)
+            assertEquals(55, savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_CATEGORY_ID))
+            assertEquals(88, savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_ACCOUNT_ID))
+
+            // Act: Recreate ViewModel with the same savedStateHandle
+            initializeViewModel()
+            advanceUntilIdle()
+
+            // Assert: Category and account are restored from SavedStateHandle
+            assertEquals(customCategory, viewModel.addTransactionCategory.value)
+            assertEquals(customAccount, viewModel.addTransactionAccount.value)
+        }
+
+    @Test
     fun `onQuickFillSelected updates SavedStateHandle and survives simulated process death`() =
         runTest {
             // Arrange
+            val account = Account(id = 1, name = "Cash", type = "Cash")
+            val category = Category(id = 2, name = "Food", iconKey = "food", colorKey = "green")
+            whenever(accountRepository.getAccountByIdSync(1)).thenReturn(account)
+            whenever(categoryRepository.getCategoryById(2)).thenReturn(category)
+
             val mockDetails =
                 TransactionDetails(
                     transaction =
@@ -1220,7 +1251,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
                             date = 1000L,
                             description = "Coffee Shop",
                             accountId = 1,
-                            categoryId = null,
+                            categoryId = 2,
                             notes = null,
                         ),
                     images = emptyList(),
@@ -1238,8 +1269,12 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
 
             assertEquals("Coffee Shop", viewModel.addTransactionDescription.value)
             assertEquals("85.75", viewModel.addTransactionAmount.value)
+            assertEquals(category, viewModel.addTransactionCategory.value)
+            assertEquals(account, viewModel.addTransactionAccount.value)
             assertEquals("Coffee Shop", savedStateHandle.get<String>(TransactionViewModel.KEY_MANUAL_DESCRIPTION))
             assertEquals("85.75", savedStateHandle.get<String>(TransactionViewModel.KEY_MANUAL_AMOUNT))
+            assertEquals(2, savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_CATEGORY_ID))
+            assertEquals(1, savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_ACCOUNT_ID))
 
             // Simulate process recreation
             initializeViewModel()
@@ -1247,14 +1282,20 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
 
             assertEquals("Coffee Shop", viewModel.addTransactionDescription.value)
             assertEquals("85.75", viewModel.addTransactionAmount.value)
+            assertEquals(category, viewModel.addTransactionCategory.value)
+            assertEquals(account, viewModel.addTransactionAccount.value)
         }
 
     @Test
     fun `clearAddTransactionState clears entries from SavedStateHandle preventing stale restoration`() =
         runTest {
             // Arrange
+            val customCategory = Category(id = 55, name = "Groceries", iconKey = "cart", colorKey = "green")
+            val customAccount = Account(id = 88, name = "Chase Checking", type = "Bank")
             viewModel.onAddTransactionDescriptionChanged("Transient Draft")
             viewModel.onAddTransactionAmountChanged("42.00")
+            viewModel.onAddTransactionCategoryChanged(customCategory)
+            viewModel.onAddTransactionAccountChanged(customAccount)
             advanceUntilIdle()
 
             // Act
@@ -1264,8 +1305,11 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             // Assert: values are cleared from viewModel and removed from savedStateHandle
             assertEquals("", viewModel.addTransactionDescription.value)
             assertEquals("", viewModel.addTransactionAmount.value)
+            assertNull(viewModel.addTransactionCategory.value)
             assertNull(savedStateHandle.get<String>(TransactionViewModel.KEY_MANUAL_DESCRIPTION))
             assertNull(savedStateHandle.get<String>(TransactionViewModel.KEY_MANUAL_AMOUNT))
+            assertNull(savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_CATEGORY_ID))
+            assertNull(savedStateHandle.get<Int>(TransactionViewModel.KEY_MANUAL_ACCOUNT_ID))
 
             // Recreate ViewModel with the cleared savedStateHandle
             initializeViewModel()
@@ -1273,6 +1317,7 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
 
             assertEquals("", viewModel.addTransactionDescription.value)
             assertEquals("", viewModel.addTransactionAmount.value)
+            assertNull(viewModel.addTransactionCategory.value)
         }
 
     @Test
@@ -1289,6 +1334,22 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
             assertFalse(viewModel.hasRestoredManualTransactionState())
 
             viewModel.onAddTransactionAmountChanged("99.99")
+            advanceUntilIdle()
+            assertTrue(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.clearAddTransactionState()
+            advanceUntilIdle()
+            assertFalse(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.onAddTransactionCategoryChanged(Category(id = 12, name = "Fuel", iconKey = "fuel", colorKey = "blue"))
+            advanceUntilIdle()
+            assertTrue(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.clearAddTransactionState()
+            advanceUntilIdle()
+            assertFalse(viewModel.hasRestoredManualTransactionState())
+
+            viewModel.onAddTransactionAccountChanged(Account(id = 34, name = "Wallet", type = "Cash"))
             advanceUntilIdle()
             assertTrue(viewModel.hasRestoredManualTransactionState())
         }

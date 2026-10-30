@@ -62,7 +62,7 @@ fun AddRecurringTransactionScreen(
         )
     val transactionViewModel: TransactionViewModel =
         viewModel(
-            factory = io.pm.finlight.ui.viewmodel.TransactionViewModelFactory(context.applicationContext as Application)
+            factory = io.pm.finlight.di.FinlightViewModelFactory.create(context.applicationContext as Application)
         )
 
     val isEditMode = ruleId != null
