@@ -320,6 +320,10 @@ class TransactionViewModel(
 
     fun unlinkReimbursement(incomeId: Int) = reimbursementDelegate.unlinkReimbursement(incomeId)
 
+    fun resetDetailReimbursementState() = reimbursementDelegate.resetDetailReimbursementState()
+
+    fun resetMergedTransactionBreakdown() = mergeDelegate.resetBreakdown()
+
     fun linkReimbursementFromSelection() =
         reimbursementDelegate.linkReimbursementFromSelection(
             selectedTransactionIds.value, transactionsForSelectedMonth.value, { _uiEvent.send(it) }, { clearSelectionMode() },

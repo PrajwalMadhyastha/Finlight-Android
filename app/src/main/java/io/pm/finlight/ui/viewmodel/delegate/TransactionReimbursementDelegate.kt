@@ -52,7 +52,7 @@ class TransactionReimbursementDelegate(
         }.stateIn(coroutineScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun loadReimbursementData(transaction: Transaction) {
-        reimbursementJob?.cancel()
+        resetDetailReimbursementState()
         if (transaction.transactionType == TransactionType.EXPENSE) {
             reimbursementJob =
                 coroutineScope.launch {

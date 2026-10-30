@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -358,5 +359,71 @@ class TransactionReimbursementDelegateTest {
             testScope.advanceUntilIdle()
 
             assertEquals(emptyList<TransactionDetails>(), delegate.reimbursementsForCurrentExpense.value)
+        }
+
+    @Test
+    fun `loadReimbursementData immediately resets previous reimbursement and linked expense states`() =
+        runTest(testDispatcher) {
+            val expenseFlow = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val expenseTxn =
+                Transaction(
+                    id = 1,
+                    description = "Lunch",
+                    categoryId = 1,
+                    amount = 20.0,
+                    date = 100L,
+                    accountId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+            whenever(transactionRepository.getReimbursementsForExpense(1)).thenReturn(expenseFlow)
+
+            delegate.loadReimbursementData(expenseTxn)
+            testScope.advanceUntilIdle()
+
+            val details =
+                listOf(
+                    TransactionDetails(
+                        transaction =
+                            Transaction(
+                                id = 2,
+                                description = "Repayment",
+                                categoryId = null,
+                                amount = 20.0,
+                                date = 200L,
+                                accountId = 1,
+                                notes = null,
+                                transactionType = TransactionType.INCOME,
+                            ),
+                        images = emptyList(),
+                        accountName = "Bank",
+                        categoryName = null,
+                        categoryIconKey = null,
+                        categoryColorKey = null,
+                        tagNames = null,
+                    ),
+                )
+            expenseFlow.emit(details)
+            testScope.advanceUntilIdle()
+            assertEquals(details, delegate.reimbursementsForCurrentExpense.value)
+
+            val pendingFlow = kotlinx.coroutines.flow.MutableSharedFlow<List<TransactionDetails>>()
+            val nextTxn =
+                Transaction(
+                    id = 3,
+                    description = "Coffee",
+                    categoryId = 1,
+                    amount = 5.0,
+                    date = 300L,
+                    accountId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                )
+            whenever(transactionRepository.getReimbursementsForExpense(3)).thenReturn(pendingFlow)
+
+            delegate.loadReimbursementData(nextTxn)
+            // Immediately empty, before pendingFlow emits
+            assertEquals(emptyList<TransactionDetails>(), delegate.reimbursementsForCurrentExpense.value)
+            assertNull(delegate.linkedExpenseForCurrentIncome.value)
         }
 }

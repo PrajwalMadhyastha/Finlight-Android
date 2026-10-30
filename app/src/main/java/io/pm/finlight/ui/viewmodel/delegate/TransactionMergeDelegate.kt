@@ -104,6 +104,7 @@ class TransactionMergeDelegate(
     }
 
     fun loadMergedTransactionBreakdown(transactionId: Int) {
+        resetBreakdown()
         coroutineScope.launch(dispatcherProvider.io) {
             _mergedTransactionBreakdown.value =
                 mergeTransactionsUseCase.getMergedTransactionBreakdown(transactionId)

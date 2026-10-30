@@ -155,4 +155,55 @@ class TransactionMergeDelegateTest {
 
             verify(mergeTransactionsUseCase).unmerge(10)
         }
+
+    @Test
+    fun `resetBreakdown clears mergedTransactionBreakdown state`() =
+        runTest(testDispatcher) {
+            val breakdown =
+                listOf(
+                    MergedTransactionItem(
+                        accountId = 1,
+                        accountName = "Bank",
+                        amount = 25.0,
+                        transactionType = TransactionType.EXPENSE,
+                        isAnchor = false,
+                        description = "Split Item",
+                        date = 0L,
+                    ),
+                )
+            whenever(mergeTransactionsUseCase.getMergedTransactionBreakdown(10)).thenReturn(breakdown)
+
+            delegate.loadMergedTransactionBreakdown(10)
+            testScope.advanceUntilIdle()
+            assertEquals(breakdown, delegate.mergedTransactionBreakdown.value)
+
+            delegate.resetBreakdown()
+            assertTrue(delegate.mergedTransactionBreakdown.value.isEmpty())
+        }
+
+    @Test
+    fun `loadMergedTransactionBreakdown immediately resets previous breakdown before loading new breakdown`() =
+        runTest(testDispatcher) {
+            val breakdown =
+                listOf(
+                    MergedTransactionItem(
+                        accountId = 1,
+                        accountName = "Bank",
+                        amount = 25.0,
+                        transactionType = TransactionType.EXPENSE,
+                        isAnchor = false,
+                        description = "Split Item",
+                        date = 0L,
+                    ),
+                )
+            whenever(mergeTransactionsUseCase.getMergedTransactionBreakdown(10)).thenReturn(breakdown)
+            whenever(mergeTransactionsUseCase.getMergedTransactionBreakdown(20)).thenReturn(emptyList())
+
+            delegate.loadMergedTransactionBreakdown(10)
+            testScope.advanceUntilIdle()
+            assertEquals(breakdown, delegate.mergedTransactionBreakdown.value)
+
+            delegate.loadMergedTransactionBreakdown(20)
+            assertTrue(delegate.mergedTransactionBreakdown.value.isEmpty())
+        }
 }
