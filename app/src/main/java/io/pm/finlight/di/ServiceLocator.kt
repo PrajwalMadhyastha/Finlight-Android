@@ -3,6 +3,7 @@ package io.pm.finlight.di
 import android.app.Application
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
@@ -777,10 +778,12 @@ object ServiceLocator {
      *
      * @param context Application or activity context.
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param savedStateHandle Optional [SavedStateHandle] for state restoration.
      */
     fun provideTransactionViewModel(
         context: Context,
         resolvedDb: AppDatabase? = null,
+        savedStateHandle: SavedStateHandle? = null,
     ): TransactionViewModel {
         return transactionViewModel ?: run {
             val app =
@@ -826,6 +829,7 @@ object ServiceLocator {
                 customSmsRuleRepository = customSmsRuleRepository,
                 ignoreRuleRepository = ignoreRuleRepository,
                 smsParseTemplateRepository = smsParseTemplateRepository,
+                savedStateHandle = savedStateHandle ?: SavedStateHandle(),
             )
         }
     }

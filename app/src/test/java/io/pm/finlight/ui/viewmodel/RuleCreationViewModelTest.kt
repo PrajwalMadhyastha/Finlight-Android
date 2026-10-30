@@ -1,6 +1,7 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.BaseViewModelTest
@@ -44,12 +45,14 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
 
     private lateinit var viewModel: RuleCreationViewModel
     private lateinit var testDispatcherProvider: TestDispatcherProvider
+    private lateinit var savedStateHandle: SavedStateHandle
 
     @Before
     override fun setup() {
         super.setup()
         testDispatcherProvider = TestDispatcherProvider(testDispatcher)
-        viewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider)
+        savedStateHandle = SavedStateHandle()
+        viewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider, savedStateHandle)
     }
 
     @Test
@@ -824,4 +827,130 @@ class RuleCreationViewModelTest : BaseViewModelTest() {
         assertNotNull(regex)
         assertEquals("\\QPaid\\E\\s*(.*?)\\s*\\Qto Store\\E", regex)
     }
+
+    // --- SavedStateHandle Form State Restoration Tests ---
+
+    @Test
+    fun `RuleCreationViewModel form state survives simulated process death via SavedStateHandle`() =
+        runTest {
+            // Arrange: User marks selections and sets transaction type
+            viewModel.onMarkAsTrigger(RuleSelection("debited by", 10, 20))
+            viewModel.onMarkAsMerchant(RuleSelection("Amazon", 25, 31))
+            viewModel.onMarkAsAmount(RuleSelection("499.00", 35, 41))
+            viewModel.onMarkAsAccount(RuleSelection("xx1234", 45, 51))
+            viewModel.onTransactionTypeChanged(TransactionType.EXPENSE)
+
+            // Assert: SavedStateHandle contains the wired state keys
+            assertEquals("debited by", savedStateHandle.get<String>(RuleCreationViewModel.KEY_RULE_PATTERN))
+            assertEquals(10, savedStateHandle.get<Int>(RuleCreationViewModel.KEY_RULE_PATTERN_START))
+            assertEquals(20, savedStateHandle.get<Int>(RuleCreationViewModel.KEY_RULE_PATTERN_END))
+            assertEquals("Amazon", savedStateHandle.get<String>(RuleCreationViewModel.KEY_MERCHANT_TEXT))
+            assertEquals("499.00", savedStateHandle.get<String>(RuleCreationViewModel.KEY_AMOUNT_TEXT))
+            assertEquals("xx1234", savedStateHandle.get<String>(RuleCreationViewModel.KEY_ACCOUNT_TEXT))
+            assertEquals(TransactionType.EXPENSE.dbValue, savedStateHandle.get<String>(RuleCreationViewModel.KEY_RULE_TYPE))
+
+            // Act: Recreate ViewModel with the same savedStateHandle (simulating process death)
+            val recreatedViewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider, savedStateHandle)
+
+            // Assert: Recreated ViewModel restores form state exactly
+            val state = recreatedViewModel.uiState.value
+            assertEquals("debited by", state.triggerSelection.selectedText)
+            assertEquals(10, state.triggerSelection.startIndex)
+            assertEquals(20, state.triggerSelection.endIndex)
+            assertEquals("Amazon", state.merchantSelection.selectedText)
+            assertEquals(25, state.merchantSelection.startIndex)
+            assertEquals(31, state.merchantSelection.endIndex)
+            assertEquals("499.00", state.amountSelection.selectedText)
+            assertEquals(35, state.amountSelection.startIndex)
+            assertEquals(41, state.amountSelection.endIndex)
+            assertEquals("xx1234", state.accountSelection.selectedText)
+            assertEquals(45, state.accountSelection.startIndex)
+            assertEquals(51, state.accountSelection.endIndex)
+            assertEquals(TransactionType.EXPENSE, state.transactionType)
+        }
+
+    @Test
+    fun `initializeStateForCreation does not overwrite restored state after process death`() =
+        runTest {
+            // Arrange: Populate SavedStateHandle as if restored after process death
+            savedStateHandle[RuleCreationViewModel.KEY_RULE_PATTERN] = "Paid to"
+            savedStateHandle[RuleCreationViewModel.KEY_RULE_PATTERN_START] = 0
+            savedStateHandle[RuleCreationViewModel.KEY_RULE_PATTERN_END] = 7
+            savedStateHandle[RuleCreationViewModel.KEY_RULE_TYPE] = TransactionType.EXPENSE.dbValue
+            savedStateHandle[RuleCreationViewModel.KEY_INITIALIZED] = true
+
+            val recreatedViewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider, savedStateHandle)
+            assertEquals("Paid to", recreatedViewModel.uiState.value.triggerSelection.selectedText)
+
+            // Act: Screen recreation calls initializeStateForCreation
+            val potentialTxn =
+                PotentialTransaction(
+                    sourceSmsId = 1L,
+                    smsSender = "Bank",
+                    amount = 99.99,
+                    transactionType = "expense",
+                    merchantName = "Test",
+                    originalMessage = "Paid to Test 99.99",
+                )
+            recreatedViewModel.initializeStateForCreation(potentialTxn)
+
+            // Assert: Restored trigger phrase was NOT wiped out
+            assertEquals("Paid to", recreatedViewModel.uiState.value.triggerSelection.selectedText)
+        }
+
+    @Test
+    fun `loadRuleForEditing persists state into SavedStateHandle and survives process death`() =
+        runTest {
+            val customRule =
+                CustomSmsRule(
+                    id = 42,
+                    triggerPhrase = "Received Rs",
+                    merchantRegex = "from (.*)",
+                    amountRegex = "Rs (.*)",
+                    accountRegex = "in a/c (.*)",
+                    merchantNameExample = "Salary",
+                    amountExample = "50000",
+                    accountNameExample = "xx9999",
+                    priority = 15,
+                    sourceSmsBody = "Received Rs 50000 from Salary in a/c xx9999",
+                    transactionType = "income",
+                )
+            `when`(customSmsRuleRepository.getRuleById(42)).thenReturn(flowOf(customRule))
+
+            // Act: load rule for editing
+            viewModel.loadRuleForEditing(42)
+            advanceUntilIdle()
+
+            assertEquals(42, savedStateHandle.get<Int>(RuleCreationViewModel.KEY_RULE_ID_TO_EDIT))
+            assertEquals("Received Rs", savedStateHandle.get<String>(RuleCreationViewModel.KEY_RULE_PATTERN))
+            assertEquals("income", savedStateHandle.get<String>(RuleCreationViewModel.KEY_RULE_TYPE))
+            assertEquals(15, savedStateHandle.get<Int>(RuleCreationViewModel.KEY_PRIORITY))
+
+            // Simulate process death and recreation
+            val recreatedViewModel = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider, savedStateHandle)
+            val state = recreatedViewModel.uiState.value
+            assertEquals(42, state.ruleIdToEdit)
+            assertEquals("Received Rs", state.triggerSelection.selectedText)
+            assertEquals("Salary", state.merchantSelection.selectedText)
+            assertEquals("50000", state.amountSelection.selectedText)
+            assertEquals("xx9999", state.accountSelection.selectedText)
+            assertEquals(TransactionType.INCOME, state.transactionType)
+            assertEquals(15, state.priority)
+        }
+
+    @Test
+    fun `RuleCreationViewModel pre-seeded with rulePattern and ruleType in SavedStateHandle restores them immediately`() =
+        runTest {
+            val preSeededHandle =
+                SavedStateHandle(
+                    mapOf(
+                        RuleCreationViewModel.KEY_RULE_PATTERN to "Auto Debit",
+                        RuleCreationViewModel.KEY_RULE_TYPE to "expense",
+                    ),
+                )
+            val vm = RuleCreationViewModel(customSmsRuleRepository, testDispatcherProvider, preSeededHandle)
+
+            assertEquals("Auto Debit", vm.uiState.value.triggerSelection.selectedText)
+            assertEquals(TransactionType.EXPENSE, vm.uiState.value.transactionType)
+        }
 }

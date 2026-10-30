@@ -2,7 +2,9 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -97,5 +99,25 @@ class RuleCreationViewModelFactoryTest {
         assertThrows(IllegalArgumentException::class.java) {
             factory.create(UnknownViewModel::class.java)
         }
+    }
+
+    @Test
+    fun create_withExtras_returnsRuleCreationViewModel() {
+        val viewModel = factory.create(RuleCreationViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withCustomSavedStateHandle_usesExplicitInstance() {
+        val customHandle = SavedStateHandle(mapOf("key" to "value"))
+        val customFactory =
+            RuleCreationViewModelFactory(
+                application = application,
+                savedStateHandle = customHandle,
+            )
+
+        val viewModel = customFactory.create(RuleCreationViewModel::class.java)
+        assertNotNull(viewModel)
+        assertSame(customHandle, viewModel.savedStateHandle)
     }
 }

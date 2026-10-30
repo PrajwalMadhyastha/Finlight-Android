@@ -3,6 +3,7 @@ package io.pm.finlight.di
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -921,6 +922,14 @@ class ServiceLocatorTest {
     fun provideTransactionViewModel_withResolvedDb_returnsConfiguredInstance() {
         val viewModel = ServiceLocator.provideTransactionViewModel(application, db)
         assertNotNull(viewModel)
+    }
+
+    @Test
+    fun provideTransactionViewModel_withSavedStateHandle_returnsConfiguredInstanceWithSavedStateHandle() {
+        val customHandle = SavedStateHandle(mapOf("test_key" to "test_value"))
+        val viewModel = ServiceLocator.provideTransactionViewModel(application, savedStateHandle = customHandle)
+        assertNotNull(viewModel)
+        assertSame(customHandle, viewModel.savedStateHandle)
     }
 
     @Test(expected = IllegalArgumentException::class)

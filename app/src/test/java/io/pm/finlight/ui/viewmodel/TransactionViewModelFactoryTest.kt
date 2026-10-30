@@ -2,6 +2,7 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -159,5 +160,19 @@ class TransactionViewModelFactoryTest {
     fun create_withExtras_returnsTransactionViewModel() {
         val viewModel = factory.create(TransactionViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
         assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withCustomSavedStateHandle_usesExplicitInstance() {
+        val customHandle = SavedStateHandle(mapOf("key" to "value"))
+        val customFactory =
+            TransactionViewModelFactory(
+                application = application,
+                savedStateHandle = customHandle,
+            )
+
+        val viewModel = customFactory.create(TransactionViewModel::class.java)
+        assertNotNull(viewModel)
+        assertSame(customHandle, viewModel.savedStateHandle)
     }
 }

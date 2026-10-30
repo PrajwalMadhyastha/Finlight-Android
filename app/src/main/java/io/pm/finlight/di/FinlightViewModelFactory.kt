@@ -2,8 +2,10 @@ package io.pm.finlight.di
 
 import android.app.Application
 import android.content.Context
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -26,7 +28,8 @@ class FinlightViewModelFactory(
         viewModelFactory {
             initializer {
                 val app = resolveApplication(this, context)
-                ServiceLocator.provideTransactionViewModel(app)
+                val handle = runCatching { this.createSavedStateHandle() }.getOrElse { SavedStateHandle() }
+                ServiceLocator.provideTransactionViewModel(app, savedStateHandle = handle)
             }
             initializer {
                 val app = resolveApplication(this, context)

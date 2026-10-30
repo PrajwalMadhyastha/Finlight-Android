@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.model.ManualTransactionData
 import io.pm.finlight.data.model.MerchantPrediction
@@ -82,7 +83,13 @@ class TransactionViewModel(
     initialMergeDelegate: TransactionMergeDelegate? = null,
     initialBatchOperationDelegate: TransactionBatchOperationDelegate? = null,
     initialSplitDelegate: TransactionSplitDelegate? = null,
+    val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : AndroidViewModel(application) {
+    companion object {
+        const val KEY_MANUAL_DESCRIPTION = "manualDescription"
+        const val KEY_MANUAL_AMOUNT = "manualAmount"
+    }
+
     private val context = application
 
     val reimbursementDelegate =
@@ -185,14 +192,14 @@ class TransactionViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = false,
             )
-    private val _merchantSearchQuery = MutableStateFlow("")
+    private val _merchantSearchQuery = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_DESCRIPTION) ?: "")
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
 
     private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
     val showCategoryNudge = _showCategoryNudge.asStateFlow()
-    private val _addTransactionDescription = MutableStateFlow("")
+    private val _addTransactionDescription = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_DESCRIPTION) ?: "")
     val addTransactionDescription = _addTransactionDescription.asStateFlow()
-    private val _addTransactionAmount = MutableStateFlow("")
+    private val _addTransactionAmount = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_AMOUNT) ?: "")
     val addTransactionAmount = _addTransactionAmount.asStateFlow()
     private val _addTransactionCategory = MutableStateFlow<Category?>(null)
     val addTransactionCategory = _addTransactionCategory.asStateFlow()
@@ -425,12 +432,14 @@ class TransactionViewModel(
 
     fun onAddTransactionDescriptionChanged(description: String) {
         _addTransactionDescription.value = description
+        savedStateHandle[KEY_MANUAL_DESCRIPTION] = description
         _merchantSearchQuery.value = description
         if (description.isBlank()) _userManuallySelectedCategory.value = false
     }
 
     fun onAddTransactionAmountChanged(amount: String) {
         _addTransactionAmount.value = amount
+        savedStateHandle[KEY_MANUAL_AMOUNT] = amount
     }
 
     fun onAddTransactionCategoryChanged(category: Category?) {
@@ -447,9 +456,13 @@ class TransactionViewModel(
     }
 
     fun onQuickFillSelected(transactionDetails: TransactionDetails) {
-        _addTransactionDescription.value = transactionDetails.transaction.description
+        val description = transactionDetails.transaction.description
+        _addTransactionDescription.value = description
+        savedStateHandle[KEY_MANUAL_DESCRIPTION] = description
         val amount = transactionDetails.transaction.amount
-        _addTransactionAmount.value = if (amount % 1.0 == 0.0) amount.toInt().toString() else "%.2f".format(amount)
+        val amountStr = if (amount % 1.0 == 0.0) amount.toInt().toString() else "%.2f".format(amount)
+        _addTransactionAmount.value = amountStr
+        savedStateHandle[KEY_MANUAL_AMOUNT] = amountStr
 
         viewModelScope.launch {
             val category = transactionDetails.transaction.categoryId?.let { categoryRepository.getCategoryById(it) }
@@ -559,7 +572,9 @@ class TransactionViewModel(
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
         _addTransactionDescription.value = ""
+        savedStateHandle.remove<String>(KEY_MANUAL_DESCRIPTION)
         _addTransactionAmount.value = ""
+        savedStateHandle.remove<String>(KEY_MANUAL_AMOUNT)
         _addTransactionCategory.value = null
         if (_addTransactionAccount.value != _defaultAccount.value) _addTransactionAccount.value = null
         _userManuallySelectedCategory.value = false

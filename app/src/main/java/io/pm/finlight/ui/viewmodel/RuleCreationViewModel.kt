@@ -2,6 +2,7 @@ package io.pm.finlight.ui.viewmodel
 
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.CustomSmsRule
@@ -53,11 +54,142 @@ data class RuleCreationUiState(
 class RuleCreationViewModel(
     private val customSmsRuleRepository: ICustomSmsRuleRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(RuleCreationUiState())
+    companion object {
+        const val KEY_RULE_PATTERN = "rulePattern"
+        const val KEY_RULE_PATTERN_START = "rulePatternStart"
+        const val KEY_RULE_PATTERN_END = "rulePatternEnd"
+
+        const val KEY_RULE_TYPE = "ruleType"
+
+        const val KEY_MERCHANT_TEXT = "ruleMerchantText"
+        const val KEY_MERCHANT_START = "ruleMerchantStart"
+        const val KEY_MERCHANT_END = "ruleMerchantEnd"
+
+        const val KEY_AMOUNT_TEXT = "ruleAmountText"
+        const val KEY_AMOUNT_START = "ruleAmountStart"
+        const val KEY_AMOUNT_END = "ruleAmountEnd"
+
+        const val KEY_ACCOUNT_TEXT = "ruleAccountText"
+        const val KEY_ACCOUNT_START = "ruleAccountStart"
+        const val KEY_ACCOUNT_END = "ruleAccountEnd"
+
+        const val KEY_RULE_ID_TO_EDIT = "ruleIdToEdit"
+        const val KEY_SOURCE_SMS_BODY = "ruleSourceSmsBody"
+        const val KEY_MERCHANT_REGEX = "ruleMerchantRegex"
+        const val KEY_AMOUNT_REGEX = "ruleAmountRegex"
+        const val KEY_ACCOUNT_REGEX = "ruleAccountRegex"
+        const val KEY_PRIORITY = "rulePriority"
+        const val KEY_INITIALIZED = "ruleInitialized"
+    }
+
+    private fun restoreStateFromHandle(): RuleCreationUiState {
+        val triggerText: String? = savedStateHandle[KEY_RULE_PATTERN]
+        val triggerStart: Int? = savedStateHandle[KEY_RULE_PATTERN_START]
+        val triggerEnd: Int? = savedStateHandle[KEY_RULE_PATTERN_END]
+        val triggerSelection =
+            if (triggerText != null) {
+                RuleSelection(triggerText, triggerStart ?: -1, triggerEnd ?: -1)
+            } else {
+                RuleSelection()
+            }
+
+        val merchantText: String? = savedStateHandle[KEY_MERCHANT_TEXT]
+        val merchantStart: Int? = savedStateHandle[KEY_MERCHANT_START]
+        val merchantEnd: Int? = savedStateHandle[KEY_MERCHANT_END]
+        val merchantSelection =
+            if (merchantText != null) {
+                RuleSelection(merchantText, merchantStart ?: -1, merchantEnd ?: -1)
+            } else {
+                RuleSelection()
+            }
+
+        val amountText: String? = savedStateHandle[KEY_AMOUNT_TEXT]
+        val amountStart: Int? = savedStateHandle[KEY_AMOUNT_START]
+        val amountEnd: Int? = savedStateHandle[KEY_AMOUNT_END]
+        val amountSelection =
+            if (amountText != null) {
+                RuleSelection(amountText, amountStart ?: -1, amountEnd ?: -1)
+            } else {
+                RuleSelection()
+            }
+
+        val accountText: String? = savedStateHandle[KEY_ACCOUNT_TEXT]
+        val accountStart: Int? = savedStateHandle[KEY_ACCOUNT_START]
+        val accountEnd: Int? = savedStateHandle[KEY_ACCOUNT_END]
+        val accountSelection =
+            if (accountText != null) {
+                RuleSelection(accountText, accountStart ?: -1, accountEnd ?: -1)
+            } else {
+                RuleSelection()
+            }
+
+        val ruleTypeStr: String? = savedStateHandle[KEY_RULE_TYPE]
+        val transactionType = ruleTypeStr?.let { TransactionType.fromStringOrNull(it) }
+
+        return RuleCreationUiState(
+            triggerSelection = triggerSelection,
+            merchantSelection = merchantSelection,
+            amountSelection = amountSelection,
+            accountSelection = accountSelection,
+            transactionType = transactionType,
+            ruleIdToEdit = savedStateHandle[KEY_RULE_ID_TO_EDIT],
+            merchantRegex = savedStateHandle[KEY_MERCHANT_REGEX],
+            amountRegex = savedStateHandle[KEY_AMOUNT_REGEX],
+            accountRegex = savedStateHandle[KEY_ACCOUNT_REGEX],
+            sourceSmsBody = savedStateHandle[KEY_SOURCE_SMS_BODY],
+            priority = savedStateHandle[KEY_PRIORITY] ?: 10,
+        )
+    }
+
+    private fun persistStateToHandle(state: RuleCreationUiState) {
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_RULE_PATTERN] = state.triggerSelection.selectedText
+        savedStateHandle[KEY_RULE_PATTERN_START] = state.triggerSelection.startIndex
+        savedStateHandle[KEY_RULE_PATTERN_END] = state.triggerSelection.endIndex
+
+        savedStateHandle[KEY_MERCHANT_TEXT] = state.merchantSelection.selectedText
+        savedStateHandle[KEY_MERCHANT_START] = state.merchantSelection.startIndex
+        savedStateHandle[KEY_MERCHANT_END] = state.merchantSelection.endIndex
+
+        savedStateHandle[KEY_AMOUNT_TEXT] = state.amountSelection.selectedText
+        savedStateHandle[KEY_AMOUNT_START] = state.amountSelection.startIndex
+        savedStateHandle[KEY_AMOUNT_END] = state.amountSelection.endIndex
+
+        savedStateHandle[KEY_ACCOUNT_TEXT] = state.accountSelection.selectedText
+        savedStateHandle[KEY_ACCOUNT_START] = state.accountSelection.startIndex
+        savedStateHandle[KEY_ACCOUNT_END] = state.accountSelection.endIndex
+
+        savedStateHandle[KEY_RULE_TYPE] = state.transactionType?.dbValue
+        savedStateHandle[KEY_RULE_ID_TO_EDIT] = state.ruleIdToEdit
+        savedStateHandle[KEY_MERCHANT_REGEX] = state.merchantRegex
+        savedStateHandle[KEY_AMOUNT_REGEX] = state.amountRegex
+        savedStateHandle[KEY_ACCOUNT_REGEX] = state.accountRegex
+        savedStateHandle[KEY_SOURCE_SMS_BODY] = state.sourceSmsBody
+        savedStateHandle[KEY_PRIORITY] = state.priority
+    }
+
+    private val _uiState =
+        MutableStateFlow(
+            if (savedStateHandle.contains(KEY_INITIALIZED) ||
+                savedStateHandle.contains(KEY_RULE_PATTERN) ||
+                savedStateHandle.contains(KEY_RULE_TYPE)
+            ) {
+                restoreStateFromHandle()
+            } else {
+                RuleCreationUiState()
+            },
+        )
     val uiState = _uiState.asStateFlow()
 
     fun initializeStateForCreation(potentialTxn: PotentialTransaction) {
+        if (savedStateHandle.contains(KEY_INITIALIZED) ||
+            savedStateHandle.contains(KEY_RULE_PATTERN) ||
+            savedStateHandle.contains(KEY_RULE_TYPE)
+        ) {
+            return
+        }
         val dotAmountStr = String.format(Locale.ROOT, "%.2f", potentialTxn.amount)
         val commaAmountStr = String.format(Locale.GERMANY, "%.2f", potentialTxn.amount)
         val dotIndex = potentialTxn.originalMessage.indexOf(dotAmountStr)
@@ -98,7 +230,7 @@ class RuleCreationViewModel(
                 }
             } ?: RuleSelection()
 
-        _uiState.value =
+        val newState =
             RuleCreationUiState(
                 amountSelection = amountSelection,
                 merchantSelection = merchantSelection,
@@ -106,9 +238,16 @@ class RuleCreationViewModel(
                 transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType),
                 sourceSmsBody = potentialTxn.originalMessage,
             )
+        _uiState.value = newState
+        persistStateToHandle(newState)
     }
 
     fun loadRuleForEditing(ruleId: Int) {
+        if (savedStateHandle.get<Int>(KEY_RULE_ID_TO_EDIT) == ruleId &&
+            savedStateHandle.contains(KEY_INITIALIZED)
+        ) {
+            return
+        }
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 val rule = customSmsRuleRepository.getRuleById(ruleId).firstOrNull()
@@ -132,6 +271,7 @@ class RuleCreationViewModel(
                         priority = rule.priority,
                     )
                 }
+                persistStateToHandle(_uiState.value)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -143,22 +283,40 @@ class RuleCreationViewModel(
 
     fun onMarkAsTrigger(selection: RuleSelection) {
         _uiState.update { it.copy(triggerSelection = selection) }
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_RULE_PATTERN] = selection.selectedText
+        savedStateHandle[KEY_RULE_PATTERN_START] = selection.startIndex
+        savedStateHandle[KEY_RULE_PATTERN_END] = selection.endIndex
     }
 
     fun onMarkAsMerchant(selection: RuleSelection) {
         _uiState.update { it.copy(merchantSelection = selection) }
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_MERCHANT_TEXT] = selection.selectedText
+        savedStateHandle[KEY_MERCHANT_START] = selection.startIndex
+        savedStateHandle[KEY_MERCHANT_END] = selection.endIndex
     }
 
     fun onMarkAsAmount(selection: RuleSelection) {
         _uiState.update { it.copy(amountSelection = selection) }
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_AMOUNT_TEXT] = selection.selectedText
+        savedStateHandle[KEY_AMOUNT_START] = selection.startIndex
+        savedStateHandle[KEY_AMOUNT_END] = selection.endIndex
     }
 
     fun onMarkAsAccount(selection: RuleSelection) {
         _uiState.update { it.copy(accountSelection = selection) }
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_ACCOUNT_TEXT] = selection.selectedText
+        savedStateHandle[KEY_ACCOUNT_START] = selection.startIndex
+        savedStateHandle[KEY_ACCOUNT_END] = selection.endIndex
     }
 
     fun onTransactionTypeChanged(newType: TransactionType?) {
         _uiState.update { it.copy(transactionType = newType) }
+        savedStateHandle[KEY_INITIALIZED] = true
+        savedStateHandle[KEY_RULE_TYPE] = newType?.dbValue
     }
 
     fun clearError() {
