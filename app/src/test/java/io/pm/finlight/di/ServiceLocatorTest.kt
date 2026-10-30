@@ -1,6 +1,7 @@
 package io.pm.finlight.di
 
 import android.app.Application
+import android.content.Context
 import android.os.Build
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -12,6 +13,7 @@ import io.pm.finlight.BudgetDao
 import io.pm.finlight.BudgetRepository
 import io.pm.finlight.CustomSmsRuleDao
 import io.pm.finlight.CustomSmsRuleRepository
+import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
@@ -37,6 +39,7 @@ import io.pm.finlight.RecurringTransactionDao
 import io.pm.finlight.RecurringTransactionRepository
 import io.pm.finlight.SplitTransactionDao
 import io.pm.finlight.SplitTransactionRepository
+import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
@@ -905,4 +908,71 @@ class ServiceLocatorTest {
             customSmsRuleInstances.forEach { assertSame(customSmsRuleInstances.first(), it) }
             ignoreRuleInstances.forEach { assertSame(ignoreRuleInstances.first(), it) }
         }
+
+    // --- ViewModel & Factory Resolution Tests ---
+
+    @Test
+    fun provideTransactionViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideTransactionViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun provideTransactionViewModel_withResolvedDb_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideTransactionViewModel(application, db)
+        assertNotNull(viewModel)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun provideTransactionViewModel_withNonApplicationContext_throwsIllegalArgumentException() {
+        val nonAppContext =
+            mockk<Context>(relaxed = true) {
+                every { applicationContext } returns mockk<Context>(relaxed = true)
+            }
+        ServiceLocator.provideTransactionViewModel(nonAppContext)
+    }
+
+    @Test
+    fun provideDashboardViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideDashboardViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun provideViewModelFactory_returnsFactoryInstance() {
+        val factory = ServiceLocator.provideViewModelFactory(application)
+        assertNotNull(factory)
+    }
+
+    @Test
+    fun provideViewModelFactory_withNullContext_returnsFactoryInstance() {
+        val factory = ServiceLocator.provideViewModelFactory()
+        assertNotNull(factory)
+    }
+
+    @Test
+    fun setTransactionViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: TransactionViewModel = mockk(relaxed = true)
+        ServiceLocator.setTransactionViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideTransactionViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideTransactionViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun setDashboardViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: DashboardViewModel = mockk(relaxed = true)
+        ServiceLocator.setDashboardViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideDashboardViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideDashboardViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
 }

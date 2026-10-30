@@ -122,4 +122,10 @@ class DashboardViewModelFactoryTest {
             factory.create(UnknownViewModel::class.java)
         }
     }
+
+    @Test
+    fun create_withExtras_returnsDashboardViewModel() {
+        val viewModel = factory.create(DashboardViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
 }
