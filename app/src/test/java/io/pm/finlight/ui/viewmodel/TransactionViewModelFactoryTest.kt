@@ -154,4 +154,10 @@ class TransactionViewModelFactoryTest {
             factory.create(UnknownViewModel::class.java)
         }
     }
+
+    @Test
+    fun create_withExtras_returnsTransactionViewModel() {
+        val viewModel = factory.create(TransactionViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
 }

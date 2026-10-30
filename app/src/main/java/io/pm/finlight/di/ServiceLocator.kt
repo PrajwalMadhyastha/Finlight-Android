@@ -1,7 +1,9 @@
 package io.pm.finlight.di
 
+import android.app.Application
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BackupSettingsRepository
@@ -9,6 +11,7 @@ import io.pm.finlight.BudgetRepository
 import io.pm.finlight.BudgetSettingsRepository
 import io.pm.finlight.CategoryRepository
 import io.pm.finlight.DashboardSettingsRepository
+import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.FeatureSettingsRepository
 import io.pm.finlight.FirstLaunchSettingsRepository
 import io.pm.finlight.IAccountRepository
@@ -51,6 +54,7 @@ import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
 import io.pm.finlight.TransactionRepository
+import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TravelSettingsRepository
 import io.pm.finlight.data.RoomTransactionRunner
 import io.pm.finlight.data.TransactionRunner
@@ -67,6 +71,7 @@ import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.SystemTimeProvider
 
 /**
  * ServiceLocator provides centralized, decoupled dependency resolution for repositories
@@ -173,6 +178,12 @@ object ServiceLocator {
 
     @Volatile
     private var transactionRunner: TransactionRunner? = null
+
+    @Volatile
+    private var transactionViewModel: TransactionViewModel? = null
+
+    @Volatile
+    private var dashboardViewModel: DashboardViewModel? = null
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -761,6 +772,102 @@ object ServiceLocator {
         }
     }
 
+    /**
+     * Resolves a [TransactionViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideTransactionViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): TransactionViewModel {
+        return transactionViewModel ?: run {
+            val app = context.applicationContext as Application
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val tagRepo = provideTagRepository(app)
+            val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepo)
+            val mergeTransactionsUseCase = provideMergeTransactionsUseCase(app, db)
+            val dispatcherProvider = provideDispatcherProvider(app)
+            val manageReimbursementUseCase = provideManageReimbursementUseCase(app)
+            val autoSaveSmsTransactionUseCase = provideAutoSaveSmsTransactionUseCase(app, db)
+            val transactionRepository = provideTransactionRepository(app)
+            val accountRepository = provideAccountRepository(app)
+            val categoryRepository = provideCategoryRepository(app)
+            val settingsRepository = provideSettingsRepository(app)
+            val smsRepository = provideSmsRepository(app)
+            val merchantRenameRuleRepository = provideMerchantRenameRuleRepository(app, db)
+            val merchantCategoryMappingRepository = provideMerchantCategoryMappingRepository(app, db)
+            val merchantMappingRepository = provideMerchantMappingRepository(app, db)
+            val splitTransactionRepository = provideSplitTransactionRepository(app, db)
+            val customSmsRuleRepository = provideCustomSmsRuleRepository(app, db)
+            val ignoreRuleRepository = provideIgnoreRuleRepository(app, db)
+            val smsParseTemplateRepository = provideSmsParseTemplateRepository(app, db)
+
+            TransactionViewModel(
+                application = app,
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                tagRepository = tagRepo,
+                settingsRepository = settingsRepository,
+                smsRepository = smsRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                splitTransactionRepository = splitTransactionRepository,
+                resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
+                manageReimbursementUseCase = manageReimbursementUseCase,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                customSmsRuleRepository = customSmsRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                smsParseTemplateRepository = smsParseTemplateRepository,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [DashboardViewModel] instance.
+     *
+     * @param context Application or activity context.
+     */
+    fun provideDashboardViewModel(context: Context): DashboardViewModel {
+        return dashboardViewModel ?: run {
+            val app = context.applicationContext
+            val settingsRepository = provideSettingsRepository(app)
+            val dispatcherProvider = provideDispatcherProvider(app)
+            val transactionRepository = provideTransactionRepository(app)
+            val getMonthlyConsistencyDataUseCase = provideGetMonthlyConsistencyDataUseCase(app)
+            val accountRepository = provideAccountRepository(app)
+            val mergeTransactionsUseCase = provideMergeTransactionsUseCase(app)
+            val budgetRepository = provideBudgetRepository(app)
+            val recurringTransactionRepository = provideRecurringTransactionRepository(app)
+
+            DashboardViewModel(
+                transactionRepository = transactionRepository,
+                accountRepository = accountRepository,
+                budgetRepository = budgetRepository,
+                settingsRepository = settingsRepository,
+                timeProvider = SystemTimeProvider(),
+                recurringTransactionRepository = recurringTransactionRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                mergeTransactionsUseCase = mergeTransactionsUseCase,
+                dispatcherProvider = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves the centralized [ViewModelProvider.Factory].
+     *
+     * @param context Optional context fallback.
+     */
+    fun provideViewModelFactory(context: Context? = null): ViewModelProvider.Factory {
+        return FinlightViewModelFactory.create(context)
+    }
+
     @VisibleForTesting
     fun setSettingsRepository(repository: ISettingsRepository?) {
         settingsRepository = repository
@@ -927,6 +1034,16 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setTransactionViewModel(viewModel: TransactionViewModel?) {
+        transactionViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setDashboardViewModel(viewModel: DashboardViewModel?) {
+        dashboardViewModel = viewModel
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -961,5 +1078,7 @@ object ServiceLocator {
         ignoreRuleRepository = null
         smsParseTemplateRepository = null
         transactionRunner = null
+        transactionViewModel = null
+        dashboardViewModel = null
     }
 }
