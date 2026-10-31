@@ -74,7 +74,6 @@ import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
-import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
 import io.pm.finlight.data.health.DatabaseHealthChecker
@@ -147,7 +146,7 @@ class MainActivity : AppCompatActivity() {
             ForceAppScaling {
                 PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
                     if (hasSeenOnboarding == false) {
-                        val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
+                        val onboardingViewModel: OnboardingViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
                             onOnboardingFinished = {
@@ -324,17 +323,17 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val dashboardViewModel: DashboardViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
-    val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
-    val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
-    val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
-    val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory(context))
-    val incomeViewModel: IncomeViewModel = viewModel(factory = IncomeViewModelFactory(context))
-    val goalViewModel: GoalViewModel = viewModel(factory = GoalViewModelFactory(context))
+    val accountViewModel: AccountViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val categoryViewModel: CategoryViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val budgetViewModel: BudgetViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val profileViewModel: ProfileViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val incomeViewModel: IncomeViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val goalViewModel: GoalViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
     val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = ManageMerchantRulesViewModelFactory(context))
-    val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
+    val tagViewModel: TagViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
 
     val userName by dashboardViewModel.userName.collectAsState()
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
@@ -1533,7 +1532,7 @@ fun AppNavHost(
         ) { backStackEntry ->
             val context = LocalContext.current.applicationContext as Application
             val tripId = backStackEntry.arguments?.getInt("tripId")
-            val currencyViewModel: CurrencyViewModel = viewModel(factory = CurrencyViewModelFactory(context))
+            val currencyViewModel: CurrencyViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
             CurrencyTravelScreen(navController, if (tripId == -1) null else tripId, currencyViewModel)
         }
         composable(

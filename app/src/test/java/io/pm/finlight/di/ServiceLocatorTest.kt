@@ -71,6 +71,7 @@ import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -1249,5 +1250,31 @@ class ServiceLocatorTest {
         val newViewModel = ServiceLocator.provideTagViewModel(application)
         assertNotNull(newViewModel)
         assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideViewModels_throwsIllegalArgumentException_whenContextLacksApplication() {
+        val nonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns null
+
+        val viewModelProviders: List<() -> Unit> =
+            listOf(
+                { ServiceLocator.provideAccountViewModel(nonAppContext) },
+                { ServiceLocator.provideBudgetViewModel(nonAppContext) },
+                { ServiceLocator.provideCategoryViewModel(nonAppContext) },
+                { ServiceLocator.provideCurrencyViewModel(nonAppContext) },
+                { ServiceLocator.provideGoalViewModel(nonAppContext) },
+                { ServiceLocator.provideHistoricTripsViewModel(nonAppContext) },
+                { ServiceLocator.provideIncomeViewModel(nonAppContext) },
+                { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
+                { ServiceLocator.provideProfileViewModel(nonAppContext) },
+                { ServiceLocator.provideTagViewModel(nonAppContext) },
+            )
+
+        for (provider in viewModelProviders) {
+            assertThrows(IllegalArgumentException::class.java) {
+                provider()
+            }
+        }
     }
 }

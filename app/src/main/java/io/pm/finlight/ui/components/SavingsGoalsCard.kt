@@ -23,9 +23,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.GoalProgressState
 import io.pm.finlight.ui.viewmodel.GoalViewModel
-import io.pm.finlight.ui.viewmodel.GoalViewModelFactory
 import kotlin.math.roundToInt
 
 @Composable
@@ -33,7 +33,7 @@ fun SavingsGoalsCard(
     navController: NavController,
     goalViewModel: GoalViewModel =
         viewModel(
-            factory = GoalViewModelFactory(LocalContext.current.applicationContext as android.app.Application),
+            factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as android.app.Application),
         ),
 ) {
     val goalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
