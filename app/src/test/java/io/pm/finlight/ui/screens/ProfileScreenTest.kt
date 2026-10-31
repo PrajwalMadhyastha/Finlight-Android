@@ -10,8 +10,8 @@ import androidx.navigation.NavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
-import io.pm.finlight.ProfileViewModel
 import io.pm.finlight.TestApplication
+import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test

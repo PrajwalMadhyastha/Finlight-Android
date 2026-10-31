@@ -55,11 +55,11 @@ import io.pm.finlight.data.model.SpendingAnalysisItem
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.AnalysisTimePeriod
 import io.pm.finlight.ui.viewmodel.AnalysisUiState
 import io.pm.finlight.ui.viewmodel.AnalysisViewModel
-import io.pm.finlight.ui.viewmodel.AnalysisViewModelFactory
 import java.net.URLEncoder
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -74,7 +74,7 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun AnalysisScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = AnalysisViewModelFactory(application)
+    val factory = FinlightViewModelFactory.create(application)
     val viewModel: AnalysisViewModel = viewModel(factory = factory)
     val uiState by viewModel.uiState.collectAsState()
     var showDateRangePicker by remember { mutableStateOf(false) }

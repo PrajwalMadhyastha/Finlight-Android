@@ -1,27 +1,33 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/RecurringTransactionViewModelFactory.kt
-// REASON: NEW FILE - This factory provides the Application context and
-// RecurringTransactionRepository dependency to the RecurringTransactionViewModel,
-// enabling constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.RecurringTransactionViewModel
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class RecurringTransactionViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(RecurringTransactionViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val repository = ServiceLocator.provideRecurringTransactionRepository(application, db)
-            val patternDao = db.recurringPatternDao()
             @Suppress("UNCHECKED_CAST")
-            return RecurringTransactionViewModel(application, repository, patternDao) as T
+            return ServiceLocator.provideRecurringTransactionViewModel(application) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

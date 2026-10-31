@@ -3,6 +3,10 @@ package io.pm.finlight.utils
 import io.pm.finlight.CategoryFinderProvider
 import io.pm.finlight.CustomSmsRule
 import io.pm.finlight.CustomSmsRuleProvider
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.IgnoreRule
 import io.pm.finlight.IgnoreRuleProvider
 import io.pm.finlight.MerchantCategoryMappingProvider
@@ -17,6 +21,32 @@ object SmsProviderHelper {
     fun getCategoryFinderProvider(): CategoryFinderProvider =
         object : CategoryFinderProvider {
             override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
+        }
+
+    fun getCustomSmsRuleProvider(repository: ICustomSmsRuleRepository): CustomSmsRuleProvider =
+        object : CustomSmsRuleProvider {
+            override suspend fun getAllRules(): List<CustomSmsRule> = repository.getAllRules().first()
+        }
+
+    fun getMerchantRenameRuleProvider(repository: IMerchantRenameRuleRepository): MerchantRenameRuleProvider =
+        object : MerchantRenameRuleProvider {
+            override suspend fun getAllRules(): List<MerchantRenameRule> = repository.getAllRules().first()
+
+            override suspend fun getAllRulesMap(): Map<String, String> = repository.getAliasesAsMap().first()
+        }
+
+    fun getIgnoreRuleProvider(repository: IIgnoreRuleRepository): IgnoreRuleProvider =
+        object : IgnoreRuleProvider {
+            override suspend fun getEnabledRules(): List<IgnoreRule> = repository.getEnabledRules()
+        }
+
+    fun getMerchantCategoryMappingProvider(repository: IMerchantCategoryMappingRepository): MerchantCategoryMappingProvider =
+        object : MerchantCategoryMappingProvider {
+            override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                repository.getCategoryIdForMerchant(merchantName)
+
+            override suspend fun getAllMappings(): Map<String, Int> =
+                repository.getAllMappings().first().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
         }
 
     fun getCustomSmsRuleProvider(db: AppDatabase): CustomSmsRuleProvider =

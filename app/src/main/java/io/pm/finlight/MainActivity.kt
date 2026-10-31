@@ -72,8 +72,8 @@ import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
-import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
 import io.pm.finlight.data.health.DatabaseHealthChecker
@@ -134,11 +134,8 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             val application = LocalContext.current.applicationContext as Application
-            val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
-            val settingsViewModel: SettingsViewModel =
-                viewModel(
-                    factory = SettingsViewModelFactory(application, transactionViewModel),
-                )
+            val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
+            val settingsViewModel: SettingsViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
             val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
 
@@ -146,7 +143,7 @@ class MainActivity : AppCompatActivity() {
             ForceAppScaling {
                 PersonalFinanceAppTheme(selectedTheme = selectedTheme) {
                     if (hasSeenOnboarding == false) {
-                        val onboardingViewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(application))
+                        val onboardingViewModel: OnboardingViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
                         OnboardingScreen(
                             viewModel = onboardingViewModel,
                             onOnboardingFinished = {
@@ -320,20 +317,20 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val navController = rememberNavController()
     val context = LocalContext.current.applicationContext as Application
 
-    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
-    val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
-    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context, transactionViewModel))
-    val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
-    val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))
-    val budgetViewModel: BudgetViewModel = viewModel(factory = BudgetViewModelFactory(context))
-    val profileViewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory(context))
-    val incomeViewModel: IncomeViewModel = viewModel(factory = IncomeViewModelFactory(context))
-    val goalViewModel: GoalViewModel = viewModel(factory = GoalViewModelFactory(context))
-    val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
+    val dashboardViewModel: DashboardViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val settingsViewModel: SettingsViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val accountViewModel: AccountViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val categoryViewModel: CategoryViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val budgetViewModel: BudgetViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val profileViewModel: ProfileViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val incomeViewModel: IncomeViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val goalViewModel: GoalViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val reportsViewModel: ReportsViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
-    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = ManageMerchantRulesViewModelFactory(context))
-    val tagViewModel: TagViewModel = viewModel(factory = TagViewModelFactory(context))
+    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val tagViewModel: TagViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
 
     val userName by dashboardViewModel.userName.collectAsState()
     val profilePictureUri by dashboardViewModel.profilePictureUri.collectAsState()
@@ -903,7 +900,6 @@ fun AppNavHost(
         ) {
             SmsDebugScreen(
                 navController = navController,
-                transactionViewModel = transactionViewModel,
             )
         }
         // --- DELETED: "account_mapping_screen" route ---
@@ -1275,8 +1271,8 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
-            val factory = WhatIfViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
-            val whatIfViewModel: WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
+            val factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as android.app.Application)
+            val whatIfViewModel: io.pm.finlight.ui.viewmodel.WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             io.pm.finlight.ui.screens.WhatIfSimulatorScreen(navController, whatIfViewModel)
         }
         composable(
@@ -1286,7 +1282,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
-            val factory = io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as android.app.Application)
             val annualSimulatorViewModel: io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             io.pm.finlight.ui.screens.AnnualSimulatorScreen(navController, annualSimulatorViewModel)
         }
@@ -1368,6 +1364,7 @@ fun AppNavHost(
             LinkTransactionScreen(navController = navController, potentialTransactionJson = json)
         }
 
+        // Legacy recurring link route (superseded by confirm_pending_transaction, retained for deep-link compatibility)
         composable(
             route = "link_recurring_transaction/{potentialTransactionJson}",
             arguments = listOf(navArgument("potentialTransactionJson") { type = NavType.StringType }),
@@ -1532,7 +1529,7 @@ fun AppNavHost(
         ) { backStackEntry ->
             val context = LocalContext.current.applicationContext as Application
             val tripId = backStackEntry.arguments?.getInt("tripId")
-            val currencyViewModel: CurrencyViewModel = viewModel(factory = CurrencyViewModelFactory(context))
+            val currencyViewModel: CurrencyViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
             CurrencyTravelScreen(navController, if (tripId == -1) null else tripId, currencyViewModel)
         }
         composable(

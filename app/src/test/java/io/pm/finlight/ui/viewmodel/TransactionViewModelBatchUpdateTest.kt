@@ -445,7 +445,7 @@ class TransactionViewModelBatchUpdateTest : TransactionViewModelBaseSetup() {
 
             // ASSERT
             verify(merchantRenameRuleRepository).insert(MerchantRenameRule(originalName = "abc", newName = "bcd"))
-            verify(smsParseTemplateDao).insert(
+            verify(smsParseTemplateRepository).insert(
                 org.mockito.kotlin.check { template ->
                     assertEquals("bcd", template.correctedMerchantName)
                     assertEquals(sourceSms.body, template.originalSmsBody)

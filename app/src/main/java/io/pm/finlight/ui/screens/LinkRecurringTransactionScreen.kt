@@ -13,6 +13,7 @@ import io.pm.finlight.TransactionType
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,13 +31,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
-import io.pm.finlight.LinkTransactionViewModelFactory
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.text.NumberFormat
@@ -57,12 +58,18 @@ fun LinkRecurringTransactionScreen(
         }
 
     val application = LocalContext.current.applicationContext as Application
-    val factory = LinkTransactionViewModelFactory(application, potentialTxn)
-    val viewModel: LinkTransactionViewModel = viewModel(factory = factory)
+    val factory = LinkRecurringTransactionViewModelFactory(application, potentialTxn)
+    val viewModel: LinkRecurringTransactionViewModel = viewModel(factory = factory)
 
     val candidates by viewModel.linkableTransactions.collectAsState()
     var showConfirmationDialog by remember { mutableStateOf<Transaction?>(null) }
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -97,11 +104,13 @@ fun LinkRecurringTransactionScreen(
                 ) {
                     OutlinedButton(
                         onClick = {
-                            viewModel.remindTomorrow {
-                                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                                notificationManager.cancel(potentialTxn.sourceSmsId.toInt())
+                            viewModel.remindTomorrow { success ->
+                                if (success) {
+                                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                                    notificationManager.cancel(potentialTxn.sourceSmsId.toInt())
+                                    navController.popBackStack()
+                                }
                             }
-                            navController.popBackStack()
                         },
                         modifier = Modifier.weight(1f),
                     ) {
@@ -160,14 +169,16 @@ fun LinkRecurringTransactionScreen(
             confirmButton = {
                 Button(onClick = {
                     showConfirmationDialog = null
-                    viewModel.linkTransaction(transactionToLink.id) {
-                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        notificationManager.cancel(potentialTxn.sourceSmsId.toInt())
-                        // --- FIX: Use popUpTo for a more robust navigation ---
-                        navController.navigate("transaction_detail/${transactionToLink.id}") {
-                            // Pop the linking screen off the back stack
-                            popUpTo("link_recurring_transaction/{potentialTransactionJson}") {
-                                inclusive = true
+                    viewModel.linkTransaction(transactionToLink.id) { success ->
+                        if (success) {
+                            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                            notificationManager.cancel(potentialTxn.sourceSmsId.toInt())
+                            // --- FIX: Use popUpTo for a more robust navigation ---
+                            navController.navigate("transaction_detail/${transactionToLink.id}") {
+                                // Pop the linking screen off the back stack
+                                popUpTo("link_recurring_transaction/{potentialTransactionJson}") {
+                                    inclusive = true
+                                }
                             }
                         }
                     }

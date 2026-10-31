@@ -13,7 +13,7 @@ package io.pm.finlight.ui.screens
 
 import android.net.Uri
 import android.widget.Toast
-import io.pm.finlight.TransactionType
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
@@ -43,6 +43,8 @@ import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +75,7 @@ import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -122,9 +125,19 @@ fun AddTransactionScreen(
     val selectedAccount by viewModel.addTransactionAccount.collectAsState()
 
     // --- Local State for UI Logic ---
-    var transactionType by remember { mutableStateOf(initialTransactionType?.let { TransactionType.fromStringOrNull(it) } ?: TransactionType.EXPENSE) }
-    var notes by remember { mutableStateOf("") }
-    var attachedImageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var transactionType by rememberSaveable {
+        mutableStateOf(
+            initialTransactionType?.let { TransactionType.fromStringOrNull(it) } ?: TransactionType.EXPENSE,
+        )
+    }
+    var notes by rememberSaveable { mutableStateOf("") }
+    var attachedImageUris by rememberSaveable(
+        stateSaver =
+            Saver<List<Uri>, ArrayList<String>>(
+                save = { uris -> ArrayList(uris.map { it.toString() }) },
+                restore = { list -> list.map { Uri.parse(it) } },
+            ),
+    ) { mutableStateOf<List<Uri>>(emptyList()) }
 
     var hasInteracted by remember { mutableStateOf(false) }
     val isAmountEntered by remember(amount) { derivedStateOf { (amount.toDoubleOrNull() ?: 0.0) > 0.0 } }
@@ -157,6 +170,7 @@ fun AddTransactionScreen(
         ) {
             showGoalAllocationDialog = savedTxnId
         } else {
+            viewModel.clearAddTransactionState()
             navController.popBackStack()
         }
     }
@@ -170,7 +184,13 @@ fun AddTransactionScreen(
     val historyManualTransactions by viewModel.historyManualTransactions.collectAsState()
     val merchantPredictions by viewModel.merchantPredictions.collectAsState()
 
-    val selectedDateTime by remember { mutableStateOf(Calendar.getInstance()) }
+    val selectedDateTime by rememberSaveable(
+        stateSaver =
+            Saver<Calendar, Long>(
+                save = { it.timeInMillis },
+                restore = { Calendar.getInstance().apply { timeInMillis = it } },
+            ),
+    ) { mutableStateOf(Calendar.getInstance()) }
 
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -183,7 +203,13 @@ fun AddTransactionScreen(
 
     val isSaveEnabled = isAmountEntered
 
-    var isDefaultAccountApplied by remember { mutableStateOf(false) }
+    var isDefaultAccountApplied by rememberSaveable { mutableStateOf(false) }
+    var isScreenInitialized by rememberSaveable { mutableStateOf(false) }
+
+    BackHandler {
+        viewModel.clearAddTransactionState()
+        navController.popBackStack()
+    }
 
     // This effect handles ALL initial data loading
     LaunchedEffect(initialDataJson, accounts, categories, defaultAccount, isCsvEdit) {
@@ -252,7 +278,12 @@ fun AddTransactionScreen(
     }
 
     LaunchedEffect(Unit) {
-        viewModel.clearAddTransactionState()
+        if (!isScreenInitialized) {
+            if (!viewModel.hasRestoredManualTransactionState()) {
+                viewModel.clearAddTransactionState()
+            }
+            isScreenInitialized = true
+        }
     }
 
     LaunchedEffect(categoryNudgeData) {
@@ -304,7 +335,10 @@ fun AddTransactionScreen(
                 TopAppBar(
                     title = { Text("Compose Transaction") },
                     navigationIcon = {
-                        IconButton(onClick = { navController.popBackStack() }) {
+                        IconButton(onClick = {
+                            viewModel.clearAddTransactionState()
+                            navController.popBackStack()
+                        }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     },
@@ -647,6 +681,7 @@ fun AddTransactionScreen(
             activeGoals = activeGoals,
             onDismiss = {
                 showGoalAllocationDialog = null
+                viewModel.clearAddTransactionState()
                 navController.popBackStack()
             },
             onConfirm = { goalsToLink ->
@@ -654,8 +689,9 @@ fun AddTransactionScreen(
                     goalViewModel.linkTransactionToGoal(goal.id, showGoalAllocationDialog!!.toInt())
                 }
                 showGoalAllocationDialog = null
+                viewModel.clearAddTransactionState()
                 navController.popBackStack()
-            }
+            },
         )
     }
 }

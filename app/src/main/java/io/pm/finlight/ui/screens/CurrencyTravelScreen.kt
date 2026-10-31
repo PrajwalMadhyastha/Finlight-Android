@@ -77,6 +77,12 @@ fun CurrencyTravelScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // Load trip data if in edit mode
     LaunchedEffect(tripId) {
         if (isEditMode && tripId != null) {

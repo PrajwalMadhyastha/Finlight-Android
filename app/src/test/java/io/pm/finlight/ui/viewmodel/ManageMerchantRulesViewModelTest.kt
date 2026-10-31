@@ -8,11 +8,11 @@ import io.pm.finlight.Category
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
-import io.pm.finlight.ManageMerchantRulesViewModel
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantRenameRule
 import io.pm.finlight.TestApplication
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -79,6 +79,7 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
                 transactionRepository = transactionRepository,
                 categoryMappingRepository = categoryMappingRepository,
                 categoryRepository = categoryRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
             )
     }
 
@@ -385,6 +386,35 @@ class ManageMerchantRulesViewModelTest : BaseViewModelTest() {
                 viewModel.clearSelectedRuleForTransactions()
                 assertEquals(emptyList<io.pm.finlight.TransactionDetails>(), awaitItem())
 
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `deleteRule emits error to uiEvent when repository throws`() =
+        runTest {
+            val rule = MerchantRenameRule(originalName = "ZOMATO", newName = "Zomato")
+            `when`(merchantRenameRuleRepository.deleteByOriginalName("ZOMATO"))
+                .thenThrow(RuntimeException("DB failure"))
+
+            viewModel.uiEvent.test {
+                viewModel.deleteRule(rule)
+                val event = awaitItem()
+                assertTrue(event.contains("DB failure"))
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `addRule emits error to uiEvent when repository throws`() =
+        runTest {
+            `when`(merchantRenameRuleRepository.insert(any()))
+                .thenThrow(RuntimeException("Insert failure"))
+
+            viewModel.uiEvent.test {
+                viewModel.addRule("ORIGINAL", "NewName")
+                val event = awaitItem()
+                assertTrue(event.contains("Insert failure"))
                 cancelAndIgnoreRemainingEvents()
             }
         }

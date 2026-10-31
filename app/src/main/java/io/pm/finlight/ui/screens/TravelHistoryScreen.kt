@@ -10,6 +10,7 @@
 package io.pm.finlight.ui.screens
 
 import android.app.Application
+import android.widget.Toast
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -30,9 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.data.db.dao.TripWithStats
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
-import io.pm.finlight.ui.viewmodel.HistoricTripsViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
@@ -41,8 +42,15 @@ import java.util.*
 @Composable
 fun TravelHistoryScreen(navController: NavController) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = HistoricTripsViewModelFactory(application)
+    val factory = FinlightViewModelFactory.create(application)
     val viewModel: HistoricTripsViewModel = viewModel(factory = factory)
+
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
+    }
 
     val trips by viewModel.historicTrips.collectAsState()
     var tripToDelete by remember { mutableStateOf<TripWithStats?>(null) }

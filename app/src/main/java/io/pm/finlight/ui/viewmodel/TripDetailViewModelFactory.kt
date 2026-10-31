@@ -17,13 +17,15 @@ class TripDetailViewModelFactory(
             val db = AppDatabase.getInstance(application)
             val tripRepository = TripRepository(db.tripDao())
             val transactionRepository = ServiceLocator.provideTransactionRepository(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
 
             @Suppress("UNCHECKED_CAST")
             return TripDetailViewModel(
-                tripRepository,
-                transactionRepository,
-                tripId,
-                tagId,
+                tripRepository = tripRepository,
+                transactionRepository = transactionRepository,
+                tripId = tripId,
+                tagId = tagId,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")

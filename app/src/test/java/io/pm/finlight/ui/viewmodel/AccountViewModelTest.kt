@@ -456,6 +456,20 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `renameAccount failure sends error event`() =
+        runTest {
+            val accountId = 1
+            `when`(accountRepository.getAccountByIdSync(accountId)).thenThrow(RuntimeException("Sync error"))
+
+            viewModel.uiEvent.test {
+                viewModel.renameAccount(accountId, "New Name")
+                val event = awaitItem()
+                assertTrue(event.contains("Sync error"))
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
     fun `dismissMergeSuggestion calls settings repository`() =
         runTest {
             // Arrange
@@ -468,6 +482,24 @@ class AccountViewModelTest : BaseViewModelTest() {
             viewModel.dismissMergeSuggestion(suggestion)
 
             // Assert
+            verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
+        }
+
+    @Test
+    fun `dismissMergeSuggestion handles repository exception gracefully`() =
+        runTest {
+            // Arrange
+            val account1 = Account(id = 1, name = "Acc 1", type = "Bank")
+            val account2 = Account(id = 2, name = "Acc 2", type = "Bank")
+            val suggestion = Pair(account1, account2)
+            val expectedKey = "${min(account1.id, account2.id)}|${max(account1.id, account2.id)}"
+            `when`(settingsRepository.addDismissedMergeSuggestion(expectedKey)).thenThrow(RuntimeException("Storage error"))
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.dismissMergeSuggestion(suggestion)
+                assertEquals("Error dismissing merge suggestion: Storage error", awaitItem())
+            }
             verify(settingsRepository).addDismissedMergeSuggestion(expectedKey)
         }
 

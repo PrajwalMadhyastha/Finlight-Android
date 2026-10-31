@@ -23,8 +23,8 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.entity.DeletedSmsHash
+import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
@@ -52,7 +52,6 @@ sealed class ScanResult {
 class SettingsViewModel(
     application: Application,
     private val settingsRepository: ISettingsRepository,
-    private val db: AppDatabase,
     private val transactionRepository: ITransactionRepository,
     private val merchantMappingRepository: IMerchantMappingRepository,
     private val accountRepository: IAccountRepository,
@@ -60,16 +59,23 @@ class SettingsViewModel(
     private val smsRepository: ISmsRepository,
     private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
     private val smsClassifier: SmsClassifier,
+    private val tagRepository: ITagRepository,
+    private val splitTransactionRepository: ISplitTransactionRepository,
+    private val merchantRenameRuleRepository: IMerchantRenameRuleRepository,
+    private val merchantCategoryMappingRepository: IMerchantCategoryMappingRepository,
+    private val customSmsRuleRepository: ICustomSmsRuleRepository,
+    private val ignoreRuleRepository: IIgnoreRuleRepository,
+    private val smsParseTemplateProvider: SmsParseTemplateProvider,
     @property:VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal val nerExtractorProvider: () -> SmsEntityExtractor = { MlModelFactory.getNerExtractor(application) },
     private val transactionRunner: TransactionRunner,
+    private val databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
 ) : AndroidViewModel(application) {
     // Secondary constructor for backward compatibility
     constructor(
         application: Application,
         settingsRepository: ISettingsRepository,
-        db: AppDatabase,
         transactionRepository: ITransactionRepository,
         merchantMappingRepository: IMerchantMappingRepository,
         accountRepository: IAccountRepository,
@@ -77,13 +83,20 @@ class SettingsViewModel(
         smsRepository: ISmsRepository,
         autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase,
         smsClassifier: SmsClassifier,
+        tagRepository: ITagRepository,
+        splitTransactionRepository: ISplitTransactionRepository,
+        merchantRenameRuleRepository: IMerchantRenameRuleRepository,
+        merchantCategoryMappingRepository: IMerchantCategoryMappingRepository,
+        customSmsRuleRepository: ICustomSmsRuleRepository,
+        ignoreRuleRepository: IIgnoreRuleRepository,
+        smsParseTemplateProvider: SmsParseTemplateProvider,
         nerExtractor: SmsEntityExtractor,
         transactionRunner: TransactionRunner,
+        databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
         dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
         application = application,
         settingsRepository = settingsRepository,
-        db = db,
         transactionRepository = transactionRepository,
         merchantMappingRepository = merchantMappingRepository,
         accountRepository = accountRepository,
@@ -91,17 +104,23 @@ class SettingsViewModel(
         smsRepository = smsRepository,
         autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
         smsClassifier = smsClassifier,
+        tagRepository = tagRepository,
+        splitTransactionRepository = splitTransactionRepository,
+        merchantRenameRuleRepository = merchantRenameRuleRepository,
+        merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+        customSmsRuleRepository = customSmsRuleRepository,
+        ignoreRuleRepository = ignoreRuleRepository,
+        smsParseTemplateProvider = smsParseTemplateProvider,
         nerExtractorProvider = { nerExtractor },
         transactionRunner = transactionRunner,
+        databaseHealthChecker = databaseHealthChecker,
         dispatchers = dispatchers,
     )
 
     private val context = application
-    private val tagDao = db.tagDao()
-    private val splitTransactionDao = db.splitTransactionDao()
     private val backupManager = BackupManager(context)
 
-    private val _uiEvent = Channel<String>()
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
     private val _showBackupSuccessDialog = MutableStateFlow(false)
@@ -319,14 +338,14 @@ class SettingsViewModel(
                     deletedSmsHashes.contains(legacyHash)
             if (isExisting) {
                 if (currentHash != null && existingSmsHashes.contains(legacyHash)) {
-                    db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                    transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
                     existingSmsHashes.remove(legacyHash)
                     existingSmsHashes.add(currentHash)
                 }
                 false
             } else if (isDeleted) {
                 if (currentHash != null && deletedSmsHashes.contains(legacyHash)) {
-                    db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                    transactionRepository.insertDeletedSmsHash(currentHash)
                     deletedSmsHashes.add(currentHash)
                 }
                 false
@@ -335,6 +354,34 @@ class SettingsViewModel(
             }
         }.map { it.first }
     }
+
+    private fun createCategoryFinderProvider(): CategoryFinderProvider =
+        object : CategoryFinderProvider {
+            override fun getCategoryIdByName(name: String): Int? {
+                return CategoryIconHelper.getCategoryIdByName(name)
+            }
+        }
+
+    private fun createCustomSmsRuleProvider(): CustomSmsRuleProvider =
+        object : CustomSmsRuleProvider {
+            override suspend fun getAllRules(): List<CustomSmsRule> = customSmsRuleRepository.getAllRules().first()
+        }
+
+    private fun createMerchantRenameRuleProvider(): MerchantRenameRuleProvider =
+        object : MerchantRenameRuleProvider {
+            override suspend fun getAllRules(): List<MerchantRenameRule> = merchantRenameRuleRepository.getAllRules().first()
+        }
+
+    private fun createIgnoreRuleProvider(): IgnoreRuleProvider =
+        object : IgnoreRuleProvider {
+            override suspend fun getEnabledRules(): List<IgnoreRule> = ignoreRuleRepository.getEnabledRules()
+        }
+
+    private fun createMerchantCategoryMappingProvider(): MerchantCategoryMappingProvider =
+        object : MerchantCategoryMappingProvider {
+            override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
+                merchantCategoryMappingRepository.getCategoryIdForMerchant(merchantName)
+        }
 
     fun rescanSmsWithNewRule(onComplete: (Int) -> Unit) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED) {
@@ -359,41 +406,14 @@ class SettingsViewModel(
                     }
                 val deletedSmsHashes =
                     withContext(dispatchers.io) {
-                        db.deletedSmsHashDao().getAllHashes().toMutableSet()
+                        transactionRepository.getAllDeletedSmsHashes().toMutableSet()
                     }
 
-                val categoryFinderProvider =
-                    object : CategoryFinderProvider {
-                        override fun getCategoryIdByName(name: String): Int? {
-                            return CategoryIconHelper.getCategoryIdByName(name)
-                        }
-                    }
-                val customSmsRuleProvider =
-                    object : CustomSmsRuleProvider {
-                        override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                    }
-                val merchantRenameRuleProvider =
-                    object : MerchantRenameRuleProvider {
-                        override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                    }
-                val ignoreRuleProvider =
-                    object : IgnoreRuleProvider {
-                        override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                    }
-                val merchantCategoryMappingProvider =
-                    object : MerchantCategoryMappingProvider {
-                        override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                            db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                    }
-                val smsParseTemplateProvider =
-                    object : SmsParseTemplateProvider {
-                        override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-
-                        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                            db.smsParseTemplateDao().getTemplatesBySignature(
-                                signature,
-                            )
-                    }
+                val categoryFinderProvider = createCategoryFinderProvider()
+                val customSmsRuleProvider = createCustomSmsRuleProvider()
+                val merchantRenameRuleProvider = createMerchantRenameRuleProvider()
+                val ignoreRuleProvider = createIgnoreRuleProvider()
+                val merchantCategoryMappingProvider = createMerchantCategoryMappingProvider()
 
                 val parsedList =
                     if (rawMessages.isEmpty()) {
@@ -494,38 +514,13 @@ class SettingsViewModel(
                         dispatchers.io,
                     ) { merchantMappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName }) }
                 val existingSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllSmsHashes().first().toMutableSet() }
-                val deletedSmsHashes = withContext(dispatchers.io) { db.deletedSmsHashDao().getAllHashes().toMutableSet() }
+                val deletedSmsHashes = withContext(dispatchers.io) { transactionRepository.getAllDeletedSmsHashes().toMutableSet() }
 
-                val categoryFinderProvider =
-                    object : CategoryFinderProvider {
-                        override fun getCategoryIdByName(name: String): Int? = CategoryIconHelper.getCategoryIdByName(name)
-                    }
-                val customSmsRuleProvider =
-                    object : CustomSmsRuleProvider {
-                        override suspend fun getAllRules(): List<CustomSmsRule> = db.customSmsRuleDao().getAllRules().first()
-                    }
-                val merchantRenameRuleProvider =
-                    object : MerchantRenameRuleProvider {
-                        override suspend fun getAllRules(): List<MerchantRenameRule> = db.merchantRenameRuleDao().getAllRules().first()
-                    }
-                val ignoreRuleProvider =
-                    object : IgnoreRuleProvider {
-                        override suspend fun getEnabledRules(): List<IgnoreRule> = db.ignoreRuleDao().getEnabledRules()
-                    }
-                val merchantCategoryMappingProvider =
-                    object : MerchantCategoryMappingProvider {
-                        override suspend fun getCategoryIdForMerchant(merchantName: String): Int? =
-                            db.merchantCategoryMappingDao().getCategoryIdForMerchant(merchantName)
-                    }
-                val smsParseTemplateProvider =
-                    object : SmsParseTemplateProvider {
-                        override suspend fun getAllTemplates(): List<SmsParseTemplate> = db.smsParseTemplateDao().getAllTemplates()
-
-                        override suspend fun getTemplatesBySignature(signature: String): List<SmsParseTemplate> =
-                            db.smsParseTemplateDao().getTemplatesBySignature(
-                                signature,
-                            )
-                    }
+                val categoryFinderProvider = createCategoryFinderProvider()
+                val customSmsRuleProvider = createCustomSmsRuleProvider()
+                val merchantRenameRuleProvider = createMerchantRenameRuleProvider()
+                val ignoreRuleProvider = createIgnoreRuleProvider()
+                val merchantCategoryMappingProvider = createMerchantCategoryMappingProvider()
 
                 // 5. Chunk the list
                 val chunks = rawMessages.chunked(100) // Process 100 messages at a time
@@ -656,9 +651,9 @@ class SettingsViewModel(
     ) {
         if (originalName.isBlank() || newName.isBlank()) return
         viewModelScope.launch {
-            val existingRule = db.merchantRenameRuleDao().getRuleByOriginalName(originalName)
+            val existingRule = merchantRenameRuleRepository.getRuleByOriginalName(originalName)
             if (originalName.equals(newName, ignoreCase = true)) {
-                db.merchantRenameRuleDao().deleteByOriginalName(originalName)
+                merchantRenameRuleRepository.deleteByOriginalName(originalName)
                 transactionRepository.updateDescriptionByOriginalDescription(
                     originalDesc = originalName,
                     newDescription = originalName,
@@ -666,7 +661,7 @@ class SettingsViewModel(
                 )
             } else {
                 val rule = MerchantRenameRule(originalName = originalName, newName = newName)
-                db.merchantRenameRuleDao().insert(rule)
+                merchantRenameRuleRepository.insert(rule)
                 transactionRepository.updateDescriptionByOriginalDescription(
                     originalDesc = originalName,
                     newDescription = newName,
@@ -906,21 +901,26 @@ class SettingsViewModel(
             val allCategories = categoryRepository.getAllCategoriesSnapshot()
             val usedColorKeys = allCategories.mapNotNull { it.colorKey }.toMutableList()
 
-            transactionRunner.run(db) {
-                if (isFinlightExport) {
-                    importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
-                } else {
-                    importGenericCsv(header, rows, learnedMappings, usedColorKeys)
-                }
+            try {
+                transactionRunner.run {
+                    if (isFinlightExport) {
+                        importFinlightCsv(header, rows, learnedMappings, usedColorKeys)
+                    } else {
+                        importGenericCsv(header, rows, learnedMappings, usedColorKeys)
+                    }
 
-                if (learnedMappings.isNotEmpty()) {
-                    val newMappings =
-                        learnedMappings.map { (merchant, categoryId) ->
-                            MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
-                        }
-                    db.merchantCategoryMappingDao().insertAll(newMappings)
-                    Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
+                    if (learnedMappings.isNotEmpty()) {
+                        val newMappings =
+                            learnedMappings.map { (merchant, categoryId) ->
+                                MerchantCategoryMapping(parsedName = merchant, categoryId = categoryId)
+                            }
+                        merchantCategoryMappingRepository.insertAll(newMappings)
+                        Log.d("CsvImport", "Learned and saved ${newMappings.size} new merchant-category mappings.")
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e("CsvImport", "Failed to import CSV", e)
+                _uiEvent.send("CSV import failed: ${e.localizedMessage ?: "Unknown error"}")
             }
         }
     }
@@ -944,6 +944,7 @@ class SettingsViewModel(
             idMap[oldId] = newId
         }
 
+        val splits = mutableListOf<SplitTransaction>()
         for (row in children) {
             val parentIdCsv = row[header.indexOf("ParentId")]
             val newParentId = idMap[parentIdCsv]?.toInt()
@@ -952,7 +953,10 @@ class SettingsViewModel(
                 continue
             }
             val split = createSplitFromRow(row, header, newParentId, usedColorKeys)
-            splitTransactionDao.insertAll(listOf(split))
+            splits.add(split)
+        }
+        if (splits.isNotEmpty()) {
+            splitTransactionRepository.insertAll(splits)
         }
     }
 
@@ -1041,9 +1045,9 @@ class SettingsViewModel(
         if (!tagsString.isNullOrBlank()) {
             val tagNames = tagsString.split('|').map { it.trim() }.filter { it.isNotEmpty() }
             for (tagName in tagNames) {
-                var tag = tagDao.findByName(tagName)
+                var tag = tagRepository.findByName(tagName)
                 if (tag == null) {
-                    val newTagId = tagDao.insert(Tag(name = tagName))
+                    val newTagId = tagRepository.insert(Tag(name = tagName))
                     tag = Tag(id = newTagId.toInt(), name = tagName)
                 }
                 tagsToAssociate.add(tag)
@@ -1125,7 +1129,7 @@ class SettingsViewModel(
         viewModelScope.launch(dispatchers.io) {
             _isCheckingHealth.value = true
             try {
-                val result = io.pm.finlight.data.health.DatabaseHealthChecker.checkHealth(db, context)
+                val result = databaseHealthChecker.checkHealth(context)
                 _healthCheckResult.value = result
             } finally {
                 _isCheckingHealth.value = false
@@ -1138,7 +1142,7 @@ class SettingsViewModel(
         viewModelScope.launch(dispatchers.io) {
             _isRepairingDb.value = true
             try {
-                val repairOutcome = io.pm.finlight.data.health.DatabaseHealthChecker.repair(db, context)
+                val repairOutcome = databaseHealthChecker.repair(context)
                 _healthCheckResult.value = null
                 val total =
                     repairOutcome.repairedAccountsCount +

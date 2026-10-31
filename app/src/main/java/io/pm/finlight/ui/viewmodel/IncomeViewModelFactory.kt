@@ -3,24 +3,30 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.di.ServiceLocator
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class IncomeViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(IncomeViewModel::class.java)) {
-            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val accountRepository = ServiceLocator.provideAccountRepository(application)
-            val categoryRepository = ServiceLocator.provideCategoryRepository(application)
-
             @Suppress("UNCHECKED_CAST")
-            return IncomeViewModel(
-                transactionRepository,
-                accountRepository,
-                categoryRepository,
-                settingsRepository,
-            ) as T
+            return ServiceLocator.provideIncomeViewModel(application) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

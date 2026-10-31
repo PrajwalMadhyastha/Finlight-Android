@@ -50,6 +50,9 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SplitItem
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import java.text.NumberFormat
@@ -171,9 +174,13 @@ fun SplitTransactionScreen(
                     }
                     Button(
                         onClick = {
-                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) {
-                                Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
+                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) { success ->
+                                if (success) {
+                                    Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                } else {
+                                    Toast.makeText(context, "Failed to save transaction split", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f).height(48.dp),

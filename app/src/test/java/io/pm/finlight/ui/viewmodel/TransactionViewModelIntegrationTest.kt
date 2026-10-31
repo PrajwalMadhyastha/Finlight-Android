@@ -87,7 +87,7 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         merchantRenameRuleRepository = MerchantRenameRuleRepository(db.merchantRenameRuleDao())
         merchantCategoryMappingRepository = MerchantCategoryMappingRepository(db.merchantCategoryMappingDao())
         merchantMappingRepository = MerchantMappingRepository(db.merchantMappingDao())
-        splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao())
+        splitTransactionRepository = SplitTransactionRepository(db.splitTransactionDao(), db.transactionWriteDao())
         mergeTransactionsUseCase =
             io.pm.finlight.domain.usecase.MergeTransactionsUseCase(
                 transactionQueryDao = db.transactionQueryDao(),
@@ -103,7 +103,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
         viewModel =
             TransactionViewModel(
                 application = context,
-                db = db,
                 transactionRepository = transactionRepository,
                 accountRepository = accountRepository,
                 categoryRepository = categoryRepository,
@@ -114,7 +113,6 @@ class TransactionViewModelIntegrationTest : BaseViewModelTest() {
                 merchantCategoryMappingRepository = merchantCategoryMappingRepository,
                 merchantMappingRepository = merchantMappingRepository,
                 splitTransactionRepository = splitTransactionRepository,
-                smsParseTemplateDao = db.smsParseTemplateDao(),
                 resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
                 mergeTransactionsUseCase = mergeTransactionsUseCase,
             )

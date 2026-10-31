@@ -7,6 +7,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Account
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.data.internalSettingsDataStore
 import io.pm.finlight.util.DatabaseTestRule
@@ -31,6 +32,7 @@ class DatabaseHealthCheckerTest {
     @Before
     fun setup() =
         runTest {
+            AppDatabase.setTestInstance(dbRule.db)
             dbRule.db.accountDao().insertAll(
                 listOf(
                     Account(id = 1, name = "Cash Spends", type = "Cash"),
@@ -292,5 +294,21 @@ class DatabaseHealthCheckerTest {
                 assertTrue(c.moveToFirst())
                 assertEquals(5, c.getInt(0))
             }
+        }
+
+    @Test
+    fun checkHealth_withContextOverload_returnsHealthCheckResult() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val result = DatabaseHealthChecker.checkHealth(context)
+            assertTrue(result.integrityCheckPassed)
+        }
+
+    @Test
+    fun repair_withContextOverload_returnsRepairResult() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val result = DatabaseHealthChecker.repair(context)
+            assertTrue(result.success)
         }
 }

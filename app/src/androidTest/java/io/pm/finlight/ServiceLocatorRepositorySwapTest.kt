@@ -151,6 +151,24 @@ class ServiceLocatorRepositorySwapTest {
     }
 
     @Test
+    fun serviceLocator_swapsCustomSmsRuleRepositoryForTestingInAndroidTest() {
+        val mockCustomRuleRepo: ICustomSmsRuleRepository = createFakeRepository()
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomRuleRepo)
+
+        val resolved = ServiceLocator.provideCustomSmsRuleRepository(context)
+        assertSame(mockCustomRuleRepo, resolved)
+    }
+
+    @Test
+    fun serviceLocator_swapsIgnoreRuleRepositoryForTestingInAndroidTest() {
+        val mockIgnoreRuleRepo: IIgnoreRuleRepository = createFakeRepository()
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
+
+        val resolved = ServiceLocator.provideIgnoreRuleRepository(context)
+        assertSame(mockIgnoreRuleRepo, resolved)
+    }
+
+    @Test
     fun serviceLocator_reset_restoresDefaultRepositories() {
         val mockAccountRepo: IAccountRepository = createFakeRepository()
         val mockTxnRepo: ITransactionRepository = createFakeRepository()
@@ -159,6 +177,8 @@ class ServiceLocatorRepositorySwapTest {
         val mockSplitRepo: ISplitTransactionRepository = createFakeRepository()
         val mockRenameRepo: IMerchantRenameRuleRepository = createFakeRepository()
         val mockCategoryMappingRepo: IMerchantCategoryMappingRepository = createFakeRepository()
+        val mockCustomRuleRepo: ICustomSmsRuleRepository = createFakeRepository()
+        val mockIgnoreRuleRepo: IIgnoreRuleRepository = createFakeRepository()
 
         ServiceLocator.setAccountRepository(mockAccountRepo)
         ServiceLocator.setTransactionRepository(mockTxnRepo)
@@ -167,6 +187,8 @@ class ServiceLocatorRepositorySwapTest {
         ServiceLocator.setSplitTransactionRepository(mockSplitRepo)
         ServiceLocator.setMerchantRenameRuleRepository(mockRenameRepo)
         ServiceLocator.setMerchantCategoryMappingRepository(mockCategoryMappingRepo)
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomRuleRepo)
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
 
         assertSame(mockAccountRepo, ServiceLocator.provideAccountRepository(context))
         assertSame(mockTxnRepo, ServiceLocator.provideTransactionRepository(context))
@@ -175,6 +197,8 @@ class ServiceLocatorRepositorySwapTest {
         assertSame(mockSplitRepo, ServiceLocator.provideSplitTransactionRepository(context))
         assertSame(mockRenameRepo, ServiceLocator.provideMerchantRenameRuleRepository(context))
         assertSame(mockCategoryMappingRepo, ServiceLocator.provideMerchantCategoryMappingRepository(context))
+        assertSame(mockCustomRuleRepo, ServiceLocator.provideCustomSmsRuleRepository(context))
+        assertSame(mockIgnoreRuleRepo, ServiceLocator.provideIgnoreRuleRepository(context))
 
         ServiceLocator.reset()
 
@@ -185,6 +209,8 @@ class ServiceLocatorRepositorySwapTest {
         val restoredSplitRepo = ServiceLocator.provideSplitTransactionRepository(context)
         val restoredRenameRepo = ServiceLocator.provideMerchantRenameRuleRepository(context)
         val restoredCategoryMappingRepo = ServiceLocator.provideMerchantCategoryMappingRepository(context)
+        val restoredCustomRuleRepo = ServiceLocator.provideCustomSmsRuleRepository(context)
+        val restoredIgnoreRuleRepo = ServiceLocator.provideIgnoreRuleRepository(context)
 
         assertNotNull(restoredAccountRepo)
         assertNotNull(restoredTxnRepo)
@@ -193,6 +219,8 @@ class ServiceLocatorRepositorySwapTest {
         assertNotNull(restoredSplitRepo)
         assertNotNull(restoredRenameRepo)
         assertNotNull(restoredCategoryMappingRepo)
+        assertNotNull(restoredCustomRuleRepo)
+        assertNotNull(restoredIgnoreRuleRepo)
         assertNotSame(mockAccountRepo, restoredAccountRepo)
         assertNotSame(mockTxnRepo, restoredTxnRepo)
         assertNotSame(mockBudgetRepo, restoredBudgetRepo)
@@ -200,6 +228,8 @@ class ServiceLocatorRepositorySwapTest {
         assertNotSame(mockSplitRepo, restoredSplitRepo)
         assertNotSame(mockRenameRepo, restoredRenameRepo)
         assertNotSame(mockCategoryMappingRepo, restoredCategoryMappingRepo)
+        assertNotSame(mockCustomRuleRepo, restoredCustomRuleRepo)
+        assertNotSame(mockIgnoreRuleRepo, restoredIgnoreRuleRepo)
     }
 
     @Test

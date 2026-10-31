@@ -1,0 +1,105 @@
+package io.pm.finlight.ui.viewmodel
+
+import android.app.Application
+import android.os.Build
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.mockk.mockk
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.TestApplication
+import io.pm.finlight.di.ServiceLocator
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.annotation.Config
+
+@RunWith(AndroidJUnit4::class)
+@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
+class AnnualSimulatorViewModelFactoryTest {
+    private lateinit var application: Application
+    private lateinit var factory: AnnualSimulatorViewModelFactory
+
+    @Before
+    fun setup() {
+        application = ApplicationProvider.getApplicationContext()
+        factory = AnnualSimulatorViewModelFactory(application)
+        ServiceLocator.reset()
+    }
+
+    @After
+    fun tearDown() {
+        ServiceLocator.reset()
+    }
+
+    @Test
+    fun create_withAnnualSimulatorViewModelClass_resolvesRepositoriesFromServiceLocator() {
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val viewModel = factory.create(AnnualSimulatorViewModel::class.java)
+
+        assertNotNull(viewModel)
+
+        val settingsRepoField =
+            AnnualSimulatorViewModel::class.java.getDeclaredField("settingsRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSettingsRepo, settingsRepoField)
+
+        val txnRepoField =
+            AnnualSimulatorViewModel::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTxnRepo, txnRepoField)
+    }
+
+    @Test
+    fun create_withCustomSimulationYear_initializesYearCorrectly() {
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val customFactory = AnnualSimulatorViewModelFactory(application, simulationYear = 2030)
+        val viewModel = customFactory.create(AnnualSimulatorViewModel::class.java)
+
+        assertNotNull(viewModel)
+        assertEquals(2030, viewModel.currentYear.value)
+    }
+
+    @Test
+    fun create_withExtras_returnsAnnualSimulatorViewModel() {
+        val viewModel = factory.create(AnnualSimulatorViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: AnnualSimulatorViewModel = mockk(relaxed = true)
+        ServiceLocator.setAnnualSimulatorViewModel(mockViewModel)
+
+        val resolved = factory.create(AnnualSimulatorViewModel::class.java)
+        assertSame(mockViewModel, resolved)
+    }
+
+    @Test
+    fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
+        class UnknownViewModel : ViewModel()
+
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(UnknownViewModel::class.java)
+        }
+    }
+}

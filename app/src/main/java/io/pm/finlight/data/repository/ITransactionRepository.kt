@@ -190,6 +190,10 @@ interface ITransactionRepository {
 
     suspend fun insertDeletedSmsHash(hash: String)
 
+    suspend fun getSmsHashesByIds(transactionIds: List<Int>): List<String>
+
+    suspend fun getAllDeletedSmsHashes(): List<String>
+
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
     suspend fun findSimilarTransactions(

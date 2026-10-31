@@ -1,22 +1,22 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate and
-// provide all required repository and service dependencies to the
-// SmsDebugViewModel's constructor, supporting the new dependency injection pattern.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.SmsDebugViewModel
-import io.pm.finlight.TransactionViewModel
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
-import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class SmsDebugViewModelFactory(
     private val application: Application,
     private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null,
@@ -31,47 +31,22 @@ class SmsDebugViewModelFactory(
         nerExtractorProvider = nerExtractorProvider,
     )
 
-    constructor(
-        application: Application,
-        transactionViewModel: TransactionViewModel,
-        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
-    ) : this(
-        application = application,
-        autoSaveSmsTransactionUseCase = null,
-        nerExtractorProvider = nerExtractorProvider,
-    )
-
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
-            val smsRepository = ServiceLocator.provideSmsRepository(application)
-            val db = AppDatabase.getInstance(application)
-            val smsClassifier = MlModelFactory.getClassifier(application)
-            val autoSaveUseCase =
-                autoSaveSmsTransactionUseCase
-                    ?: ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
-
             @Suppress("UNCHECKED_CAST")
-            val viewModel =
-                if (nerExtractorProvider != null) {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        nerExtractorProvider = nerExtractorProvider,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                } else {
-                    SmsDebugViewModel(
-                        application = application,
-                        smsRepository = smsRepository,
-                        db = db,
-                        smsClassifier = smsClassifier,
-                        autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    )
-                }
-            return viewModel as T
+            return ServiceLocator.provideSmsDebugViewModel(
+                context = application,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                nerExtractorProvider = nerExtractorProvider,
+            ) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

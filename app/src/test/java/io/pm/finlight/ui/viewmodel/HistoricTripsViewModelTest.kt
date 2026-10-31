@@ -14,6 +14,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -45,7 +46,7 @@ class HistoricTripsViewModelTest : BaseViewModelTest() {
 
     private fun initializeViewModel(initialTrips: List<TripWithStats> = emptyList()) {
         `when`(tripRepository.getAllTripsWithStats()).thenReturn(flowOf(initialTrips))
-        viewModel = HistoricTripsViewModel(tripRepository, transactionRepository)
+        viewModel = HistoricTripsViewModel(tripRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @Test
@@ -83,5 +84,23 @@ class HistoricTripsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(transactionRepository).removeAllTransactionsForTag(tagId)
             verify(tripRepository).deleteTripById(tripId)
+        }
+
+    @Test
+    fun `deleteTrip on repository failure emits error to uiEvent`() =
+        runTest {
+            // Arrange
+            initializeViewModel()
+            val tripId = 1
+            val tagId = 10
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure")).`when`(tripRepository).deleteTripById(tripId)
+
+            // Act & Assert
+            viewModel.uiEvent.test {
+                viewModel.deleteTrip(tripId, tagId)
+                val event = awaitItem()
+                assertEquals("Error deleting trip: DB failure", event)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }
