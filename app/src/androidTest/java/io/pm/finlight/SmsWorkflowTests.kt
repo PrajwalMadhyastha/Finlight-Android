@@ -13,10 +13,9 @@ import androidx.navigation.compose.rememberNavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.screens.ApproveTransactionScreen
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
-import io.pm.finlight.ui.viewmodel.TransactionViewModelFactory
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Before
@@ -45,8 +44,9 @@ class SmsWorkflowTests {
         }
 
         // Initialize ViewModels manually for the isolated composable test
-        transactionViewModel = TransactionViewModelFactory(context).create(TransactionViewModel::class.java)
-        settingsViewModel = SettingsViewModelFactory(context).create(SettingsViewModel::class.java)
+        val factory = FinlightViewModelFactory.create(context)
+        transactionViewModel = factory.create(TransactionViewModel::class.java)
+        settingsViewModel = factory.create(SettingsViewModel::class.java)
     }
 
     @Test

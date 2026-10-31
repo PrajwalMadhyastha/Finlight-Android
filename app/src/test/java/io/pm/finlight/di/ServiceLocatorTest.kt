@@ -9,6 +9,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
 import io.mockk.verify
 import io.pm.finlight.BudgetDao
 import io.pm.finlight.BudgetRepository
@@ -43,6 +45,8 @@ import io.pm.finlight.SplitTransactionDao
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
+import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.data.db.AppDatabase
@@ -105,6 +109,7 @@ class ServiceLocatorTest {
     fun tearDown() {
         db.close()
         ServiceLocator.reset()
+        unmockkAll()
     }
 
     // --- Singleton Resolution Tests ---
@@ -1432,6 +1437,56 @@ class ServiceLocatorTest {
             setter = { ServiceLocator.setSmsDebugViewModel(it) },
             provider = { ServiceLocator.provideSmsDebugViewModel(application) },
         )
+    }
+
+    @Test
+    fun provideSmsClassifier_whenClassifierIsNull_createsAndCachesInstanceFromMlModelFactory() {
+        ServiceLocator.reset()
+        mockkObject(MlModelFactory)
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(application.applicationContext) } returns mockClassifier
+
+        val classifier1 = ServiceLocator.provideSmsClassifier(application)
+        val classifier2 = ServiceLocator.provideSmsClassifier(application)
+
+        assertSame(mockClassifier, classifier1)
+        assertSame(classifier1, classifier2)
+        verify(exactly = 1) { MlModelFactory.getClassifier(application.applicationContext) }
+    }
+
+    @Test
+    fun setSmsClassifier_overridesProvidedInstance_andResetClearsIt() {
+        val customClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(customClassifier)
+
+        assertSame(customClassifier, ServiceLocator.provideSmsClassifier(application))
+
+        ServiceLocator.reset()
+        mockkObject(MlModelFactory)
+        val factoryClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(any()) } returns factoryClassifier
+
+        val newClassifier = ServiceLocator.provideSmsClassifier(application)
+        assertSame(factoryClassifier, newClassifier)
+        assertNotSame(customClassifier, newClassifier)
+    }
+
+    @Test
+    fun provideSettingsAndSmsDebugViewModel_resolvesFallbackNerExtractor_whenNoProviderConfigured() {
+        ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
+        ServiceLocator.setNerExtractorProvider(null)
+
+        mockkObject(MlModelFactory)
+        val fallbackExtractor: NerExtractor = mockk(relaxed = true)
+        every { MlModelFactory.getNerExtractor(application) } returns fallbackExtractor
+
+        val settingsVm = ServiceLocator.provideSettingsViewModel(application, db)
+        val smsDebugVm = ServiceLocator.provideSmsDebugViewModel(application, db)
+
+        assertSame(fallbackExtractor, settingsVm.nerExtractorProvider.invoke())
+        assertSame(fallbackExtractor, smsDebugVm.nerExtractorProvider.invoke())
     }
 
     @Test
