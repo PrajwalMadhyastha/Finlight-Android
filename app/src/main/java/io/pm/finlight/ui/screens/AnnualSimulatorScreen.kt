@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,14 +43,15 @@ fun AnnualSimulatorScreen(
     val baseAnnualBudget by viewModel.baseAnnualBudget.collectAsState()
     val currentYear by viewModel.currentYear.collectAsState()
     val privacyModeEnabled by viewModel.privacyModeEnabled.collectAsState()
+    val validationError by viewModel.validationError.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
 
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-    val projectedImpact = viewModel.calculateProjectedAnnualImpact()
-    val projectedDeficitSurplus = baseAnnualIncome - baseAnnualBudget - projectedImpact
+    val projectedImpact by viewModel.projectedImpact.collectAsState()
+    val projectedDeficitSurplus by viewModel.projectedDeficitSurplus.collectAsState()
 
     Scaffold(
         topBar = {
@@ -102,11 +105,39 @@ fun AnnualSimulatorScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(
-                            text = "Projected Annual Balance ($currentYear)",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.setYear(currentYear - 1) },
+                                enabled = currentYear > viewModel.minYear,
+                                modifier = Modifier.testTag("btn_prev_year")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                                    contentDescription = "Previous Year"
+                                )
+                            }
+                            Text(
+                                text = "Projected Annual Balance ($currentYear)",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = { viewModel.setYear(currentYear + 1) },
+                                enabled = currentYear < viewModel.maxYear,
+                                modifier = Modifier.testTag("btn_next_year")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = "Next Year"
+                                )
+                            }
+                        }
                         // Privacy mode handled by state
                         PrivacyAwareText(
                             amount = projectedDeficitSurplus,
@@ -181,7 +212,12 @@ fun AnnualSimulatorScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    TextButton(onClick = { showAddDialog = true }) {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearValidationError()
+                            showAddDialog = true
+                        }
+                    ) {
                         Icon(
                             Icons.Default.Add,
                             contentDescription = "Add Event",
@@ -267,14 +303,27 @@ fun AnnualSimulatorScreen(
         var expanded by remember { mutableStateOf(false) }
 
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+            onDismissRequest = {
+                viewModel.clearValidationError()
+                showAddDialog = false
+            },
             title = { Text("Add Life Event") },
             containerColor = popupContainerColor,
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (validationError != null) {
+                        Text(
+                            text = validationError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = {
+                            name = it
+                            if (validationError != null) viewModel.clearValidationError()
+                        },
                         label = { Text("Event Name (e.g., Buy a Car)") },
                         singleLine = true,
                         colors =
@@ -295,6 +344,7 @@ fun AnnualSimulatorScreen(
                         onValueChange = { str ->
                             if (str.all { it.isDigit() }) {
                                 amountStr = str
+                                if (validationError != null) viewModel.clearValidationError()
                             }
                         },
                         label = { Text("Amount") },
@@ -365,9 +415,9 @@ fun AnnualSimulatorScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = amountStr.toDoubleOrNull()
-                        if (name.isNotBlank() && amount != null) {
-                            viewModel.addLifeEvent(name, amount, isRecurring, startMonth)
+                        val amount = amountStr.toDoubleOrNull() ?: 0.0
+                        val result = viewModel.addLifeEvent(name, amount, isRecurring, startMonth)
+                        if (result.isSuccess) {
                             showAddDialog = false
                         }
                     },
@@ -377,7 +427,12 @@ fun AnnualSimulatorScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(
+                    onClick = {
+                        viewModel.clearValidationError()
+                        showAddDialog = false
+                    }
+                ) {
                     Text("Cancel")
                 }
             }

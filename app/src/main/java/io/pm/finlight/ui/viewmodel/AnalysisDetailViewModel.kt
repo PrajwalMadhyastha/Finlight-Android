@@ -1,9 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/AnalysisDetailViewModel.kt
-// REASON: NEW FILE - This ViewModel and factory power the drill-down screen for
-// the new Spending Analysis feature. It takes the dimension, ID, and date range
-// and fetches the specific list of transactions that match.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
@@ -13,8 +7,12 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 
 class AnalysisDetailViewModelFactory(
@@ -27,8 +25,16 @@ class AnalysisDetailViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AnalysisDetailViewModel::class.java)) {
             val db = AppDatabase.getInstance(application)
+            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
-            return AnalysisDetailViewModel(db.transactionAnalyticsDao(), dimension, dimensionId, startDate, endDate) as T
+            return AnalysisDetailViewModel(
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                dimension = dimension,
+                dimensionId = dimensionId,
+                startDate = startDate,
+                endDate = endDate,
+                dispatcherProvider = dispatcherProvider,
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -40,6 +46,7 @@ class AnalysisDetailViewModel(
     dimensionId: String,
     startDate: Long,
     endDate: Long,
+    dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val transactions: StateFlow<List<TransactionDetails>>
 
@@ -50,6 +57,9 @@ class AnalysisDetailViewModel(
                 AnalysisDimension.TAG -> transactionAnalyticsDao.getTransactionsForTagInRange(dimensionId.toInt(), startDate, endDate)
                 AnalysisDimension.MERCHANT -> transactionAnalyticsDao.getTransactionsForMerchantInRange(dimensionId, startDate, endDate)
             }
-        transactions = transactionFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        transactions =
+            transactionFlow
+                .flowOn(dispatcherProvider.io)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
 }

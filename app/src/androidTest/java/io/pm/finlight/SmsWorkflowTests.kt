@@ -46,7 +46,7 @@ class SmsWorkflowTests {
 
         // Initialize ViewModels manually for the isolated composable test
         transactionViewModel = TransactionViewModelFactory(context).create(TransactionViewModel::class.java)
-        settingsViewModel = SettingsViewModelFactory(context, transactionViewModel).create(SettingsViewModel::class.java)
+        settingsViewModel = SettingsViewModelFactory(context).create(SettingsViewModel::class.java)
     }
 
     @Test

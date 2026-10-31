@@ -27,4 +27,11 @@ class MerchantCategoryMappingRepository(private val dao: MerchantCategoryMapping
      */
     override suspend fun getCategoryIdForMerchant(parsedName: String): Int? =
         dao.getCategoryIdForMerchant(parsedName)
+
+    /**
+     * Inserts a list of merchant-category mappings in bulk.
+     */
+    override suspend fun insertAll(mappings: List<MerchantCategoryMapping>) {
+        dao.insertAll(mappings)
+    }
 }

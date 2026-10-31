@@ -8,4 +8,6 @@ interface IMerchantCategoryMappingRepository {
     fun getAllMappings(): Flow<List<MerchantCategoryMapping>>
 
     suspend fun getCategoryIdForMerchant(parsedName: String): Int?
+
+    suspend fun insertAll(mappings: List<MerchantCategoryMapping>)
 }

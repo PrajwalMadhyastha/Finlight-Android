@@ -56,10 +56,14 @@ class DashboardViewModelFactoryTest {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
         val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
         val mockMergeTransactionsUseCase: MergeTransactionsUseCase = mockk(relaxed = true)
+        val mockBudgetRepo: io.pm.finlight.IBudgetRepository = mockk(relaxed = true)
+        val mockRecurringRepo: io.pm.finlight.IRecurringTransactionRepository = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxnRepo)
         ServiceLocator.setAccountRepository(mockAccountRepo)
         ServiceLocator.setMergeTransactionsUseCase(mockMergeTransactionsUseCase)
+        ServiceLocator.setBudgetRepository(mockBudgetRepo)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
 
         val viewModel = factory.create(DashboardViewModel::class.java)
 
@@ -75,6 +79,18 @@ class DashboardViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockAccountRepo, accField)
+
+        val budgetField =
+            DashboardViewModel::class.java.getDeclaredField("budgetRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockBudgetRepo, budgetField)
+
+        val recurringField =
+            DashboardViewModel::class.java.getDeclaredField("recurringTransactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRecurringRepo, recurringField)
 
         val mergeUseCaseField =
             DashboardViewModel::class.java.getDeclaredField("mergeTransactionsUseCase").apply {
@@ -105,5 +121,11 @@ class DashboardViewModelFactoryTest {
         assertThrows(IllegalArgumentException::class.java) {
             factory.create(UnknownViewModel::class.java)
         }
+    }
+
+    @Test
+    fun create_withExtras_returnsDashboardViewModel() {
+        val viewModel = factory.create(DashboardViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
     }
 }

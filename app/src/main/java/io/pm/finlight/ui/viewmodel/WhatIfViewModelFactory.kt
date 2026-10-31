@@ -1,4 +1,4 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel

@@ -11,16 +11,19 @@ import io.pm.finlight.DashboardSettingsRepository
 import io.pm.finlight.FeatureSettingsRepository
 import io.pm.finlight.FirstLaunchSettingsRepository
 import io.pm.finlight.GoalRepository
+import io.pm.finlight.CustomSmsRuleRepository
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IAppConfigRepository
 import io.pm.finlight.IBackupSettingsRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.IBudgetSettingsRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IDashboardSettingsRepository
 import io.pm.finlight.IFeatureSettingsRepository
 import io.pm.finlight.IFirstLaunchSettingsRepository
 import io.pm.finlight.IGoalRepository
+import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
@@ -34,6 +37,7 @@ import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.IgnoreRuleRepository
 import io.pm.finlight.MerchantCategoryMappingRepository
 import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRuleRepository
@@ -128,6 +132,12 @@ class RepositoryInterfaceTest {
 
         val mockTripRepo = mockk<TripRepository>(relaxed = true)
         assertTrue(mockTripRepo is ITripRepository)
+
+        val realCustomSmsRuleRepo = CustomSmsRuleRepository(mockk(relaxed = true))
+        assertTrue(realCustomSmsRuleRepo is ICustomSmsRuleRepository)
+
+        val realIgnoreRuleRepo = IgnoreRuleRepository(mockk(relaxed = true))
+        assertTrue(realIgnoreRuleRepo is IIgnoreRuleRepository)
     }
 
     @Test

@@ -138,4 +138,6 @@ class AccountRepository(
             }
         }
     }
+
+    override suspend fun findByName(name: String): Account? = accountDao.findByName(name)
 }

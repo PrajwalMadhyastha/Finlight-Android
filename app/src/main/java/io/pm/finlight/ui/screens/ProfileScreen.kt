@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import io.pm.finlight.*
 import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.viewmodel.ProfileViewModel
 
 @Composable
 fun ProfileScreen(

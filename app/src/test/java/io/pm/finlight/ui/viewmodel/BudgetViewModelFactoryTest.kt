@@ -8,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISettingsRepository
@@ -80,6 +79,25 @@ class BudgetViewModelFactoryTest {
         assertSame(mockCategoryRepo, categoryRepoField)
 
         verify(atLeast = 1) { mockTxnRepo.getFirstTransactionDate() }
+    }
+
+    @Test
+    fun create_withExtras_returnsBudgetViewModel() {
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        every { mockTxnRepo.getFirstTransactionDate() } returns flowOf(null)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val viewModel = factory.create(BudgetViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: BudgetViewModel = mockk(relaxed = true)
+        ServiceLocator.setBudgetViewModel(mockViewModel)
+
+        val resolved = factory.create(BudgetViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

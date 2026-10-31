@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.Flow
 
 class RecurringTransactionRepository(
     private val recurringTransactionDao: RecurringTransactionDao,
+    private val recurringPatternDao: RecurringPatternDao,
 ) : IRecurringTransactionRepository {
     override fun getAll(): Flow<List<RecurringTransaction>> {
         return recurringTransactionDao.getAllRulesFlow()
@@ -49,5 +50,13 @@ class RecurringTransactionRepository(
         skipCount: Int,
     ) {
         recurringTransactionDao.updateLastRunAndSkipCount(ruleId, lastRunDate, skipCount)
+    }
+
+    override fun getUnacknowledgedPatterns(): Flow<List<RecurringPattern>> {
+        return recurringPatternDao.getUnacknowledgedPatterns()
+    }
+
+    override suspend fun dismissPatternSuggestion(pattern: RecurringPattern) {
+        recurringPatternDao.update(pattern.copy(isDismissed = true))
     }
 }

@@ -10,8 +10,6 @@ import io.mockk.mockk
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SplitTransactionViewModel
-import io.pm.finlight.SplitTransactionViewModelFactory
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.flow.flowOf

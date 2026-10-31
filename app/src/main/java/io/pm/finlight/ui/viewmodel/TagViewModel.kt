@@ -1,16 +1,12 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/TagViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
-// injection for its repositories. This decouples it from direct database
-// initialization, making it fully unit-testable. The logic for adding a tag
-// has also been updated to use the repository layer instead of direct DAO access.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.ITagRepository
+import io.pm.finlight.Tag
 import io.pm.finlight.data.repository.ITripRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,11 +15,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class TagViewModel(
-    application: Application,
     private val tagRepository: ITagRepository,
     private val tripRepository: ITripRepository,
-) : AndroidViewModel(application) {
-    private val _uiEvent = Channel<String>()
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+) : ViewModel() {
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
     val allTags: StateFlow<List<Tag>> =
@@ -38,14 +34,18 @@ class TagViewModel(
      */
     fun addTag(tagName: String) {
         if (tagName.isNotBlank()) {
-            viewModelScope.launch {
-                // Check if a tag with this name already exists using the repository
-                val existingTag = tagRepository.findByName(tagName)
-                if (existingTag != null) {
-                    _uiEvent.send("A tag named '$tagName' already exists.")
-                } else {
-                    tagRepository.insert(Tag(name = tagName))
-                    _uiEvent.send("Tag '$tagName' created.")
+            viewModelScope.launch(dispatcherProvider.io) {
+                try {
+                    // Check if a tag with this name already exists using the repository
+                    val existingTag = tagRepository.findByName(tagName)
+                    if (existingTag != null) {
+                        _uiEvent.send("A tag named '$tagName' already exists.")
+                    } else {
+                        tagRepository.insert(Tag(name = tagName))
+                        _uiEvent.send("Tag '$tagName' created.")
+                    }
+                } catch (e: Exception) {
+                    _uiEvent.send("Error creating tag: ${e.message}")
                 }
             }
         }
@@ -53,24 +53,32 @@ class TagViewModel(
 
     fun updateTag(tag: Tag) {
         if (tag.name.isNotBlank()) {
-            viewModelScope.launch {
-                tagRepository.update(tag)
+            viewModelScope.launch(dispatcherProvider.io) {
+                try {
+                    tagRepository.update(tag)
+                } catch (e: Exception) {
+                    _uiEvent.send("Error updating tag: ${e.message}")
+                }
             }
         }
     }
 
     fun deleteTag(tag: Tag) {
-        viewModelScope.launch {
-            val isUsedByTransaction = tagRepository.isTagInUse(tag.id)
-            val isUsedByTrip = tripRepository.isTagUsedByTrip(tag.id)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val isUsedByTransaction = tagRepository.isTagInUse(tag.id)
+                val isUsedByTrip = tripRepository.isTagUsedByTrip(tag.id)
 
-            if (isUsedByTransaction) {
-                _uiEvent.send("Cannot delete '${tag.name}'. It is attached to one or more transactions.")
-            } else if (isUsedByTrip) {
-                _uiEvent.send("Cannot delete '${tag.name}'. It is linked to a trip in your travel history.")
-            } else {
-                tagRepository.delete(tag)
-                _uiEvent.send("Tag '${tag.name}' deleted.")
+                if (isUsedByTransaction) {
+                    _uiEvent.send("Cannot delete '${tag.name}'. It is attached to one or more transactions.")
+                } else if (isUsedByTrip) {
+                    _uiEvent.send("Cannot delete '${tag.name}'. It is linked to a trip in your travel history.")
+                } else {
+                    tagRepository.delete(tag)
+                    _uiEvent.send("Tag '${tag.name}' deleted.")
+                }
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting tag: ${e.message}")
             }
         }
     }
