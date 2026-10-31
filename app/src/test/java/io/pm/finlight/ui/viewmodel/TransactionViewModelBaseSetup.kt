@@ -2,6 +2,7 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.Account
@@ -73,11 +74,14 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
 
     @Mock protected lateinit var manageReimbursementUseCase: io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 
+    protected lateinit var savedStateHandle: SavedStateHandle
     protected lateinit var viewModel: TransactionViewModel
 
     @Before
     override fun setup() {
         super.setup()
+
+        savedStateHandle = SavedStateHandle()
 
         // Setup default mock behaviors for ViewModel initialization
         setupDefaultMocks()
@@ -196,6 +200,7 @@ abstract class TransactionViewModelBaseSetup : BaseViewModelTest() {
                 customSmsRuleRepository = customSmsRuleRepository,
                 ignoreRuleRepository = ignoreRuleRepository,
                 smsParseTemplateRepository = smsParseTemplateRepository,
+                savedStateHandle = savedStateHandle,
             )
     }
 }

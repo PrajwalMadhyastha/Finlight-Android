@@ -72,6 +72,7 @@ import com.google.gson.Gson
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModelFactory
 import io.pm.finlight.ui.viewmodel.SearchViewModel
@@ -134,7 +135,7 @@ class MainActivity : AppCompatActivity() {
 
         setContent {
             val application = LocalContext.current.applicationContext as Application
-            val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(application))
+            val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
             val settingsViewModel: SettingsViewModel =
                 viewModel(
                     factory = SettingsViewModelFactory(application),
@@ -320,8 +321,8 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val navController = rememberNavController()
     val context = LocalContext.current.applicationContext as Application
 
-    val dashboardViewModel: DashboardViewModel = viewModel(factory = DashboardViewModelFactory(context))
-    val transactionViewModel: TransactionViewModel = viewModel(factory = TransactionViewModelFactory(context))
+    val dashboardViewModel: DashboardViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
     val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModelFactory(context))
     val categoryViewModel: CategoryViewModel = viewModel(factory = CategoryViewModelFactory(context))

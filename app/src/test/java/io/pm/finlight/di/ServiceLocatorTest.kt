@@ -3,6 +3,7 @@ package io.pm.finlight.di
 import android.app.Application
 import android.content.Context
 import android.os.Build
+import androidx.lifecycle.SavedStateHandle
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -42,6 +43,7 @@ import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -923,6 +925,14 @@ class ServiceLocatorTest {
         assertNotNull(viewModel)
     }
 
+    @Test
+    fun provideTransactionViewModel_withSavedStateHandle_returnsConfiguredInstanceWithSavedStateHandle() {
+        val customHandle = SavedStateHandle(mapOf("test_key" to "test_value"))
+        val viewModel = ServiceLocator.provideTransactionViewModel(application, savedStateHandle = customHandle)
+        assertNotNull(viewModel)
+        assertSame(customHandle, viewModel.savedStateHandle)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun provideTransactionViewModel_withNonApplicationContext_throwsIllegalArgumentException() {
         val nonAppContext =
@@ -972,6 +982,25 @@ class ServiceLocatorTest {
 
         ServiceLocator.reset()
         val newViewModel = ServiceLocator.provideDashboardViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideRuleCreationViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideRuleCreationViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setRuleCreationViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: RuleCreationViewModel = mockk(relaxed = true)
+        ServiceLocator.setRuleCreationViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideRuleCreationViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideRuleCreationViewModel(application)
         assertNotNull(newViewModel)
         assertNotSame(mockViewModel, newViewModel)
     }

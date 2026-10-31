@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.data.model.ManualTransactionData
 import io.pm.finlight.data.model.MerchantPrediction
@@ -82,7 +83,15 @@ class TransactionViewModel(
     initialMergeDelegate: TransactionMergeDelegate? = null,
     initialBatchOperationDelegate: TransactionBatchOperationDelegate? = null,
     initialSplitDelegate: TransactionSplitDelegate? = null,
+    val savedStateHandle: SavedStateHandle = SavedStateHandle(),
 ) : AndroidViewModel(application) {
+    companion object {
+        const val KEY_MANUAL_DESCRIPTION = "manualDescription"
+        const val KEY_MANUAL_AMOUNT = "manualAmount"
+        const val KEY_MANUAL_CATEGORY_ID = "manualCategoryId"
+        const val KEY_MANUAL_ACCOUNT_ID = "manualAccountId"
+    }
+
     private val context = application
 
     val reimbursementDelegate =
@@ -185,14 +194,14 @@ class TransactionViewModel(
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = false,
             )
-    private val _merchantSearchQuery = MutableStateFlow("")
+    private val _merchantSearchQuery = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_DESCRIPTION) ?: "")
     val merchantPredictions: StateFlow<List<MerchantPrediction>>
 
     private val _showCategoryNudge = MutableStateFlow<ManualTransactionData?>(null)
     val showCategoryNudge = _showCategoryNudge.asStateFlow()
-    private val _addTransactionDescription = MutableStateFlow("")
+    private val _addTransactionDescription = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_DESCRIPTION) ?: "")
     val addTransactionDescription = _addTransactionDescription.asStateFlow()
-    private val _addTransactionAmount = MutableStateFlow("")
+    private val _addTransactionAmount = MutableStateFlow(savedStateHandle.get<String>(KEY_MANUAL_AMOUNT) ?: "")
     val addTransactionAmount = _addTransactionAmount.asStateFlow()
     private val _addTransactionCategory = MutableStateFlow<Category?>(null)
     val addTransactionCategory = _addTransactionCategory.asStateFlow()
@@ -290,6 +299,19 @@ class TransactionViewModel(
 
         viewModelScope.launch {
             _defaultAccount.value = accountRepository.findByName("Cash Spends")
+            val savedAccountId = savedStateHandle.get<Int>(KEY_MANUAL_ACCOUNT_ID)
+            if (savedAccountId != null) {
+                accountRepository.getAccountByIdSync(savedAccountId)?.let { restoredAccount ->
+                    _addTransactionAccount.value = restoredAccount
+                }
+            }
+            val savedCategoryId = savedStateHandle.get<Int>(KEY_MANUAL_CATEGORY_ID)
+            if (savedCategoryId != null) {
+                categoryRepository.getCategoryById(savedCategoryId)?.let { restoredCategory ->
+                    _addTransactionCategory.value = restoredCategory
+                    _userManuallySelectedCategory.value = true
+                }
+            }
         }
     }
 
@@ -425,21 +447,33 @@ class TransactionViewModel(
 
     fun onAddTransactionDescriptionChanged(description: String) {
         _addTransactionDescription.value = description
+        savedStateHandle[KEY_MANUAL_DESCRIPTION] = description
         _merchantSearchQuery.value = description
         if (description.isBlank()) _userManuallySelectedCategory.value = false
     }
 
     fun onAddTransactionAmountChanged(amount: String) {
         _addTransactionAmount.value = amount
+        savedStateHandle[KEY_MANUAL_AMOUNT] = amount
     }
 
     fun onAddTransactionCategoryChanged(category: Category?) {
         _addTransactionCategory.value = category
-        if (category != null) _userManuallySelectedCategory.value = true
+        if (category != null) {
+            _userManuallySelectedCategory.value = true
+            savedStateHandle[KEY_MANUAL_CATEGORY_ID] = category.id
+        } else {
+            savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
+        }
     }
 
     fun onAddTransactionAccountChanged(account: Account?) {
         _addTransactionAccount.value = account
+        if (account != null) {
+            savedStateHandle[KEY_MANUAL_ACCOUNT_ID] = account.id
+        } else {
+            savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
+        }
     }
 
     fun onUserManuallySelectedCategory() {
@@ -447,16 +481,30 @@ class TransactionViewModel(
     }
 
     fun onQuickFillSelected(transactionDetails: TransactionDetails) {
-        _addTransactionDescription.value = transactionDetails.transaction.description
+        val description = transactionDetails.transaction.description
+        _addTransactionDescription.value = description
+        savedStateHandle[KEY_MANUAL_DESCRIPTION] = description
         val amount = transactionDetails.transaction.amount
-        _addTransactionAmount.value = if (amount % 1.0 == 0.0) amount.toInt().toString() else "%.2f".format(amount)
+        val amountStr = if (amount % 1.0 == 0.0) amount.toInt().toString() else "%.2f".format(amount)
+        _addTransactionAmount.value = amountStr
+        savedStateHandle[KEY_MANUAL_AMOUNT] = amountStr
 
         viewModelScope.launch {
             val category = transactionDetails.transaction.categoryId?.let { categoryRepository.getCategoryById(it) }
             val account = accountRepository.getAccountByIdSync(transactionDetails.transaction.accountId)
             _addTransactionCategory.value = category
+            if (category != null) {
+                savedStateHandle[KEY_MANUAL_CATEGORY_ID] = category.id
+            } else {
+                savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
+            }
             _userManuallySelectedCategory.value = true
             _addTransactionAccount.value = account
+            if (account != null) {
+                savedStateHandle[KEY_MANUAL_ACCOUNT_ID] = account.id
+            } else {
+                savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
+            }
             _selectedTags.value = transactionRepository.getTagsForTransactionSimple(transactionDetails.transaction.id).toSet()
         }
     }
@@ -556,12 +604,23 @@ class TransactionViewModel(
         }
     }
 
+    fun hasRestoredManualTransactionState(): Boolean {
+        return savedStateHandle.contains(KEY_MANUAL_DESCRIPTION) ||
+            savedStateHandle.contains(KEY_MANUAL_AMOUNT) ||
+            savedStateHandle.contains(KEY_MANUAL_CATEGORY_ID) ||
+            savedStateHandle.contains(KEY_MANUAL_ACCOUNT_ID)
+    }
+
     fun clearAddTransactionState() {
         _selectedTags.value = emptySet()
         _addTransactionDescription.value = ""
+        savedStateHandle.remove<String>(KEY_MANUAL_DESCRIPTION)
         _addTransactionAmount.value = ""
+        savedStateHandle.remove<String>(KEY_MANUAL_AMOUNT)
         _addTransactionCategory.value = null
+        savedStateHandle.remove<Int>(KEY_MANUAL_CATEGORY_ID)
         if (_addTransactionAccount.value != _defaultAccount.value) _addTransactionAccount.value = null
+        savedStateHandle.remove<Int>(KEY_MANUAL_ACCOUNT_ID)
         _userManuallySelectedCategory.value = false
         _validationError.value = null
         _showCategoryNudge.value = null

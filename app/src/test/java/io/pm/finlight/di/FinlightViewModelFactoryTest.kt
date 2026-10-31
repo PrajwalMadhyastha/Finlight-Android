@@ -16,11 +16,13 @@ import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -102,6 +104,22 @@ class FinlightViewModelFactoryTest {
     }
 
     @Test
+    fun create_withRuleCreationViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRuleRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
+        ServiceLocator.setCustomSmsRuleRepository(mockRuleRepo)
+
+        val factory = FinlightViewModelFactory(application)
+        val viewModel = factory.create(RuleCreationViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val repoField =
+            RuleCreationViewModel::class.java.getDeclaredField("customSmsRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRuleRepo, repoField)
+    }
+
+    @Test
     fun create_withCreationExtras_resolvesApplicationFromExtras() {
         val factory = FinlightViewModelFactory.create()
         val extras =
@@ -114,6 +132,9 @@ class FinlightViewModelFactoryTest {
 
         val dashboardViewModel = factory.create(DashboardViewModel::class.java, extras)
         assertNotNull(dashboardViewModel)
+
+        val ruleCreationViewModel = factory.create(RuleCreationViewModel::class.java, extras)
+        assertNotNull(ruleCreationViewModel)
     }
 
     @Test
@@ -161,16 +182,20 @@ class FinlightViewModelFactoryTest {
     fun create_withOverriddenViewModelsInServiceLocator_returnsMockedInstances() {
         val mockTxnViewModel: TransactionViewModel = mockk(relaxed = true)
         val mockDashboardViewModel: DashboardViewModel = mockk(relaxed = true)
+        val mockRuleCreationViewModel: RuleCreationViewModel = mockk(relaxed = true)
 
         ServiceLocator.setTransactionViewModel(mockTxnViewModel)
         ServiceLocator.setDashboardViewModel(mockDashboardViewModel)
+        ServiceLocator.setRuleCreationViewModel(mockRuleCreationViewModel)
 
         val factory = FinlightViewModelFactory.create(application)
 
         val txnViewModel = factory.create(TransactionViewModel::class.java)
         val dashboardViewModel = factory.create(DashboardViewModel::class.java)
+        val ruleCreationViewModel = factory.create(RuleCreationViewModel::class.java)
 
         assertSame(mockTxnViewModel, txnViewModel)
         assertSame(mockDashboardViewModel, dashboardViewModel)
+        assertSame(mockRuleCreationViewModel, ruleCreationViewModel)
     }
 }
