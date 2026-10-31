@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
@@ -85,6 +86,28 @@ class ManageMerchantRulesViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockCategoryRepo, categoryRepoField)
+    }
+
+    @Test
+    fun create_withExtras_returnsManageMerchantRulesViewModel() {
+        val mockRenameRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        val mockCatMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
+        every { mockRenameRepo.getAllRules() } returns flowOf(emptyList())
+        every { mockCatMappingRepo.getAllMappings() } returns flowOf(emptyList())
+        ServiceLocator.setMerchantRenameRuleRepository(mockRenameRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockCatMappingRepo)
+
+        val viewModel = factory.create(ManageMerchantRulesViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: ManageMerchantRulesViewModel = mockk(relaxed = true)
+        ServiceLocator.setManageMerchantRulesViewModel(mockViewModel)
+
+        val resolved = factory.create(ManageMerchantRulesViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

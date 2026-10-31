@@ -135,10 +135,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val application = LocalContext.current.applicationContext as Application
             val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
-            val settingsViewModel: SettingsViewModel =
-                viewModel(
-                    factory = SettingsViewModelFactory(application),
-                )
+            val settingsViewModel: SettingsViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
             val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
 
@@ -322,17 +319,17 @@ fun MainAppScreen(shortcutAction: String? = null) {
 
     val dashboardViewModel: DashboardViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val transactionViewModel: TransactionViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
-    val settingsViewModel: SettingsViewModel = viewModel(factory = SettingsViewModelFactory(context))
+    val settingsViewModel: SettingsViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val accountViewModel: AccountViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val categoryViewModel: CategoryViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val budgetViewModel: BudgetViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val profileViewModel: ProfileViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val incomeViewModel: IncomeViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val goalViewModel: GoalViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
-    val reportsViewModel: ReportsViewModel = viewModel(factory = ReportsViewModelFactory(context))
+    val reportsViewModel: ReportsViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
     val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
-    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = ManageMerchantRulesViewModelFactory(context))
+    val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val tagViewModel: TagViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
 
     val userName by dashboardViewModel.userName.collectAsState()
@@ -1274,7 +1271,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
-            val factory = io.pm.finlight.ui.viewmodel.WhatIfViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as android.app.Application)
             val whatIfViewModel: io.pm.finlight.ui.viewmodel.WhatIfViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             io.pm.finlight.ui.screens.WhatIfSimulatorScreen(navController, whatIfViewModel)
         }
@@ -1285,7 +1282,7 @@ fun AppNavHost(
             popEnterTransition = { fadeIn(animationSpec = tween(300)) + slideInHorizontally(initialOffsetX = { -1000 }, animationSpec = tween(300)) },
             popExitTransition = { fadeOut(animationSpec = tween(300)) + slideOutHorizontally(targetOffsetX = { 1000 }, animationSpec = tween(300)) },
         ) {
-            val factory = io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModelFactory(LocalContext.current.applicationContext as android.app.Application)
+            val factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as android.app.Application)
             val annualSimulatorViewModel: io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel = androidx.lifecycle.viewmodel.compose.viewModel(factory = factory)
             io.pm.finlight.ui.screens.AnnualSimulatorScreen(navController, annualSimulatorViewModel)
         }

@@ -75,6 +75,28 @@ class RecurringTransactionViewModelFactoryTest {
     }
 
     @Test
+    fun create_withExtras_returnsRecurringTransactionViewModel() {
+        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        val mockScheduleWorkerUseCase: io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase = mockk(relaxed = true)
+        every { mockRecurringRepo.getAll() } returns flowOf(emptyList())
+
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
+        ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockScheduleWorkerUseCase)
+
+        val viewModel = factory.create(RecurringTransactionViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: RecurringTransactionViewModel = mockk(relaxed = true)
+        ServiceLocator.setRecurringTransactionViewModel(mockViewModel)
+
+        val resolved = factory.create(RecurringTransactionViewModel::class.java)
+        assertSame(mockViewModel, resolved)
+    }
+
+    @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
         class UnknownViewModel : ViewModel()
 

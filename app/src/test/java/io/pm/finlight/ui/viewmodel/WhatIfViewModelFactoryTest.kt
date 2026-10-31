@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -60,6 +61,21 @@ class WhatIfViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockTxnRepo, txnRepoField)
+    }
+
+    @Test
+    fun create_withExtras_returnsWhatIfViewModel() {
+        val viewModel = factory.create(WhatIfViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: WhatIfViewModel = mockk(relaxed = true)
+        ServiceLocator.setWhatIfViewModel(mockViewModel)
+
+        val resolved = factory.create(WhatIfViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

@@ -84,9 +84,9 @@ import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
 import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
@@ -136,7 +136,7 @@ fun TransactionDetailScreen(
     val context = LocalContext.current
     val settingsViewModel: SettingsViewModel =
         viewModel(
-            factory = SettingsViewModelFactory(context.applicationContext as android.app.Application),
+            factory = FinlightViewModelFactory.create(context.applicationContext as android.app.Application),
         )
 
     val detailsState by viewModel.findTransactionDetailsById(transactionId).collectAsState(initial = null)

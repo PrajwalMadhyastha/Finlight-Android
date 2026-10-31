@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -67,6 +68,21 @@ class ReportsViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel) as GetMonthlyConsistencyDataUseCase
         assertSame(mockUseCase, useCase)
+    }
+
+    @Test
+    fun create_withExtras_returnsReportsViewModel() {
+        val viewModel = factory.create(ReportsViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: ReportsViewModel = mockk(relaxed = true)
+        ServiceLocator.setReportsViewModel(mockViewModel)
+
+        val resolved = factory.create(ReportsViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test
