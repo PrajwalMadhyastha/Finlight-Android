@@ -19,6 +19,7 @@ import io.pm.finlight.IAccountRepository
 import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IGoalRepository
 import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IgnoreRuleDao
@@ -43,7 +44,18 @@ import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.repository.ITripRepository
+import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.BudgetViewModel
+import io.pm.finlight.ui.viewmodel.CategoryViewModel
+import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.ui.viewmodel.GoalViewModel
+import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
+import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.OnboardingViewModel
+import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.TagViewModel
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -59,6 +71,7 @@ import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -1003,5 +1016,331 @@ class ServiceLocatorTest {
         val newViewModel = ServiceLocator.provideRuleCreationViewModel(application)
         assertNotNull(newViewModel)
         assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideTripRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideTripRepository(application)
+        val repo2 = ServiceLocator.provideTripRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun setTripRepository_overridesProvidedInstance_andResetClearsIt() {
+        val mockRepo: ITripRepository = mockk(relaxed = true)
+        ServiceLocator.setTripRepository(mockRepo)
+
+        assertSame(mockRepo, ServiceLocator.provideTripRepository(application))
+
+        ServiceLocator.reset()
+        val newRepo = ServiceLocator.provideTripRepository(application)
+        assertNotNull(newRepo)
+        assertNotSame(mockRepo, newRepo)
+    }
+
+    @Test
+    fun provideTripRepository_withResolvedDb_usesProvidedDb() {
+        ServiceLocator.reset()
+        val repo = ServiceLocator.provideTripRepository(application, db)
+        assertNotNull(repo)
+    }
+
+    @Test
+    fun provideGoalRepository_returnsSingletonInstance() {
+        val repo1 = ServiceLocator.provideGoalRepository(application)
+        val repo2 = ServiceLocator.provideGoalRepository(application)
+
+        assertNotNull(repo1)
+        assertSame(repo1, repo2)
+    }
+
+    @Test
+    fun setGoalRepository_overridesProvidedInstance_andResetClearsIt() {
+        val mockRepo: IGoalRepository = mockk(relaxed = true)
+        ServiceLocator.setGoalRepository(mockRepo)
+
+        assertSame(mockRepo, ServiceLocator.provideGoalRepository(application))
+
+        ServiceLocator.reset()
+        val newRepo = ServiceLocator.provideGoalRepository(application)
+        assertNotNull(newRepo)
+        assertNotSame(mockRepo, newRepo)
+    }
+
+    @Test
+    fun provideGoalRepository_withResolvedDb_usesProvidedDb() {
+        ServiceLocator.reset()
+        val repo = ServiceLocator.provideGoalRepository(application, db)
+        assertNotNull(repo)
+    }
+
+    @Test
+    fun provideAccountViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideAccountViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setAccountViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: AccountViewModel = mockk(relaxed = true)
+        ServiceLocator.setAccountViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideAccountViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideAccountViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideBudgetViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideBudgetViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setBudgetViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: BudgetViewModel = mockk(relaxed = true)
+        ServiceLocator.setBudgetViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideBudgetViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideBudgetViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideCategoryViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideCategoryViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setCategoryViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: CategoryViewModel = mockk(relaxed = true)
+        ServiceLocator.setCategoryViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideCategoryViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideCategoryViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideCurrencyViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideCurrencyViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setCurrencyViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: CurrencyViewModel = mockk(relaxed = true)
+        ServiceLocator.setCurrencyViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideCurrencyViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideCurrencyViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideGoalViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideGoalViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setGoalViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: GoalViewModel = mockk(relaxed = true)
+        ServiceLocator.setGoalViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideGoalViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideGoalViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideHistoricTripsViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideHistoricTripsViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setHistoricTripsViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: HistoricTripsViewModel = mockk(relaxed = true)
+        ServiceLocator.setHistoricTripsViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideHistoricTripsViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideHistoricTripsViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideIncomeViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideIncomeViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setIncomeViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: IncomeViewModel = mockk(relaxed = true)
+        ServiceLocator.setIncomeViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideIncomeViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideIncomeViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideOnboardingViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideOnboardingViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setOnboardingViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: OnboardingViewModel = mockk(relaxed = true)
+        ServiceLocator.setOnboardingViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideOnboardingViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideOnboardingViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideProfileViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideProfileViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setProfileViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: ProfileViewModel = mockk(relaxed = true)
+        ServiceLocator.setProfileViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideProfileViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideProfileViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideTagViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideTagViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setTagViewModel_overridesProvidedInstance_andResetClearsIt() {
+        val mockViewModel: TagViewModel = mockk(relaxed = true)
+        ServiceLocator.setTagViewModel(mockViewModel)
+
+        assertSame(mockViewModel, ServiceLocator.provideTagViewModel(application))
+
+        ServiceLocator.reset()
+        val newViewModel = ServiceLocator.provideTagViewModel(application)
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideViewModels_throwsIllegalArgumentException_whenContextLacksApplication() {
+        val nonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns null
+
+        val viewModelProviders: List<() -> Unit> =
+            listOf(
+                { ServiceLocator.provideAccountViewModel(nonAppContext) },
+                { ServiceLocator.provideBudgetViewModel(nonAppContext) },
+                { ServiceLocator.provideCategoryViewModel(nonAppContext) },
+                { ServiceLocator.provideCurrencyViewModel(nonAppContext) },
+                { ServiceLocator.provideGoalViewModel(nonAppContext) },
+                { ServiceLocator.provideHistoricTripsViewModel(nonAppContext) },
+                { ServiceLocator.provideIncomeViewModel(nonAppContext) },
+                { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
+                { ServiceLocator.provideProfileViewModel(nonAppContext) },
+                { ServiceLocator.provideTagViewModel(nonAppContext) },
+            )
+
+        for (provider in viewModelProviders) {
+            assertThrows(IllegalArgumentException::class.java) {
+                provider()
+            }
+        }
+    }
+
+    @Test
+    fun provideViewModels_resolvesInstance_whenContextIsNotApplicationButProvidesApplicationContext() {
+        val nonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns application
+
+        val viewModels =
+            listOf(
+                ServiceLocator.provideAccountViewModel(nonAppContext),
+                ServiceLocator.provideBudgetViewModel(nonAppContext),
+                ServiceLocator.provideCategoryViewModel(nonAppContext),
+                ServiceLocator.provideCurrencyViewModel(nonAppContext),
+                ServiceLocator.provideGoalViewModel(nonAppContext),
+                ServiceLocator.provideHistoricTripsViewModel(nonAppContext),
+                ServiceLocator.provideIncomeViewModel(nonAppContext),
+                ServiceLocator.provideOnboardingViewModel(nonAppContext),
+                ServiceLocator.provideProfileViewModel(nonAppContext),
+                ServiceLocator.provideTagViewModel(nonAppContext),
+            )
+
+        for (viewModel in viewModels) {
+            assertNotNull(viewModel)
+        }
+    }
+
+    @Test
+    fun provideViewModels_throwsIllegalArgumentException_whenApplicationContextIsNotApplication() {
+        val nonAppContext = mockk<Context>()
+        val nestedNonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns nestedNonAppContext
+        every { nestedNonAppContext.applicationContext } returns null
+
+        val viewModelProviders: List<() -> Unit> =
+            listOf(
+                { ServiceLocator.provideAccountViewModel(nonAppContext) },
+                { ServiceLocator.provideBudgetViewModel(nonAppContext) },
+                { ServiceLocator.provideCategoryViewModel(nonAppContext) },
+                { ServiceLocator.provideCurrencyViewModel(nonAppContext) },
+                { ServiceLocator.provideGoalViewModel(nonAppContext) },
+                { ServiceLocator.provideHistoricTripsViewModel(nonAppContext) },
+                { ServiceLocator.provideIncomeViewModel(nonAppContext) },
+                { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
+                { ServiceLocator.provideProfileViewModel(nonAppContext) },
+                { ServiceLocator.provideTagViewModel(nonAppContext) },
+            )
+
+        for (provider in viewModelProviders) {
+            assertThrows(IllegalArgumentException::class.java) {
+                provider()
+            }
+        }
     }
 }
