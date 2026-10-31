@@ -1041,6 +1041,13 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideTripRepository_withResolvedDb_usesProvidedDb() {
+        ServiceLocator.reset()
+        val repo = ServiceLocator.provideTripRepository(application, db)
+        assertNotNull(repo)
+    }
+
+    @Test
     fun provideGoalRepository_returnsSingletonInstance() {
         val repo1 = ServiceLocator.provideGoalRepository(application)
         val repo2 = ServiceLocator.provideGoalRepository(application)
@@ -1060,6 +1067,13 @@ class ServiceLocatorTest {
         val newRepo = ServiceLocator.provideGoalRepository(application)
         assertNotNull(newRepo)
         assertNotSame(mockRepo, newRepo)
+    }
+
+    @Test
+    fun provideGoalRepository_withResolvedDb_usesProvidedDb() {
+        ServiceLocator.reset()
+        val repo = ServiceLocator.provideGoalRepository(application, db)
+        assertNotNull(repo)
     }
 
     @Test
@@ -1256,6 +1270,58 @@ class ServiceLocatorTest {
     fun provideViewModels_throwsIllegalArgumentException_whenContextLacksApplication() {
         val nonAppContext = mockk<Context>()
         every { nonAppContext.applicationContext } returns null
+
+        val viewModelProviders: List<() -> Unit> =
+            listOf(
+                { ServiceLocator.provideAccountViewModel(nonAppContext) },
+                { ServiceLocator.provideBudgetViewModel(nonAppContext) },
+                { ServiceLocator.provideCategoryViewModel(nonAppContext) },
+                { ServiceLocator.provideCurrencyViewModel(nonAppContext) },
+                { ServiceLocator.provideGoalViewModel(nonAppContext) },
+                { ServiceLocator.provideHistoricTripsViewModel(nonAppContext) },
+                { ServiceLocator.provideIncomeViewModel(nonAppContext) },
+                { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
+                { ServiceLocator.provideProfileViewModel(nonAppContext) },
+                { ServiceLocator.provideTagViewModel(nonAppContext) },
+            )
+
+        for (provider in viewModelProviders) {
+            assertThrows(IllegalArgumentException::class.java) {
+                provider()
+            }
+        }
+    }
+
+    @Test
+    fun provideViewModels_resolvesInstance_whenContextIsNotApplicationButProvidesApplicationContext() {
+        val nonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns application
+
+        val viewModels =
+            listOf(
+                ServiceLocator.provideAccountViewModel(nonAppContext),
+                ServiceLocator.provideBudgetViewModel(nonAppContext),
+                ServiceLocator.provideCategoryViewModel(nonAppContext),
+                ServiceLocator.provideCurrencyViewModel(nonAppContext),
+                ServiceLocator.provideGoalViewModel(nonAppContext),
+                ServiceLocator.provideHistoricTripsViewModel(nonAppContext),
+                ServiceLocator.provideIncomeViewModel(nonAppContext),
+                ServiceLocator.provideOnboardingViewModel(nonAppContext),
+                ServiceLocator.provideProfileViewModel(nonAppContext),
+                ServiceLocator.provideTagViewModel(nonAppContext),
+            )
+
+        for (viewModel in viewModels) {
+            assertNotNull(viewModel)
+        }
+    }
+
+    @Test
+    fun provideViewModels_throwsIllegalArgumentException_whenApplicationContextIsNotApplication() {
+        val nonAppContext = mockk<Context>()
+        val nestedNonAppContext = mockk<Context>()
+        every { nonAppContext.applicationContext } returns nestedNonAppContext
+        every { nestedNonAppContext.applicationContext } returns null
 
         val viewModelProviders: List<() -> Unit> =
             listOf(
