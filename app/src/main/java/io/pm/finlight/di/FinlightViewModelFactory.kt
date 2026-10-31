@@ -80,6 +80,38 @@ class FinlightViewModelFactory(
                 val app = resolveApplication(this, context)
                 ServiceLocator.provideTagViewModel(app)
             }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideReportsViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideAnalysisViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideAnnualSimulatorViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideWhatIfViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideManageMerchantRulesViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideSettingsViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideRecurringTransactionViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideSmsDebugViewModel(app)
+            }
         }
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

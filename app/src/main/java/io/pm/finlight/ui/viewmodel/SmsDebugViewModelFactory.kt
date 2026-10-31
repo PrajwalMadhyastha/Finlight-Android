@@ -1,22 +1,22 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SmsDebugViewModelFactory.kt
-// REASON: REFACTOR (Testing) - The factory has been updated to instantiate and
-// provide all required repository and service dependencies to the
-// SmsDebugViewModel's constructor, supporting the new dependency injection pattern.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.SmsDebugViewModel
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
-import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsEntityExtractor
-import io.pm.finlight.utils.SmsProviderHelper
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class SmsDebugViewModelFactory(
     private val application: Application,
     private val autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null,
@@ -33,38 +33,20 @@ class SmsDebugViewModelFactory(
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(SmsDebugViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val smsRepository = ServiceLocator.provideSmsRepository(application)
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(application, db)
-            val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(application, db)
-            val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(application, db)
-            val merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(application, db)
-            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
-            val smsClassifier = MlModelFactory.getClassifier(application)
-            val autoSaveUseCase =
-                autoSaveSmsTransactionUseCase
-                    ?: ServiceLocator.provideAutoSaveSmsTransactionUseCase(application, db)
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-
             @Suppress("UNCHECKED_CAST")
-            val viewModel =
-                SmsDebugViewModel(
-                    application = application,
-                    smsRepository = smsRepository,
-                    transactionRepository = transactionRepository,
-                    customSmsRuleRepository = customSmsRuleRepository,
-                    merchantRenameRuleRepository = merchantRenameRuleRepository,
-                    ignoreRuleRepository = ignoreRuleRepository,
-                    merchantCategoryMappingRepository = merchantCategoryMappingRepository,
-                    smsParseTemplateProvider = smsParseTemplateProvider,
-                    smsClassifier = smsClassifier,
-                    nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(application) },
-                    autoSaveSmsTransactionUseCase = autoSaveUseCase,
-                    dispatchers = dispatcherProvider,
-                )
-            return viewModel as T
+            return ServiceLocator.provideSmsDebugViewModel(
+                context = application,
+                autoSaveSmsTransactionUseCase = autoSaveSmsTransactionUseCase,
+                nerExtractorProvider = nerExtractorProvider,
+            ) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }
