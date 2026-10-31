@@ -18,6 +18,7 @@ import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IGoalRepository
+import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.IRecurringTransactionRepository
@@ -44,8 +45,11 @@ import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
+import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
 import io.pm.finlight.ui.viewmodel.OnboardingViewModel
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.ReportsViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
@@ -490,6 +494,59 @@ class FinlightViewModelFactoryTest {
     }
 
     @Test
+    fun create_withManageIgnoreRulesViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRepo: IIgnoreRuleRepository = mockk(relaxed = true)
+        every { mockRepo.getAllRules() } returns flowOf(emptyList())
+        ServiceLocator.setIgnoreRuleRepository(mockRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(ManageIgnoreRulesViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val repoField =
+            ManageIgnoreRulesViewModel::class.java.getDeclaredField("ignoreRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRepo, repoField)
+    }
+
+    @Test
+    fun create_withManageParseRulesViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
+        every { mockRepo.getAllRules() } returns flowOf(emptyList())
+        ServiceLocator.setCustomSmsRuleRepository(mockRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(ManageParseRulesViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val repoField =
+            ManageParseRulesViewModel::class.java.getDeclaredField("customSmsRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRepo, repoField)
+    }
+
+    @Test
+    fun create_withPendingTransactionsViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        every { mockTxnRepo.getPendingTransactionsFlow() } returns flowOf(emptyList())
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(PendingTransactionsViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val txnRepoField =
+            PendingTransactionsViewModel::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTxnRepo, txnRepoField)
+    }
+
+    @Test
     fun create_withCreationExtras_resolvesApplicationFromExtras() {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
         every { mockTxnRepo.getFirstTransactionDate() } returns flowOf(null)
@@ -522,6 +579,9 @@ class FinlightViewModelFactoryTest {
         assertNotNull(factory.create(SettingsViewModel::class.java, extras))
         assertNotNull(factory.create(RecurringTransactionViewModel::class.java, extras))
         assertNotNull(factory.create(SmsDebugViewModel::class.java, extras))
+        assertNotNull(factory.create(ManageIgnoreRulesViewModel::class.java, extras))
+        assertNotNull(factory.create(ManageParseRulesViewModel::class.java, extras))
+        assertNotNull(factory.create(PendingTransactionsViewModel::class.java, extras))
     }
 
     @Test
@@ -588,6 +648,9 @@ class FinlightViewModelFactoryTest {
         val mockSettingsViewModel: SettingsViewModel = mockk(relaxed = true)
         val mockRecurringTransactionViewModel: RecurringTransactionViewModel = mockk(relaxed = true)
         val mockSmsDebugViewModel: SmsDebugViewModel = mockk(relaxed = true)
+        val mockManageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = mockk(relaxed = true)
+        val mockManageParseRulesViewModel: ManageParseRulesViewModel = mockk(relaxed = true)
+        val mockPendingTransactionsViewModel: PendingTransactionsViewModel = mockk(relaxed = true)
 
         ServiceLocator.setTransactionViewModel(mockTxnViewModel)
         ServiceLocator.setDashboardViewModel(mockDashboardViewModel)
@@ -610,6 +673,9 @@ class FinlightViewModelFactoryTest {
         ServiceLocator.setSettingsViewModel(mockSettingsViewModel)
         ServiceLocator.setRecurringTransactionViewModel(mockRecurringTransactionViewModel)
         ServiceLocator.setSmsDebugViewModel(mockSmsDebugViewModel)
+        ServiceLocator.setManageIgnoreRulesViewModel(mockManageIgnoreRulesViewModel)
+        ServiceLocator.setManageParseRulesViewModel(mockManageParseRulesViewModel)
+        ServiceLocator.setPendingTransactionsViewModel(mockPendingTransactionsViewModel)
 
         val factory = FinlightViewModelFactory.create(application)
 
@@ -634,5 +700,8 @@ class FinlightViewModelFactoryTest {
         assertSame(mockSettingsViewModel, factory.create(SettingsViewModel::class.java))
         assertSame(mockRecurringTransactionViewModel, factory.create(RecurringTransactionViewModel::class.java))
         assertSame(mockSmsDebugViewModel, factory.create(SmsDebugViewModel::class.java))
+        assertSame(mockManageIgnoreRulesViewModel, factory.create(ManageIgnoreRulesViewModel::class.java))
+        assertSame(mockManageParseRulesViewModel, factory.create(ManageParseRulesViewModel::class.java))
+        assertSame(mockPendingTransactionsViewModel, factory.create(PendingTransactionsViewModel::class.java))
     }
 }

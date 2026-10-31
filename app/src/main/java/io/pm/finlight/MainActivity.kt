@@ -327,8 +327,8 @@ fun MainAppScreen(shortcutAction: String? = null) {
     val incomeViewModel: IncomeViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val goalViewModel: GoalViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val reportsViewModel: ReportsViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
-    val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = ManageIgnoreRulesViewModelFactory(context))
-    val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = ManageParseRulesViewModelFactory(context))
+    val manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
+    val manageParseRulesViewModel: ManageParseRulesViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val manageMerchantRulesViewModel: ManageMerchantRulesViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
     val tagViewModel: TagViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
 

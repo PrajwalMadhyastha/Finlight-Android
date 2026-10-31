@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
@@ -95,6 +96,21 @@ class ManageParseRulesViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(customDispatchers, dispatchersField)
+    }
+
+    @Test
+    fun create_withExtras_returnsManageParseRulesViewModel() {
+        val viewModel = factory.create(ManageParseRulesViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: ManageParseRulesViewModel = mockk(relaxed = true)
+        ServiceLocator.setManageParseRulesViewModel(mockViewModel)
+
+        val resolved = factory.create(ManageParseRulesViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test
