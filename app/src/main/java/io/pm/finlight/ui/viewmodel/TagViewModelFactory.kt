@@ -3,24 +3,30 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.repository.TripRepository
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.di.ServiceLocator
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class TagViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(TagViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val tagRepository = ServiceLocator.provideTagRepository(application)
-            val tripRepository = TripRepository(db.tripDao())
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
-            return TagViewModel(
-                tagRepository = tagRepository,
-                tripRepository = tripRepository,
-                dispatcherProvider = dispatcherProvider,
-            ) as T
+            return ServiceLocator.provideTagViewModel(application) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

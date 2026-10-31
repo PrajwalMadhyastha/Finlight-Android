@@ -40,6 +40,46 @@ class FinlightViewModelFactory(
                 val handle = runCatching { this.createSavedStateHandle() }.getOrElse { SavedStateHandle() }
                 ServiceLocator.provideRuleCreationViewModel(app, savedStateHandle = handle)
             }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideAccountViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideBudgetViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideCategoryViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideCurrencyViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideGoalViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideHistoricTripsViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideIncomeViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideOnboardingViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideProfileViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideTagViewModel(app)
+            }
         }
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

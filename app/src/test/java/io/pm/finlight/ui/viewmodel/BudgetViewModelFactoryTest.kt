@@ -82,6 +82,25 @@ class BudgetViewModelFactoryTest {
     }
 
     @Test
+    fun create_withExtras_returnsBudgetViewModel() {
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        every { mockTxnRepo.getFirstTransactionDate() } returns flowOf(null)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val viewModel = factory.create(BudgetViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: BudgetViewModel = mockk(relaxed = true)
+        ServiceLocator.setBudgetViewModel(mockViewModel)
+
+        val resolved = factory.create(BudgetViewModel::class.java)
+        assertSame(mockViewModel, resolved)
+    }
+
+    @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
         class UnknownViewModel : ViewModel()
 
