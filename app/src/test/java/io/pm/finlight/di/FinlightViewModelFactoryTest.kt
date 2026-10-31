@@ -18,26 +18,40 @@ import io.pm.finlight.IBudgetRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IGoalRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.IRecurringTransactionRepository
 import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.RecurringTransactionViewModel
+import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.data.repository.ITripRepository
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisViewModel
+import io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel
 import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import io.pm.finlight.ui.viewmodel.CategoryViewModel
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
 import io.pm.finlight.ui.viewmodel.OnboardingViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
+import io.pm.finlight.ui.viewmodel.ReportsViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
+import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -63,6 +77,10 @@ class FinlightViewModelFactoryTest {
                 .build()
         AppDatabase.setTestInstance(db)
         ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        val mockNerExtractor: SmsEntityExtractor = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
+        ServiceLocator.setNerExtractorProvider { mockNerExtractor }
     }
 
     @After
@@ -333,6 +351,145 @@ class FinlightViewModelFactoryTest {
     }
 
     @Test
+    fun create_withReportsViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockCatRepo: ICategoryRepository = mockk(relaxed = true)
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+
+        ServiceLocator.setCategoryRepository(mockCatRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockUseCase)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(ReportsViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val catField =
+            ReportsViewModel::class.java.getDeclaredField("categoryRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockCatRepo, catField)
+    }
+
+    @Test
+    fun create_withAnalysisViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(AnalysisViewModel::class.java)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withAnnualSimulatorViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(AnnualSimulatorViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val settingsField =
+            AnnualSimulatorViewModel::class.java.getDeclaredField("settingsRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSettingsRepo, settingsField)
+    }
+
+    @Test
+    fun create_withWhatIfViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(WhatIfViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val settingsField =
+            WhatIfViewModel::class.java.getDeclaredField("settingsRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSettingsRepo, settingsField)
+    }
+
+    @Test
+    fun create_withManageMerchantRulesViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRenameRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        val mockCatMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
+        every { mockRenameRepo.getAllRules() } returns flowOf(emptyList())
+        every { mockCatMappingRepo.getAllMappings() } returns flowOf(emptyList())
+
+        ServiceLocator.setMerchantRenameRuleRepository(mockRenameRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockCatMappingRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(ManageMerchantRulesViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val renameField =
+            ManageMerchantRulesViewModel::class.java.getDeclaredField("merchantRenameRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRenameRepo, renameField)
+    }
+
+    @Test
+    fun create_withSettingsViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        every { mockSettingsRepo.getSelectedTheme() } returns flowOf(io.pm.finlight.ui.theme.AppTheme.SYSTEM_DEFAULT)
+        every { mockSettingsRepo.getHasSeenOnboarding() } returns flowOf(false)
+        every { mockSettingsRepo.getPrivacyModeEnabled() } returns flowOf(false)
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(SettingsViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val settingsField =
+            SettingsViewModel::class.java.getDeclaredField("settingsRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockSettingsRepo, settingsField)
+    }
+
+    @Test
+    fun create_withRecurringTransactionViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        every { mockRepo.getAll() } returns flowOf(emptyList())
+        ServiceLocator.setRecurringTransactionRepository(mockRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(RecurringTransactionViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val repoField =
+            RecurringTransactionViewModel::class.java.getDeclaredField("repository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRepo, repoField)
+    }
+
+    @Test
+    fun create_withSmsDebugViewModelClass_resolvesDependenciesFromServiceLocator() {
+        val mockRepo: ISmsRepository = mockk(relaxed = true)
+        ServiceLocator.setSmsRepository(mockRepo)
+
+        val factory = FinlightViewModelFactory.create(application)
+        val viewModel = factory.create(SmsDebugViewModel::class.java)
+
+        assertNotNull(viewModel)
+        val repoField =
+            SmsDebugViewModel::class.java.getDeclaredField("smsRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockRepo, repoField)
+    }
+
+    @Test
     fun create_withCreationExtras_resolvesApplicationFromExtras() {
         val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
         every { mockTxnRepo.getFirstTransactionDate() } returns flowOf(null)
@@ -357,6 +514,14 @@ class FinlightViewModelFactoryTest {
         assertNotNull(factory.create(OnboardingViewModel::class.java, extras))
         assertNotNull(factory.create(ProfileViewModel::class.java, extras))
         assertNotNull(factory.create(TagViewModel::class.java, extras))
+        assertNotNull(factory.create(ReportsViewModel::class.java, extras))
+        assertNotNull(factory.create(AnalysisViewModel::class.java, extras))
+        assertNotNull(factory.create(AnnualSimulatorViewModel::class.java, extras))
+        assertNotNull(factory.create(WhatIfViewModel::class.java, extras))
+        assertNotNull(factory.create(ManageMerchantRulesViewModel::class.java, extras))
+        assertNotNull(factory.create(SettingsViewModel::class.java, extras))
+        assertNotNull(factory.create(RecurringTransactionViewModel::class.java, extras))
+        assertNotNull(factory.create(SmsDebugViewModel::class.java, extras))
     }
 
     @Test
@@ -415,6 +580,14 @@ class FinlightViewModelFactoryTest {
         val mockOnboardingViewModel: OnboardingViewModel = mockk(relaxed = true)
         val mockProfileViewModel: ProfileViewModel = mockk(relaxed = true)
         val mockTagViewModel: TagViewModel = mockk(relaxed = true)
+        val mockReportsViewModel: ReportsViewModel = mockk(relaxed = true)
+        val mockAnalysisViewModel: AnalysisViewModel = mockk(relaxed = true)
+        val mockAnnualSimulatorViewModel: AnnualSimulatorViewModel = mockk(relaxed = true)
+        val mockWhatIfViewModel: WhatIfViewModel = mockk(relaxed = true)
+        val mockManageMerchantRulesViewModel: ManageMerchantRulesViewModel = mockk(relaxed = true)
+        val mockSettingsViewModel: SettingsViewModel = mockk(relaxed = true)
+        val mockRecurringTransactionViewModel: RecurringTransactionViewModel = mockk(relaxed = true)
+        val mockSmsDebugViewModel: SmsDebugViewModel = mockk(relaxed = true)
 
         ServiceLocator.setTransactionViewModel(mockTxnViewModel)
         ServiceLocator.setDashboardViewModel(mockDashboardViewModel)
@@ -429,6 +602,14 @@ class FinlightViewModelFactoryTest {
         ServiceLocator.setOnboardingViewModel(mockOnboardingViewModel)
         ServiceLocator.setProfileViewModel(mockProfileViewModel)
         ServiceLocator.setTagViewModel(mockTagViewModel)
+        ServiceLocator.setReportsViewModel(mockReportsViewModel)
+        ServiceLocator.setAnalysisViewModel(mockAnalysisViewModel)
+        ServiceLocator.setAnnualSimulatorViewModel(mockAnnualSimulatorViewModel)
+        ServiceLocator.setWhatIfViewModel(mockWhatIfViewModel)
+        ServiceLocator.setManageMerchantRulesViewModel(mockManageMerchantRulesViewModel)
+        ServiceLocator.setSettingsViewModel(mockSettingsViewModel)
+        ServiceLocator.setRecurringTransactionViewModel(mockRecurringTransactionViewModel)
+        ServiceLocator.setSmsDebugViewModel(mockSmsDebugViewModel)
 
         val factory = FinlightViewModelFactory.create(application)
 
@@ -445,5 +626,13 @@ class FinlightViewModelFactoryTest {
         assertSame(mockOnboardingViewModel, factory.create(OnboardingViewModel::class.java))
         assertSame(mockProfileViewModel, factory.create(ProfileViewModel::class.java))
         assertSame(mockTagViewModel, factory.create(TagViewModel::class.java))
+        assertSame(mockReportsViewModel, factory.create(ReportsViewModel::class.java))
+        assertSame(mockAnalysisViewModel, factory.create(AnalysisViewModel::class.java))
+        assertSame(mockAnnualSimulatorViewModel, factory.create(AnnualSimulatorViewModel::class.java))
+        assertSame(mockWhatIfViewModel, factory.create(WhatIfViewModel::class.java))
+        assertSame(mockManageMerchantRulesViewModel, factory.create(ManageMerchantRulesViewModel::class.java))
+        assertSame(mockSettingsViewModel, factory.create(SettingsViewModel::class.java))
+        assertSame(mockRecurringTransactionViewModel, factory.create(RecurringTransactionViewModel::class.java))
+        assertSame(mockSmsDebugViewModel, factory.create(SmsDebugViewModel::class.java))
     }
 }

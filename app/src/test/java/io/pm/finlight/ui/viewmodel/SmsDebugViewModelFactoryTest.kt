@@ -51,6 +51,8 @@ class SmsDebugViewModelFactoryTest {
                 .build()
         AppDatabase.setTestInstance(db)
         ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
     }
 
     @After
@@ -86,6 +88,7 @@ class SmsDebugViewModelFactoryTest {
         val mockNerExtractor: NerExtractor = mockk(relaxed = true)
         every { MlModelFactory.getClassifier(any()) } returns mockClassifier
         every { MlModelFactory.getNerExtractor(any()) } returns mockNerExtractor
+        ServiceLocator.setSmsClassifier(mockClassifier)
 
         val factory = SmsDebugViewModelFactory(application)
 
@@ -162,6 +165,23 @@ class SmsDebugViewModelFactoryTest {
 
         assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
+    }
+
+    @Test
+    fun create_withExtras_returnsSmsDebugViewModel() {
+        val factory = SmsDebugViewModelFactory(application)
+        val viewModel = factory.create(SmsDebugViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: SmsDebugViewModel = mockk(relaxed = true)
+        ServiceLocator.setSmsDebugViewModel(mockViewModel)
+
+        val factory = SmsDebugViewModelFactory(application)
+        val resolved = factory.create(SmsDebugViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

@@ -9,6 +9,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
 import io.mockk.verify
 import io.pm.finlight.BudgetDao
 import io.pm.finlight.BudgetRepository
@@ -43,6 +45,10 @@ import io.pm.finlight.SplitTransactionDao
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
+import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.ui.viewmodel.AccountViewModel
@@ -93,12 +99,17 @@ class ServiceLocatorTest {
                 .build()
         AppDatabase.setTestInstance(db)
         ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        val mockNerExtractor: SmsEntityExtractor = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
+        ServiceLocator.setNerExtractorProvider { mockNerExtractor }
     }
 
     @After
     fun tearDown() {
         db.close()
         ServiceLocator.reset()
+        unmockkAll()
     }
 
     // --- Singleton Resolution Tests ---
@@ -1266,6 +1277,218 @@ class ServiceLocatorTest {
         assertNotSame(mockViewModel, newViewModel)
     }
 
+    private inline fun <reified T : androidx.lifecycle.ViewModel> testViewModelOverrideAndReset(
+        setter: (T?) -> Unit,
+        provider: () -> T,
+    ) {
+        val mockViewModel: T = mockk(relaxed = true)
+        setter(mockViewModel)
+        assertSame(mockViewModel, provider())
+
+        ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        val mockNerExtractor: SmsEntityExtractor = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
+        ServiceLocator.setNerExtractorProvider { mockNerExtractor }
+        val newViewModel = provider()
+        assertNotNull(newViewModel)
+        assertNotSame(mockViewModel, newViewModel)
+    }
+
+    @Test
+    fun provideReportsViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideReportsViewModel(application)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun setReportsViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setReportsViewModel(it) },
+            provider = { ServiceLocator.provideReportsViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideAnalysisViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideAnalysisViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideAnalysisViewModel(application))
+    }
+
+    @Test
+    fun setAnalysisViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setAnalysisViewModel(it) },
+            provider = { ServiceLocator.provideAnalysisViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideAnnualSimulatorViewModel_returnsConfiguredInstance() {
+        val viewModel =
+            ServiceLocator.provideAnnualSimulatorViewModel(
+                application,
+                simulationYear = 2030,
+                timeProvider = io.pm.finlight.utils.SystemTimeProvider(),
+            )
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideAnnualSimulatorViewModel(application))
+    }
+
+    @Test
+    fun setAnnualSimulatorViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setAnnualSimulatorViewModel(it) },
+            provider = { ServiceLocator.provideAnnualSimulatorViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideWhatIfViewModel_returnsConfiguredInstance() {
+        val viewModel =
+            ServiceLocator.provideWhatIfViewModel(
+                application,
+                timeProvider = io.pm.finlight.utils.SystemTimeProvider(),
+            )
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideWhatIfViewModel(application))
+    }
+
+    @Test
+    fun setWhatIfViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setWhatIfViewModel(it) },
+            provider = { ServiceLocator.provideWhatIfViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideManageMerchantRulesViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideManageMerchantRulesViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideManageMerchantRulesViewModel(application))
+    }
+
+    @Test
+    fun setManageMerchantRulesViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setManageMerchantRulesViewModel(it) },
+            provider = { ServiceLocator.provideManageMerchantRulesViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideSettingsViewModel_returnsConfiguredInstance() {
+        val autoSaveUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        val nerExtractor: io.pm.finlight.ml.SmsEntityExtractor = mockk(relaxed = true)
+        val viewModel =
+            ServiceLocator.provideSettingsViewModel(
+                context = application,
+                resolvedDb = db,
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                nerExtractorProvider = { nerExtractor },
+            )
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideSettingsViewModel(application))
+    }
+
+    @Test
+    fun setSettingsViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setSettingsViewModel(it) },
+            provider = { ServiceLocator.provideSettingsViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideRecurringTransactionViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideRecurringTransactionViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideRecurringTransactionViewModel(application))
+    }
+
+    @Test
+    fun setRecurringTransactionViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setRecurringTransactionViewModel(it) },
+            provider = { ServiceLocator.provideRecurringTransactionViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideSmsDebugViewModel_returnsConfiguredInstance() {
+        val autoSaveUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+        val nerExtractor: io.pm.finlight.ml.SmsEntityExtractor = mockk(relaxed = true)
+        val viewModel =
+            ServiceLocator.provideSmsDebugViewModel(
+                context = application,
+                resolvedDb = db,
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                nerExtractorProvider = { nerExtractor },
+            )
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideSmsDebugViewModel(application))
+    }
+
+    @Test
+    fun setSmsDebugViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setSmsDebugViewModel(it) },
+            provider = { ServiceLocator.provideSmsDebugViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideSmsClassifier_whenClassifierIsNull_createsAndCachesInstanceFromMlModelFactory() {
+        ServiceLocator.reset()
+        mockkObject(MlModelFactory)
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(application.applicationContext) } returns mockClassifier
+
+        val classifier1 = ServiceLocator.provideSmsClassifier(application)
+        val classifier2 = ServiceLocator.provideSmsClassifier(application)
+
+        assertSame(mockClassifier, classifier1)
+        assertSame(classifier1, classifier2)
+        verify(exactly = 1) { MlModelFactory.getClassifier(application.applicationContext) }
+    }
+
+    @Test
+    fun setSmsClassifier_overridesProvidedInstance_andResetClearsIt() {
+        val customClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(customClassifier)
+
+        assertSame(customClassifier, ServiceLocator.provideSmsClassifier(application))
+
+        ServiceLocator.reset()
+        mockkObject(MlModelFactory)
+        val factoryClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(any()) } returns factoryClassifier
+
+        val newClassifier = ServiceLocator.provideSmsClassifier(application)
+        assertSame(factoryClassifier, newClassifier)
+        assertNotSame(customClassifier, newClassifier)
+    }
+
+    @Test
+    fun provideSettingsAndSmsDebugViewModel_resolvesFallbackNerExtractor_whenNoProviderConfigured() {
+        ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
+        ServiceLocator.setNerExtractorProvider(null)
+
+        mockkObject(MlModelFactory)
+        val fallbackExtractor: NerExtractor = mockk(relaxed = true)
+        every { MlModelFactory.getNerExtractor(application) } returns fallbackExtractor
+
+        val settingsVm = ServiceLocator.provideSettingsViewModel(application, db)
+        val smsDebugVm = ServiceLocator.provideSmsDebugViewModel(application, db)
+
+        assertSame(fallbackExtractor, settingsVm.nerExtractorProvider.invoke())
+        assertSame(fallbackExtractor, smsDebugVm.nerExtractorProvider.invoke())
+    }
+
     @Test
     fun provideViewModels_throwsIllegalArgumentException_whenContextLacksApplication() {
         val nonAppContext = mockk<Context>()
@@ -1283,6 +1506,14 @@ class ServiceLocatorTest {
                 { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
                 { ServiceLocator.provideProfileViewModel(nonAppContext) },
                 { ServiceLocator.provideTagViewModel(nonAppContext) },
+                { ServiceLocator.provideReportsViewModel(nonAppContext) },
+                { ServiceLocator.provideAnalysisViewModel(nonAppContext) },
+                { ServiceLocator.provideAnnualSimulatorViewModel(nonAppContext) },
+                { ServiceLocator.provideWhatIfViewModel(nonAppContext) },
+                { ServiceLocator.provideManageMerchantRulesViewModel(nonAppContext) },
+                { ServiceLocator.provideSettingsViewModel(nonAppContext) },
+                { ServiceLocator.provideRecurringTransactionViewModel(nonAppContext) },
+                { ServiceLocator.provideSmsDebugViewModel(nonAppContext) },
             )
 
         for (provider in viewModelProviders) {
@@ -1309,6 +1540,14 @@ class ServiceLocatorTest {
                 ServiceLocator.provideOnboardingViewModel(nonAppContext),
                 ServiceLocator.provideProfileViewModel(nonAppContext),
                 ServiceLocator.provideTagViewModel(nonAppContext),
+                ServiceLocator.provideReportsViewModel(nonAppContext),
+                ServiceLocator.provideAnalysisViewModel(nonAppContext),
+                ServiceLocator.provideAnnualSimulatorViewModel(nonAppContext),
+                ServiceLocator.provideWhatIfViewModel(nonAppContext),
+                ServiceLocator.provideManageMerchantRulesViewModel(nonAppContext),
+                ServiceLocator.provideSettingsViewModel(nonAppContext),
+                ServiceLocator.provideRecurringTransactionViewModel(nonAppContext),
+                ServiceLocator.provideSmsDebugViewModel(nonAppContext),
             )
 
         for (viewModel in viewModels) {
@@ -1335,6 +1574,14 @@ class ServiceLocatorTest {
                 { ServiceLocator.provideOnboardingViewModel(nonAppContext) },
                 { ServiceLocator.provideProfileViewModel(nonAppContext) },
                 { ServiceLocator.provideTagViewModel(nonAppContext) },
+                { ServiceLocator.provideReportsViewModel(nonAppContext) },
+                { ServiceLocator.provideAnalysisViewModel(nonAppContext) },
+                { ServiceLocator.provideAnnualSimulatorViewModel(nonAppContext) },
+                { ServiceLocator.provideWhatIfViewModel(nonAppContext) },
+                { ServiceLocator.provideManageMerchantRulesViewModel(nonAppContext) },
+                { ServiceLocator.provideSettingsViewModel(nonAppContext) },
+                { ServiceLocator.provideRecurringTransactionViewModel(nonAppContext) },
+                { ServiceLocator.provideSmsDebugViewModel(nonAppContext) },
             )
 
         for (provider in viewModelProviders) {

@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -76,6 +77,21 @@ class AnnualSimulatorViewModelFactoryTest {
 
         assertNotNull(viewModel)
         assertEquals(2030, viewModel.currentYear.value)
+    }
+
+    @Test
+    fun create_withExtras_returnsAnnualSimulatorViewModel() {
+        val viewModel = factory.create(AnnualSimulatorViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: AnnualSimulatorViewModel = mockk(relaxed = true)
+        ServiceLocator.setAnnualSimulatorViewModel(mockViewModel)
+
+        val resolved = factory.create(AnnualSimulatorViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

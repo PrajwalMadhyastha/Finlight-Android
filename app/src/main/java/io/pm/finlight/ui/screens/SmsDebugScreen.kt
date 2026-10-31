@@ -27,7 +27,7 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
-import io.pm.finlight.ui.viewmodel.SmsDebugViewModelFactory
+import io.pm.finlight.di.FinlightViewModelFactory
 import java.net.URLEncoder
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +36,7 @@ fun SmsDebugScreen(
     navController: NavController,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = SmsDebugViewModelFactory(application)
+    val factory = FinlightViewModelFactory.create(application)
     val viewModel: SmsDebugViewModel = viewModel(factory = factory)
 
     val uiState by viewModel.uiState.collectAsState()

@@ -49,10 +49,12 @@ import io.pm.finlight.MerchantMappingRepository
 import io.pm.finlight.MerchantRenameRuleRepository
 import io.pm.finlight.NotificationSettingsRepository
 import io.pm.finlight.RecurringTransactionRepository
+import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.SecuritySettingsRepository
 import io.pm.finlight.SettingsRepository
-import io.pm.finlight.SmsRepository
+import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.SmsParseTemplateRepository
+import io.pm.finlight.SmsRepository
 import io.pm.finlight.SmsRuleSettingsRepository
 import io.pm.finlight.SplitTransactionRepository
 import io.pm.finlight.TagRepository
@@ -66,17 +68,6 @@ import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.data.repository.TripRepository
-import io.pm.finlight.ui.viewmodel.AccountViewModel
-import io.pm.finlight.ui.viewmodel.BudgetViewModel
-import io.pm.finlight.ui.viewmodel.CategoryViewModel
-import io.pm.finlight.ui.viewmodel.CurrencyViewModel
-import io.pm.finlight.ui.viewmodel.GoalViewModel
-import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
-import io.pm.finlight.ui.viewmodel.IncomeViewModel
-import io.pm.finlight.ui.viewmodel.OnboardingViewModel
-import io.pm.finlight.ui.viewmodel.ProfileViewModel
-import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
-import io.pm.finlight.ui.viewmodel.TagViewModel
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -85,9 +76,31 @@ import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
+import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisViewModel
+import io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel
+import io.pm.finlight.ui.viewmodel.BudgetViewModel
+import io.pm.finlight.ui.viewmodel.CategoryViewModel
+import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.ui.viewmodel.GoalViewModel
+import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
+import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
+import io.pm.finlight.ui.viewmodel.OnboardingViewModel
+import io.pm.finlight.ui.viewmodel.ProfileViewModel
+import io.pm.finlight.ui.viewmodel.ReportsViewModel
+import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import io.pm.finlight.ui.viewmodel.TagViewModel
+import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SystemTimeProvider
+import io.pm.finlight.utils.TimeProvider
 
 /**
  * ServiceLocator provides centralized, decoupled dependency resolution for repositories
@@ -239,6 +252,44 @@ object ServiceLocator {
 
     @Volatile
     private var tagViewModel: TagViewModel? = null
+
+    @Volatile
+    private var reportsViewModel: ReportsViewModel? = null
+
+    @Volatile
+    private var analysisViewModel: AnalysisViewModel? = null
+
+    @Volatile
+    private var annualSimulatorViewModel: AnnualSimulatorViewModel? = null
+
+    @Volatile
+    private var whatIfViewModel: WhatIfViewModel? = null
+
+    @Volatile
+    private var manageMerchantRulesViewModel: ManageMerchantRulesViewModel? = null
+
+    @Volatile
+    private var settingsViewModel: SettingsViewModel? = null
+
+    @Volatile
+    private var recurringTransactionViewModel: RecurringTransactionViewModel? = null
+
+    @Volatile
+    private var smsDebugViewModel: SmsDebugViewModel? = null
+
+    @Volatile
+    private var smsClassifier: SmsClassifier? = null
+
+    @Volatile
+    private var nerExtractorProvider: (() -> SmsEntityExtractor)? = null
+
+    fun provideSmsClassifier(context: Context): SmsClassifier {
+        return smsClassifier ?: synchronized(this) {
+            smsClassifier ?: MlModelFactory.getClassifier(context.applicationContext).also {
+                smsClassifier = it
+            }
+        }
+    }
 
     fun provideDispatcherProvider(context: Context? = null): DispatcherProvider {
         return dispatcherProvider ?: synchronized(this) {
@@ -1237,6 +1288,282 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves a [ReportsViewModel] instance.
+     *
+     * @param context Application or activity context.
+     */
+    fun provideReportsViewModel(context: Context): ReportsViewModel {
+        return reportsViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val transactionRepository = provideTransactionRepository(app)
+            val categoryRepository = provideCategoryRepository(app)
+            val getMonthlyConsistencyDataUseCase = provideGetMonthlyConsistencyDataUseCase(app)
+            val dispatcherProvider = provideDispatcherProvider(app)
+
+            ReportsViewModel(
+                transactionRepository = transactionRepository,
+                categoryRepository = categoryRepository,
+                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+                dispatcherProvider = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves an [AnalysisViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideAnalysisViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): AnalysisViewModel {
+        return analysisViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val dispatcherProvider = provideDispatcherProvider(app)
+
+            AnalysisViewModel(
+                transactionAnalyticsDao = db.transactionAnalyticsDao(),
+                categoryDao = db.categoryDao(),
+                tagDao = db.tagDao(),
+                dispatcherProvider = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves an [AnnualSimulatorViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param simulationYear Optional year override.
+     * @param timeProvider Optional [TimeProvider] instance.
+     */
+    fun provideAnnualSimulatorViewModel(
+        context: Context,
+        simulationYear: Int? = null,
+        timeProvider: TimeProvider = SystemTimeProvider(),
+    ): AnnualSimulatorViewModel {
+        return annualSimulatorViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val settingsRepository = provideSettingsRepository(app)
+            val transactionRepository = provideTransactionRepository(app)
+
+            AnnualSimulatorViewModel(
+                transactionRepository = transactionRepository,
+                settingsRepository = settingsRepository,
+                timeProvider = timeProvider,
+                simulationYear = simulationYear,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [WhatIfViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param timeProvider Optional [TimeProvider] instance.
+     */
+    fun provideWhatIfViewModel(
+        context: Context,
+        timeProvider: TimeProvider = SystemTimeProvider(),
+    ): WhatIfViewModel {
+        return whatIfViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val settingsRepository = provideSettingsRepository(app)
+            val transactionRepository = provideTransactionRepository(app)
+
+            WhatIfViewModel(
+                transactionRepository = transactionRepository,
+                settingsRepository = settingsRepository,
+                timeProvider = timeProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [ManageMerchantRulesViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideManageMerchantRulesViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ManageMerchantRulesViewModel {
+        return manageMerchantRulesViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val merchantRenameRuleRepository = provideMerchantRenameRuleRepository(app, db)
+            val transactionRepository = provideTransactionRepository(app)
+            val categoryMappingRepository = provideMerchantCategoryMappingRepository(app, db)
+            val categoryRepository = provideCategoryRepository(app)
+            val dispatcherProvider = provideDispatcherProvider(app)
+
+            ManageMerchantRulesViewModel(
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                transactionRepository = transactionRepository,
+                categoryMappingRepository = categoryMappingRepository,
+                categoryRepository = categoryRepository,
+                dispatcherProvider = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [SettingsViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param autoSaveSmsTransactionUseCase Optional [AutoSaveSmsTransactionUseCase] override.
+     * @param smsClassifier Optional [SmsClassifier] override.
+     * @param nerExtractorProvider Optional NER extractor provider lambda.
+     */
+    fun provideSettingsViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null,
+        smsClassifier: SmsClassifier? = null,
+        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    ): SettingsViewModel {
+        return settingsViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val settingsRepository = provideSettingsRepository(app)
+            val transactionRepository = provideTransactionRepository(app)
+            val merchantMappingRepository = provideMerchantMappingRepository(app, db)
+            val accountRepository = provideAccountRepository(app)
+            val categoryRepository = provideCategoryRepository(app)
+            val smsRepository = provideSmsRepository(app)
+            val autoSaveUseCase =
+                autoSaveSmsTransactionUseCase
+                    ?: provideAutoSaveSmsTransactionUseCase(app, db)
+            val classifier = smsClassifier ?: provideSmsClassifier(app)
+            val tagRepository = provideTagRepository(app)
+            val splitTransactionRepository = provideSplitTransactionRepository(app, db)
+            val merchantRenameRuleRepository = provideMerchantRenameRuleRepository(app, db)
+            val merchantCategoryMappingRepository = provideMerchantCategoryMappingRepository(app, db)
+            val customSmsRuleRepository = provideCustomSmsRuleRepository(app, db)
+            val ignoreRuleRepository = provideIgnoreRuleRepository(app, db)
+            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
+            val transactionRunner = provideTransactionRunner(app, db)
+            val databaseHealthChecker = provideDatabaseHealthChecker()
+            val dispatcherProvider = provideDispatcherProvider(app)
+
+            SettingsViewModel(
+                application = app,
+                settingsRepository = settingsRepository,
+                transactionRepository = transactionRepository,
+                merchantMappingRepository = merchantMappingRepository,
+                accountRepository = accountRepository,
+                categoryRepository = categoryRepository,
+                smsRepository = smsRepository,
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                smsClassifier = classifier,
+                tagRepository = tagRepository,
+                splitTransactionRepository = splitTransactionRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                customSmsRuleRepository = customSmsRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                smsParseTemplateProvider = smsParseTemplateProvider,
+                nerExtractorProvider = nerExtractorProvider ?: this.nerExtractorProvider ?: { MlModelFactory.getNerExtractor(app) },
+                transactionRunner = transactionRunner,
+                databaseHealthChecker = databaseHealthChecker,
+                dispatchers = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [RecurringTransactionViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideRecurringTransactionViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): RecurringTransactionViewModel {
+        return recurringTransactionViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val repository = provideRecurringTransactionRepository(app, resolvedDb)
+            val scheduleWorkerUseCase = provideScheduleRecurringTransactionWorkerUseCase(app)
+
+            RecurringTransactionViewModel(
+                repository = repository,
+                scheduleWorkerUseCase = scheduleWorkerUseCase,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [SmsDebugViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param autoSaveSmsTransactionUseCase Optional [AutoSaveSmsTransactionUseCase] override.
+     * @param smsClassifier Optional [SmsClassifier] override.
+     * @param nerExtractorProvider Optional NER extractor provider lambda.
+     */
+    fun provideSmsDebugViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        autoSaveSmsTransactionUseCase: AutoSaveSmsTransactionUseCase? = null,
+        smsClassifier: SmsClassifier? = null,
+        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    ): SmsDebugViewModel {
+        return smsDebugViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val smsRepository = provideSmsRepository(app)
+            val transactionRepository = provideTransactionRepository(app)
+            val customSmsRuleRepository = provideCustomSmsRuleRepository(app, db)
+            val merchantRenameRuleRepository = provideMerchantRenameRuleRepository(app, db)
+            val ignoreRuleRepository = provideIgnoreRuleRepository(app, db)
+            val merchantCategoryMappingRepository = provideMerchantCategoryMappingRepository(app, db)
+            val smsParseTemplateProvider = SmsProviderHelper.getSmsParseTemplateProvider(db)
+            val classifier = smsClassifier ?: provideSmsClassifier(app)
+            val autoSaveUseCase =
+                autoSaveSmsTransactionUseCase
+                    ?: provideAutoSaveSmsTransactionUseCase(app, db)
+            val dispatcherProvider = provideDispatcherProvider(app)
+
+            SmsDebugViewModel(
+                application = app,
+                smsRepository = smsRepository,
+                transactionRepository = transactionRepository,
+                customSmsRuleRepository = customSmsRuleRepository,
+                merchantRenameRuleRepository = merchantRenameRuleRepository,
+                ignoreRuleRepository = ignoreRuleRepository,
+                merchantCategoryMappingRepository = merchantCategoryMappingRepository,
+                smsParseTemplateProvider = smsParseTemplateProvider,
+                smsClassifier = classifier,
+                nerExtractorProvider = nerExtractorProvider ?: this.nerExtractorProvider ?: { MlModelFactory.getNerExtractor(app) },
+                autoSaveSmsTransactionUseCase = autoSaveUseCase,
+                dispatchers = dispatcherProvider,
+            )
+        }
+    }
+
+    /**
      * Resolves the centralized [ViewModelProvider.Factory].
      *
      * @param context Optional context fallback.
@@ -1486,6 +1813,56 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setReportsViewModel(viewModel: ReportsViewModel?) {
+        reportsViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setAnalysisViewModel(viewModel: AnalysisViewModel?) {
+        analysisViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setAnnualSimulatorViewModel(viewModel: AnnualSimulatorViewModel?) {
+        annualSimulatorViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setWhatIfViewModel(viewModel: WhatIfViewModel?) {
+        whatIfViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setManageMerchantRulesViewModel(viewModel: ManageMerchantRulesViewModel?) {
+        manageMerchantRulesViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setSettingsViewModel(viewModel: SettingsViewModel?) {
+        settingsViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setRecurringTransactionViewModel(viewModel: RecurringTransactionViewModel?) {
+        recurringTransactionViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setSmsDebugViewModel(viewModel: SmsDebugViewModel?) {
+        smsDebugViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setSmsClassifier(classifier: SmsClassifier?) {
+        smsClassifier = classifier
+    }
+
+    @VisibleForTesting
+    fun setNerExtractorProvider(provider: (() -> SmsEntityExtractor)?) {
+        nerExtractorProvider = provider
+    }
+
+    @VisibleForTesting
     fun reset() {
         dispatcherProvider = null
         settingsRepository = null
@@ -1535,5 +1912,15 @@ object ServiceLocator {
         onboardingViewModel = null
         profileViewModel = null
         tagViewModel = null
+        reportsViewModel = null
+        analysisViewModel = null
+        annualSimulatorViewModel = null
+        whatIfViewModel = null
+        manageMerchantRulesViewModel = null
+        settingsViewModel = null
+        recurringTransactionViewModel = null
+        smsDebugViewModel = null
+        smsClassifier = null
+        nerExtractorProvider = null
     }
 }

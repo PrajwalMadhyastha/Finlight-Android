@@ -58,6 +58,8 @@ class SettingsViewModelFactoryTest {
                 .build()
         AppDatabase.setTestInstance(db)
         ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
     }
 
     @After
@@ -109,6 +111,7 @@ class SettingsViewModelFactoryTest {
         val mockNerExtractor: NerExtractor = mockk(relaxed = true)
         every { MlModelFactory.getClassifier(any()) } returns mockClassifier
         every { MlModelFactory.getNerExtractor(any()) } returns mockNerExtractor
+        ServiceLocator.setSmsClassifier(mockClassifier)
 
         ServiceLocator.setSettingsRepository(mockSettingsRepo)
         ServiceLocator.setTransactionRepository(mockTxnRepo)
@@ -276,6 +279,38 @@ class SettingsViewModelFactoryTest {
 
         assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
+    }
+
+    @Test
+    fun create_withSecondaryConstructor_passesNerExtractorProvider() {
+        mockkObject(MlModelFactory)
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        every { MlModelFactory.getClassifier(any()) } returns mockClassifier
+
+        val customExtractor: NerExtractor = mockk(relaxed = true)
+        val customProvider: () -> NerExtractor = { customExtractor }
+
+        val factory = SettingsViewModelFactory(application, nerExtractorProvider = customProvider)
+        val viewModel = factory.create(SettingsViewModel::class.java)
+
+        assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())
+    }
+
+    @Test
+    fun create_withExtras_returnsSettingsViewModel() {
+        val factory = SettingsViewModelFactory(application)
+        val viewModel = factory.create(SettingsViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: SettingsViewModel = mockk(relaxed = true)
+        ServiceLocator.setSettingsViewModel(mockViewModel)
+
+        val factory = SettingsViewModelFactory(application)
+        val resolved = factory.create(SettingsViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test
