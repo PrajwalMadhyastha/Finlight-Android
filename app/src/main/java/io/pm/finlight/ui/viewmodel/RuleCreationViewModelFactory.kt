@@ -10,6 +10,14 @@ import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class RuleCreationViewModelFactory(
     private val application: Application,
     private val customSmsRuleRepository: ICustomSmsRuleRepository? = null,
@@ -21,14 +29,13 @@ class RuleCreationViewModelFactory(
         extras: CreationExtras,
     ): T {
         if (modelClass.isAssignableFrom(RuleCreationViewModel::class.java)) {
-            val repository = customSmsRuleRepository ?: ServiceLocator.provideCustomSmsRuleRepository(application)
-            val dispatchers = dispatcherProvider ?: ServiceLocator.provideDispatcherProvider(application)
             val handle = savedStateHandle ?: runCatching { extras.createSavedStateHandle() }.getOrElse { SavedStateHandle() }
             @Suppress("UNCHECKED_CAST")
-            return RuleCreationViewModel(
-                customSmsRuleRepository = repository,
-                dispatcherProvider = dispatchers,
+            return ServiceLocator.provideRuleCreationViewModel(
+                context = application,
                 savedStateHandle = handle,
+                customSmsRuleRepository = customSmsRuleRepository,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")

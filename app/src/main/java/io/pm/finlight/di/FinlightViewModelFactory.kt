@@ -112,6 +112,18 @@ class FinlightViewModelFactory(
                 val app = resolveApplication(this, context)
                 ServiceLocator.provideSmsDebugViewModel(app)
             }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideManageIgnoreRulesViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.provideManageParseRulesViewModel(app)
+            }
+            initializer {
+                val app = resolveApplication(this, context)
+                ServiceLocator.providePendingTransactionsViewModel(app)
+            }
         }
 
     override fun <T : ViewModel> create(modelClass: Class<T>): T {

@@ -88,8 +88,11 @@ import io.pm.finlight.ui.viewmodel.CurrencyViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
+import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
 import io.pm.finlight.ui.viewmodel.OnboardingViewModel
+import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.ReportsViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
@@ -276,6 +279,15 @@ object ServiceLocator {
 
     @Volatile
     private var smsDebugViewModel: SmsDebugViewModel? = null
+
+    @Volatile
+    private var manageIgnoreRulesViewModel: ManageIgnoreRulesViewModel? = null
+
+    @Volatile
+    private var manageParseRulesViewModel: ManageParseRulesViewModel? = null
+
+    @Volatile
+    private var pendingTransactionsViewModel: PendingTransactionsViewModel? = null
 
     @Volatile
     private var smsClassifier: SmsClassifier? = null
@@ -1021,18 +1033,22 @@ object ServiceLocator {
      * @param context Application or activity context.
      * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
      * @param savedStateHandle Optional [SavedStateHandle] for state restoration.
+     * @param customSmsRuleRepository Optional [ICustomSmsRuleRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
      */
     fun provideRuleCreationViewModel(
         context: Context,
         resolvedDb: AppDatabase? = null,
         savedStateHandle: SavedStateHandle? = null,
+        customSmsRuleRepository: ICustomSmsRuleRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
     ): RuleCreationViewModel {
         return ruleCreationViewModel ?: run {
             val app =
                 (context as? Application) ?: (context.applicationContext as? Application)
                     ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
-            val repository = provideCustomSmsRuleRepository(app, resolvedDb)
-            val dispatchers = provideDispatcherProvider(app)
+            val repository = customSmsRuleRepository ?: provideCustomSmsRuleRepository(app, resolvedDb)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
             RuleCreationViewModel(
                 customSmsRuleRepository = repository,
                 dispatcherProvider = dispatchers,
@@ -1564,6 +1580,92 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves a [ManageIgnoreRulesViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param ignoreRuleRepository Optional [IIgnoreRuleRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideManageIgnoreRulesViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        ignoreRuleRepository: IIgnoreRuleRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): ManageIgnoreRulesViewModel {
+        return manageIgnoreRulesViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val repository = ignoreRuleRepository ?: provideIgnoreRuleRepository(app, resolvedDb)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            ManageIgnoreRulesViewModel(
+                ignoreRuleRepository = repository,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [ManageParseRulesViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param customSmsRuleRepository Optional [ICustomSmsRuleRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideManageParseRulesViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        customSmsRuleRepository: ICustomSmsRuleRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): ManageParseRulesViewModel {
+        return manageParseRulesViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val repository = customSmsRuleRepository ?: provideCustomSmsRuleRepository(app, resolvedDb)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            ManageParseRulesViewModel(
+                customSmsRuleRepository = repository,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [PendingTransactionsViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param recurringTransactionRepository Optional [IRecurringTransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun providePendingTransactionsViewModel(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+        transactionRepository: ITransactionRepository? = null,
+        recurringTransactionRepository: IRecurringTransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): PendingTransactionsViewModel {
+        return pendingTransactionsViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val recurringRepo =
+                recurringTransactionRepository ?: provideRecurringTransactionRepository(app, resolvedDb)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            PendingTransactionsViewModel(
+                transactionRepository = txnRepo,
+                recurringTransactionRepository = recurringRepo,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
      * Resolves the centralized [ViewModelProvider.Factory].
      *
      * @param context Optional context fallback.
@@ -1853,6 +1955,21 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setManageIgnoreRulesViewModel(viewModel: ManageIgnoreRulesViewModel?) {
+        manageIgnoreRulesViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setManageParseRulesViewModel(viewModel: ManageParseRulesViewModel?) {
+        manageParseRulesViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setPendingTransactionsViewModel(viewModel: PendingTransactionsViewModel?) {
+        pendingTransactionsViewModel = viewModel
+    }
+
+    @VisibleForTesting
     fun setSmsClassifier(classifier: SmsClassifier?) {
         smsClassifier = classifier
     }
@@ -1920,6 +2037,9 @@ object ServiceLocator {
         settingsViewModel = null
         recurringTransactionViewModel = null
         smsDebugViewModel = null
+        manageIgnoreRulesViewModel = null
+        manageParseRulesViewModel = null
+        pendingTransactionsViewModel = null
         smsClassifier = null
         nerExtractorProvider = null
     }

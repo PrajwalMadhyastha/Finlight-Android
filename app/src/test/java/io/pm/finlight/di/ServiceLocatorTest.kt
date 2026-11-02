@@ -1440,6 +1440,51 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideManageIgnoreRulesViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideManageIgnoreRulesViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideManageIgnoreRulesViewModel(application))
+    }
+
+    @Test
+    fun setManageIgnoreRulesViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setManageIgnoreRulesViewModel(it) },
+            provider = { ServiceLocator.provideManageIgnoreRulesViewModel(application) },
+        )
+    }
+
+    @Test
+    fun provideManageParseRulesViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.provideManageParseRulesViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.provideManageParseRulesViewModel(application))
+    }
+
+    @Test
+    fun setManageParseRulesViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setManageParseRulesViewModel(it) },
+            provider = { ServiceLocator.provideManageParseRulesViewModel(application) },
+        )
+    }
+
+    @Test
+    fun providePendingTransactionsViewModel_returnsConfiguredInstance() {
+        val viewModel = ServiceLocator.providePendingTransactionsViewModel(application, db)
+        assertNotNull(viewModel)
+        assertNotNull(ServiceLocator.providePendingTransactionsViewModel(application))
+    }
+
+    @Test
+    fun setPendingTransactionsViewModel_overridesProvidedInstance_andResetClearsIt() {
+        testViewModelOverrideAndReset(
+            setter = { ServiceLocator.setPendingTransactionsViewModel(it) },
+            provider = { ServiceLocator.providePendingTransactionsViewModel(application) },
+        )
+    }
+
+    @Test
     fun provideSmsClassifier_whenClassifierIsNull_createsAndCachesInstanceFromMlModelFactory() {
         ServiceLocator.reset()
         mockkObject(MlModelFactory)
@@ -1514,6 +1559,10 @@ class ServiceLocatorTest {
                 { ServiceLocator.provideSettingsViewModel(nonAppContext) },
                 { ServiceLocator.provideRecurringTransactionViewModel(nonAppContext) },
                 { ServiceLocator.provideSmsDebugViewModel(nonAppContext) },
+                { ServiceLocator.provideRuleCreationViewModel(nonAppContext) },
+                { ServiceLocator.provideManageIgnoreRulesViewModel(nonAppContext) },
+                { ServiceLocator.provideManageParseRulesViewModel(nonAppContext) },
+                { ServiceLocator.providePendingTransactionsViewModel(nonAppContext) },
             )
 
         for (provider in viewModelProviders) {
@@ -1548,6 +1597,10 @@ class ServiceLocatorTest {
                 ServiceLocator.provideSettingsViewModel(nonAppContext),
                 ServiceLocator.provideRecurringTransactionViewModel(nonAppContext),
                 ServiceLocator.provideSmsDebugViewModel(nonAppContext),
+                ServiceLocator.provideRuleCreationViewModel(nonAppContext),
+                ServiceLocator.provideManageIgnoreRulesViewModel(nonAppContext),
+                ServiceLocator.provideManageParseRulesViewModel(nonAppContext),
+                ServiceLocator.providePendingTransactionsViewModel(nonAppContext),
             )
 
         for (viewModel in viewModels) {
@@ -1582,6 +1635,10 @@ class ServiceLocatorTest {
                 { ServiceLocator.provideSettingsViewModel(nonAppContext) },
                 { ServiceLocator.provideRecurringTransactionViewModel(nonAppContext) },
                 { ServiceLocator.provideSmsDebugViewModel(nonAppContext) },
+                { ServiceLocator.provideRuleCreationViewModel(nonAppContext) },
+                { ServiceLocator.provideManageIgnoreRulesViewModel(nonAppContext) },
+                { ServiceLocator.provideManageParseRulesViewModel(nonAppContext) },
+                { ServiceLocator.providePendingTransactionsViewModel(nonAppContext) },
             )
 
         for (provider in viewModelProviders) {

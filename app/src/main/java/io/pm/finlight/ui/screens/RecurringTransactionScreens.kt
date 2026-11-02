@@ -34,7 +34,6 @@ import android.app.Application
 import androidx.compose.ui.platform.LocalContext
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
-import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModelFactory
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.RecurringTransaction
@@ -305,7 +304,7 @@ fun UpcomingPaymentsCard(
     navController: NavController,
     pendingViewModel: PendingTransactionsViewModel =
         viewModel(
-            factory = PendingTransactionsViewModelFactory(LocalContext.current.applicationContext as Application),
+            factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as Application),
         ),
 ) {
     val pending by pendingViewModel.pendingTransactions.collectAsState()

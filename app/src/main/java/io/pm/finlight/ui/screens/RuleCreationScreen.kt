@@ -39,10 +39,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
-import io.pm.finlight.ui.viewmodel.RuleCreationViewModelFactory
 import io.pm.finlight.ui.viewmodel.RuleSelection
 import kotlin.math.max
 import kotlin.math.min
@@ -55,7 +55,7 @@ fun RuleCreationScreen(
     ruleId: Int?,
     viewModel: RuleCreationViewModel =
         viewModel(
-            factory = RuleCreationViewModelFactory(LocalContext.current.applicationContext as Application),
+            factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as Application),
         ),
 ) {
     val uiState by viewModel.uiState.collectAsState()

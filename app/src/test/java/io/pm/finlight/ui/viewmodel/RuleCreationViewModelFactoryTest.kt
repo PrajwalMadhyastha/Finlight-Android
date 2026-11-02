@@ -117,6 +117,15 @@ class RuleCreationViewModelFactoryTest {
     }
 
     @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: RuleCreationViewModel = mockk(relaxed = true)
+        ServiceLocator.setRuleCreationViewModel(mockViewModel)
+
+        val resolved = factory.create(RuleCreationViewModel::class.java)
+        assertSame(mockViewModel, resolved)
+    }
+
+    @Test
     fun create_withCustomSavedStateHandle_usesExplicitInstance() {
         val customHandle = SavedStateHandle(mapOf("key" to "value"))
         val customFactory =
