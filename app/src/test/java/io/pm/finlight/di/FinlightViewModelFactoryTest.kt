@@ -1,4 +1,4 @@
-package io.pm.finlight.di
+ package io.pm.finlight.di
 
 import android.app.Application
 import android.content.Context
@@ -720,19 +720,7 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun create_withCreationExtras_parameterizedViewModels_resolvesSuccessfully() {
-        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
-        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
-        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
-        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
-        val mockTagRepo: ITagRepository = mockk(relaxed = true)
-        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
-        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
-        every { mockTagRepo.allTags } returns flowOf(emptyList())
-        ServiceLocator.setTransactionRepository(mockTxnRepo)
-        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
-        ServiceLocator.setAccountRepository(mockAccountRepo)
-        ServiceLocator.setCategoryRepository(mockCategoryRepo)
-        ServiceLocator.setTagRepository(mockTagRepo)
+        setupMockRepositories()
 
         val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
         val factory = FinlightViewModelFactory.create(application)
@@ -814,19 +802,7 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun createAssistedFactories_buildsExpectedViewModels() {
-        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
-        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
-        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
-        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
-        val mockTagRepo: ITagRepository = mockk(relaxed = true)
-        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
-        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
-        every { mockTagRepo.allTags } returns flowOf(emptyList())
-        ServiceLocator.setTransactionRepository(mockTxnRepo)
-        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
-        ServiceLocator.setAccountRepository(mockAccountRepo)
-        ServiceLocator.setCategoryRepository(mockCategoryRepo)
-        ServiceLocator.setTagRepository(mockTagRepo)
+        setupMockRepositories()
 
         val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
 
@@ -904,5 +880,21 @@ class FinlightViewModelFactoryTest {
         assertSame(mockAnalysisVM, FinlightViewModelFactory.createAnalysisDetailFactory(application, AnalysisDimension.CATEGORY, "1", 0L, 1L).create(AnalysisDetailViewModel::class.java))
         assertSame(mockSearchVM, FinlightViewModelFactory.createSearchFactory(application).create(SearchViewModel::class.java))
         assertSame(mockBatchVM, FinlightViewModelFactory.createBatchAnalysisFactory(application).create(BatchAnalysisViewModel::class.java))
+    }
+
+    private fun setupMockRepositories() {
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
+        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
+        val mockTagRepo: ITagRepository = mockk(relaxed = true)
+        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
+        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
+        every { mockTagRepo.allTags } returns flowOf(emptyList())
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
+        ServiceLocator.setAccountRepository(mockAccountRepo)
+        ServiceLocator.setCategoryRepository(mockCategoryRepo)
+        ServiceLocator.setTagRepository(mockTagRepo)
     }
 }
