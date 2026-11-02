@@ -11,6 +11,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
@@ -28,28 +29,44 @@ enum class DrilldownType {
     MERCHANT,
 }
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createDrilldownFactory(application, drilldownType, entityName, month, year)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class DrilldownViewModelFactory(
     private val application: Application,
     private val drilldownType: DrilldownType,
     private val entityName: String,
     private val month: Int,
     private val year: Int,
+    private val transactionRepository: ITransactionRepository? = null,
+    private val dispatcherProvider: DispatcherProvider? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return create(modelClass, CreationExtras.Empty)
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
         if (modelClass.isAssignableFrom(DrilldownViewModel::class.java)) {
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
             @Suppress("UNCHECKED_CAST")
-            return DrilldownViewModel(
-                transactionRepository = transactionRepository,
+            return ServiceLocator.provideDrilldownViewModel(
+                context = application,
                 drilldownType = drilldownType,
                 entityName = entityName,
                 month = month,
                 year = year,
+                transactionRepository = transactionRepository,
                 dispatcherProvider = dispatcherProvider,
             ) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
     }
 }
 

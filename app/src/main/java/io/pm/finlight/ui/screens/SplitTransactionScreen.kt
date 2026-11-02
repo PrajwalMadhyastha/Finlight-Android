@@ -47,12 +47,12 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SplitItem
 import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
-import io.pm.finlight.ui.viewmodel.SplitTransactionViewModelFactory
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import java.text.NumberFormat
@@ -69,7 +69,7 @@ fun SplitTransactionScreen(
     transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = SplitTransactionViewModelFactory(application, transactionId)
+    val factory = FinlightViewModelFactory.createSplitTransactionFactory(application, transactionId)
     val viewModel: SplitTransactionViewModel = viewModel(factory = factory)
     // --- FIX: Remove the local viewModel() call that was crashing ---
     // val transactionViewModel: TransactionViewModel = viewModel()

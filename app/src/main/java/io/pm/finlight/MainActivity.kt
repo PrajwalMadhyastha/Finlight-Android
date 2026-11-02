@@ -75,7 +75,6 @@ import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
 import io.pm.finlight.ui.viewmodel.SearchViewModel
-import io.pm.finlight.ui.viewmodel.SearchViewModelFactory
 import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ui.BottomNavItem
@@ -1065,7 +1064,7 @@ fun AppNavHost(
             val query = backStackEntry.arguments?.getString("query")
 
             val factory =
-                SearchViewModelFactory(
+                FinlightViewModelFactory.createSearchFactory(
                     activity.application,
                     if (categoryId != -1) categoryId else null,
                     if (date != -1L) date else null,

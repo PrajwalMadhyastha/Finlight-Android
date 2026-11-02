@@ -8,6 +8,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -50,6 +51,21 @@ class SearchViewModelFactoryTest {
         AppDatabase.setTestInstance(db)
         factory = SearchViewModelFactory(application)
         ServiceLocator.reset()
+
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
+        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
+        val mockTagRepo: ITagRepository = mockk(relaxed = true)
+
+        every { mockTxnRepo.searchTransactions(any(), any()) } returns flowOf(emptyList())
+        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
+        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
+        every { mockTagRepo.allTags } returns flowOf(emptyList())
+
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setAccountRepository(mockAccountRepo)
+        ServiceLocator.setCategoryRepository(mockCategoryRepo)
+        ServiceLocator.setTagRepository(mockTagRepo)
     }
 
     @After
@@ -119,5 +135,20 @@ class SearchViewModelFactoryTest {
                 factory.create(UnknownViewModel::class.java)
             }
         assertTrue(exception.message?.contains("Unknown ViewModel class") == true)
+    }
+
+    @Test
+    fun `create with extras returns SearchViewModel`() {
+        val vm = factory.create(SearchViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(vm)
+    }
+
+    @Test
+    fun `create with overridden ViewModel returns mocked instance`() {
+        val mockVM: SearchViewModel = mockk(relaxed = true)
+        ServiceLocator.setSearchViewModel(mockVM)
+
+        val resolved = factory.create(SearchViewModel::class.java)
+        org.junit.Assert.assertSame(mockVM, resolved)
     }
 }

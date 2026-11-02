@@ -11,8 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
 import io.pm.finlight.RuleType
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -269,6 +271,14 @@ class BatchAnalysisViewModel(
     }
 }
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createBatchAnalysisFactory(context)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class BatchAnalysisViewModelFactory(
     private val context: Context,
     private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
@@ -276,14 +286,20 @@ class BatchAnalysisViewModelFactory(
     private val dispatcherProvider: DispatcherProvider? = null,
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return create(modelClass, CreationExtras.Empty)
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
         if (modelClass.isAssignableFrom(BatchAnalysisViewModel::class.java)) {
-            val appContext = context.applicationContext ?: context
             @Suppress("UNCHECKED_CAST")
-            return BatchAnalysisViewModel(
-                context = appContext,
-                dispatcherProvider = dispatcherProvider ?: DefaultDispatcherProvider(),
-                nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(appContext) },
-                classifier = classifier ?: MlModelFactory.getClassifier(appContext),
+            return ServiceLocator.provideBatchAnalysisViewModel(
+                context = context,
+                nerExtractorProvider = nerExtractorProvider,
+                classifier = classifier,
+                dispatcherProvider = dispatcherProvider,
             ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
