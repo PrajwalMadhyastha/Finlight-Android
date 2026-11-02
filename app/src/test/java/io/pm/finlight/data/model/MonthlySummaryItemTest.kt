@@ -13,8 +13,16 @@ import java.util.Locale
 class MonthlySummaryItemTest {
     @Test
     fun `data class equals hashCode and copy behave correctly`() {
-        val cal1 = Calendar.getInstance().apply { set(2026, Calendar.JANUARY, 1) }
-        val cal2 = Calendar.getInstance().apply { set(2026, Calendar.JANUARY, 1) }
+        val cal1 =
+            Calendar.getInstance().apply {
+                clear()
+                set(2026, Calendar.JANUARY, 1)
+            }
+        val cal2 =
+            Calendar.getInstance().apply {
+                clear()
+                set(2026, Calendar.JANUARY, 1)
+            }
         val item1 = MonthlySummaryItem(cal1, 100.0)
         val item2 = MonthlySummaryItem(cal2, 100.0)
         val item3 = item1.copy(totalSpent = 200.0)
