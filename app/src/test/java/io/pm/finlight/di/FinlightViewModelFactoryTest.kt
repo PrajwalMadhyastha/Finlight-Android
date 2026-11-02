@@ -1,9 +1,8 @@
- package io.pm.finlight.di
+package io.pm.finlight.di
 
 import android.app.Application
 import android.content.Context
 import android.os.Build
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
@@ -599,12 +598,8 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
-
         val factory = FinlightViewModelFactory.create(application)
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test
@@ -720,7 +715,7 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun create_withCreationExtras_parameterizedViewModels_resolvesSuccessfully() {
-        setupMockRepositories()
+        setupCommonMockRepositories()
 
         val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
         val factory = FinlightViewModelFactory.create(application)
@@ -802,7 +797,7 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun createAssistedFactories_buildsExpectedViewModels() {
-        setupMockRepositories()
+        setupCommonMockRepositories()
 
         val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
 
@@ -842,10 +837,7 @@ class FinlightViewModelFactoryTest {
         val batchFactory = FinlightViewModelFactory.createBatchAnalysisFactory(application)
         assertNotNull(batchFactory.create(BatchAnalysisViewModel::class.java))
 
-        class UnknownViewModel : ViewModel()
-        assertThrows(IllegalArgumentException::class.java) {
-            splitFactory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(splitFactory)
     }
 
     @Test
@@ -880,21 +872,5 @@ class FinlightViewModelFactoryTest {
         assertSame(mockAnalysisVM, FinlightViewModelFactory.createAnalysisDetailFactory(application, AnalysisDimension.CATEGORY, "1", 0L, 1L).create(AnalysisDetailViewModel::class.java))
         assertSame(mockSearchVM, FinlightViewModelFactory.createSearchFactory(application).create(SearchViewModel::class.java))
         assertSame(mockBatchVM, FinlightViewModelFactory.createBatchAnalysisFactory(application).create(BatchAnalysisViewModel::class.java))
-    }
-
-    private fun setupMockRepositories() {
-        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
-        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
-        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
-        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
-        val mockTagRepo: ITagRepository = mockk(relaxed = true)
-        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
-        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
-        every { mockTagRepo.allTags } returns flowOf(emptyList())
-        ServiceLocator.setTransactionRepository(mockTxnRepo)
-        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
-        ServiceLocator.setAccountRepository(mockAccountRepo)
-        ServiceLocator.setCategoryRepository(mockCategoryRepo)
-        ServiceLocator.setTagRepository(mockTagRepo)
     }
 }

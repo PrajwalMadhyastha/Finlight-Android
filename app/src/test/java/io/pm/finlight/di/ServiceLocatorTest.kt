@@ -85,7 +85,6 @@ import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
@@ -1594,7 +1593,7 @@ class ServiceLocatorTest {
     fun provideViewModels_resolvesInstance_whenContextIsNotApplicationButProvidesApplicationContext() {
         val nonAppContext = mockk<Context>()
         every { nonAppContext.applicationContext } returns application
-        setupMockRepositories()
+        setupCommonMockRepositories()
         val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
 
         val viewModels =
@@ -1688,7 +1687,7 @@ class ServiceLocatorTest {
 
     @Test
     fun provideParameterizedViewModels_resolvesInstancesAndForwardsArguments() {
-        setupMockRepositories()
+        setupCommonMockRepositories()
 
         val sampleTxn = PotentialTransaction(101L, "Bank", 75.0, "expense", "Grocery", "SMS Body")
 
@@ -1776,7 +1775,7 @@ class ServiceLocatorTest {
         val freshNer: SmsEntityExtractor = mockk(relaxed = true)
         ServiceLocator.setSmsClassifier(freshClassifier)
         ServiceLocator.setNerExtractorProvider { freshNer }
-        setupMockRepositories()
+        setupCommonMockRepositories()
         ServiceLocator.setDispatcherProvider(TestDispatcherProvider())
 
         org.junit.Assert.assertNotSame(mockSplit, ServiceLocator.provideSplitTransactionViewModel(application, 1))
@@ -1897,22 +1896,5 @@ class ServiceLocatorTest {
                 classifier = mockClassifier,
             )
         assertNotNull(batchVM)
-    }
-
-    private fun setupMockRepositories() {
-        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
-        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
-        val mockAccountRepo: IAccountRepository = mockk(relaxed = true)
-        val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
-        val mockTagRepo: ITagRepository = mockk(relaxed = true)
-        every { mockAccountRepo.allAccounts } returns flowOf(emptyList())
-        every { mockAccountRepo.accountsWithBalance } returns flowOf(emptyList())
-        every { mockCategoryRepo.allCategories } returns flowOf(emptyList())
-        every { mockTagRepo.allTags } returns flowOf(emptyList())
-        ServiceLocator.setTransactionRepository(mockTxnRepo)
-        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
-        ServiceLocator.setAccountRepository(mockAccountRepo)
-        ServiceLocator.setCategoryRepository(mockCategoryRepo)
-        ServiceLocator.setTagRepository(mockTagRepo)
     }
 }

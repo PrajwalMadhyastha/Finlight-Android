@@ -2,6 +2,7 @@ package io.pm.finlight.di
 
 import android.app.Application
 import android.content.Context
+import android.content.ContextWrapper
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -477,7 +478,7 @@ class FinlightViewModelFactory(
         ): ViewModelProvider.Factory =
             createAssistedFactory<BatchAnalysisViewModel>(context) { app ->
                 ServiceLocator.provideBatchAnalysisViewModel(
-                    context = app,
+                    context = context ?: app,
                     nerExtractorProvider = nerExtractorProvider,
                     classifier = classifier,
                     dispatcherProvider = dispatcherProvider,
@@ -498,12 +499,20 @@ class FinlightViewModelFactory(
             extras: CreationExtras,
             context: Context?,
         ): Application {
-            return (extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as? Application)
-                ?: (context as? Application)
-                ?: (context?.applicationContext as? Application)
-                ?: throw IllegalArgumentException(
-                    "Application not found in CreationExtras or FinlightViewModelFactory constructor",
-                )
+            val fromExtras = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as? Application
+            if (fromExtras != null) return fromExtras
+
+            var current = context
+            while (current != null) {
+                if (current is Application) return current
+                val appCtx = current.applicationContext
+                if (appCtx is Application) return appCtx
+                current = (current as? ContextWrapper)?.baseContext
+            }
+
+            throw IllegalArgumentException(
+                "Application not found in CreationExtras or FinlightViewModelFactory constructor",
+            )
         }
     }
 }

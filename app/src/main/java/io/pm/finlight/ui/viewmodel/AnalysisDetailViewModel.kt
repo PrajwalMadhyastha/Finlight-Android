@@ -4,11 +4,10 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,46 +24,31 @@ import kotlinx.coroutines.flow.stateIn
         ),
 )
 class AnalysisDetailViewModelFactory(
-    private val application: Application,
-    private val dimension: AnalysisDimension,
-    private val dimensionId: String,
-    private val startDate: Long,
-    private val endDate: Long,
-    private val resolvedDb: AppDatabase? = null,
-    private val transactionAnalyticsDao: TransactionAnalyticsDao? = null,
-    private val dispatcherProvider: DispatcherProvider? = null,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return create(modelClass, CreationExtras.Empty)
-    }
-
-    override fun <T : ViewModel> create(
-        modelClass: Class<T>,
-        extras: CreationExtras,
-    ): T {
-        if (modelClass.isAssignableFrom(AnalysisDetailViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ServiceLocator.provideAnalysisDetailViewModel(
-                context = application,
-                dimension = dimension,
-                dimensionId = dimensionId,
-                startDate = startDate,
-                endDate = endDate,
-                resolvedDb = resolvedDb,
-                transactionAnalyticsDao = transactionAnalyticsDao,
-                dispatcherProvider = dispatcherProvider,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}
-
-class AnalysisDetailViewModel(
-    transactionAnalyticsDao: TransactionAnalyticsDao,
+    application: Application,
     dimension: AnalysisDimension,
     dimensionId: String,
     startDate: Long,
     endDate: Long,
+    resolvedDb: AppDatabase? = null,
+    transactionAnalyticsDao: TransactionAnalyticsDao? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createAnalysisDetailFactory(
+        context = application,
+        dimension = dimension,
+        dimensionId = dimensionId,
+        startDate = startDate,
+        endDate = endDate,
+        resolvedDb = resolvedDb,
+        transactionAnalyticsDao = transactionAnalyticsDao,
+        dispatcherProvider = dispatcherProvider,
+    )
+
+class AnalysisDetailViewModel(
+    private val transactionAnalyticsDao: TransactionAnalyticsDao,
+    private val dimension: AnalysisDimension,
+    private val dimensionId: String,
+    private val startDate: Long,
+    private val endDate: Long,
     dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val transactions: StateFlow<List<TransactionDetails>>

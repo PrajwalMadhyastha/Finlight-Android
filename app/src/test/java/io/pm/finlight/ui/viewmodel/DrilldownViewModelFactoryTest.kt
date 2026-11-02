@@ -2,7 +2,6 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -10,10 +9,10 @@ import io.mockk.mockk
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.assertThrowsUnknownViewModel
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,11 +60,7 @@ class DrilldownViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
-
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test

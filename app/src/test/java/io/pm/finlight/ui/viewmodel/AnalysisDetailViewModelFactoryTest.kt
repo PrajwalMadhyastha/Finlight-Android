@@ -2,7 +2,6 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -12,10 +11,11 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.assertThrowsUnknownViewModel
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -57,15 +57,41 @@ class AnalysisDetailViewModelFactoryTest {
     fun create_withAnalysisDetailViewModelClass_resolvesFromServiceLocator() {
         val vm = factory.create(AnalysisDetailViewModel::class.java)
         assertNotNull(vm)
+
+        val dimField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("dimension").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(AnalysisDimension.CATEGORY, dimField)
+
+        val idField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("dimensionId").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals("1", idField)
+
+        val startField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("startDate").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(100L, startField)
+
+        val endField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("endDate").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(200L, endField)
+
+        val daoField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("transactionAnalyticsDao").apply {
+                isAccessible = true
+            }.get(vm)
+        assertNotNull(daoField)
     }
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
-
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test
@@ -98,5 +124,35 @@ class AnalysisDetailViewModelFactoryTest {
 
         val vm = customFactory.create(AnalysisDetailViewModel::class.java)
         assertNotNull(vm)
+
+        val daoField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("transactionAnalyticsDao").apply {
+                isAccessible = true
+            }.get(vm)
+        assertSame(mockDao, daoField)
+
+        val dimField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("dimension").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(AnalysisDimension.TAG, dimField)
+
+        val idField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("dimensionId").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals("2", idField)
+
+        val startField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("startDate").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(0L, startField)
+
+        val endField =
+            AnalysisDetailViewModel::class.java.getDeclaredField("endDate").apply {
+                isAccessible = true
+            }.get(vm)
+        assertEquals(100L, endField)
     }
 }

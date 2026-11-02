@@ -11,10 +11,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
 import io.pm.finlight.RuleType
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -280,28 +279,13 @@ class BatchAnalysisViewModel(
         ),
 )
 class BatchAnalysisViewModelFactory(
-    private val context: Context,
-    private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
-    private val classifier: SmsClassifier? = null,
-    private val dispatcherProvider: DispatcherProvider? = null,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return create(modelClass, CreationExtras.Empty)
-    }
-
-    override fun <T : ViewModel> create(
-        modelClass: Class<T>,
-        extras: CreationExtras,
-    ): T {
-        if (modelClass.isAssignableFrom(BatchAnalysisViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ServiceLocator.provideBatchAnalysisViewModel(
-                context = context,
-                nerExtractorProvider = nerExtractorProvider,
-                classifier = classifier,
-                dispatcherProvider = dispatcherProvider,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    context: Context,
+    nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    classifier: SmsClassifier? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createBatchAnalysisFactory(
+        context = context,
+        nerExtractorProvider = nerExtractorProvider,
+        classifier = classifier,
+        dispatcherProvider = dispatcherProvider,
+    )

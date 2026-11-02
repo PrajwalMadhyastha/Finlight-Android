@@ -2,7 +2,7 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
+import io.pm.finlight.di.assertThrowsUnknownViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -81,11 +80,7 @@ class SplitTransactionViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
-
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test

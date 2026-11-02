@@ -7,7 +7,7 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
+import io.pm.finlight.di.assertThrowsUnknownViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -128,13 +127,7 @@ class SearchViewModelFactoryTest {
 
     @Test
     fun `create with unknown ViewModel class throws IllegalArgumentException`() {
-        class UnknownViewModel : ViewModel()
-
-        val exception =
-            assertThrows(IllegalArgumentException::class.java) {
-                factory.create(UnknownViewModel::class.java)
-            }
-        assertTrue(exception.message?.contains("Unknown ViewModel class") == true)
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test
