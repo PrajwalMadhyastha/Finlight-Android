@@ -87,7 +87,6 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.FormatUtils
@@ -1264,7 +1263,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
+                        painter = rememberSafeBankLogoPainter(entry.accountName),
                         contentDescription = "${entry.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1318,7 +1317,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(detail.accountName ?: "")),
+                        painter = rememberSafeBankLogoPainter(detail.accountName ?: ""),
                         contentDescription = "${detail.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1379,7 +1378,7 @@ private fun AccountCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(details.accountName ?: "")),
+                painter = rememberSafeBankLogoPainter(details.accountName ?: ""),
                 contentDescription = "${details.accountName} Logo",
                 modifier = Modifier.size(40.dp),
             )

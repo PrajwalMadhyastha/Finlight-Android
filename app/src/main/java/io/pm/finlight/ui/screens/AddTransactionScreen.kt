@@ -60,7 +60,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -79,7 +78,6 @@ import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.FormatUtils
@@ -1270,7 +1268,7 @@ private fun AccountPickerSheet(
                         },
                         leadingContent = {
                             Image(
-                                painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
+                                painter = rememberSafeBankLogoPainter(account.name),
                                 contentDescription = "${account.name} Logo",
                                 modifier = Modifier.size(40.dp),
                             )

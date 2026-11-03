@@ -8,6 +8,50 @@ import io.pm.finlight.R
  */
 object BankLogoHelper {
     /**
+     * Complete list of all 37 bank logo and institution drawables mapped or provided by [BankLogoHelper].
+     */
+    val ALL_BANK_LOGOS: List<Int> =
+        listOf(
+            R.drawable.ic_amazon_logo,
+            R.drawable.ic_airtel_logo,
+            R.drawable.ic_jio_logo,
+            R.drawable.ic_paytm_logo,
+            R.drawable.ic_phonepe_logo,
+            R.drawable.ic_ola_logo,
+            R.drawable.ic_pluxee_logo,
+            R.drawable.ic_simpl_logo,
+            R.drawable.ic_hdfc_logo,
+            R.drawable.ic_icici_logo,
+            R.drawable.ic_sbi_logo,
+            R.drawable.ic_axis_logo,
+            R.drawable.ic_kotak_logo,
+            R.drawable.ic_pnb_logo,
+            R.drawable.ic_bob_logo,
+            R.drawable.ic_canara_logo,
+            R.drawable.ic_yes_logo,
+            R.drawable.ic_indusind_logo,
+            R.drawable.ic_idfc_logo,
+            R.drawable.ic_citi_logo,
+            R.drawable.ic_bandan_logo,
+            R.drawable.ic_boa_logo,
+            R.drawable.ic_boi_logo,
+            R.drawable.ic_bom_logo,
+            R.drawable.ic_cbi_logo,
+            R.drawable.ic_cub_logo,
+            R.drawable.ic_creditsuisse_logo,
+            R.drawable.ic_hsbc_logo,
+            R.drawable.ic_idbi_logo,
+            R.drawable.ic_iob_logo,
+            R.drawable.ic_jpm_logo,
+            R.drawable.ic_kb_logo,
+            R.drawable.ic_natwest_logo,
+            R.drawable.ic_standardchartered_logo,
+            R.drawable.ic_cash_spends,
+            R.drawable.ic_notification_logo,
+            R.drawable.ic_default_bank_logo,
+        )
+
+    /**
      * Returns the drawable resource ID for a bank's logo based on the account name.
      *
      * @param accountName The name of the account (e.g., "HDFC Bank Savings", "My SBI Card").
