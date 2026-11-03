@@ -32,17 +32,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
-import io.pm.finlight.utils.BankLogoHelper
 import java.text.NumberFormat
 import java.util.*
 
@@ -236,7 +235,7 @@ private fun AccountListItem(
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(accountWithBalance.account.name)),
+                painter = rememberSafeBankLogoPainter(accountWithBalance.account.name),
                 contentDescription = "${accountWithBalance.account.name} Logo",
                 modifier = Modifier.size(40.dp),
             )

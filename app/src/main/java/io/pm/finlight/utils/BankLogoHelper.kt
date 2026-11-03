@@ -8,6 +8,50 @@ import io.pm.finlight.R
  */
 object BankLogoHelper {
     /**
+     * Complete list of all 37 bank logo and institution drawables mapped or provided by [BankLogoHelper].
+     */
+    val ALL_BANK_LOGOS: List<Int> =
+        listOf(
+            R.drawable.ic_amazon_logo,
+            R.drawable.ic_airtel_logo,
+            R.drawable.ic_jio_logo,
+            R.drawable.ic_paytm_logo,
+            R.drawable.ic_phonepe_logo,
+            R.drawable.ic_ola_logo,
+            R.drawable.ic_pluxee_logo,
+            R.drawable.ic_simpl_logo,
+            R.drawable.ic_hdfc_logo,
+            R.drawable.ic_icici_logo,
+            R.drawable.ic_sbi_logo,
+            R.drawable.ic_axis_logo,
+            R.drawable.ic_kotak_logo,
+            R.drawable.ic_pnb_logo,
+            R.drawable.ic_bob_logo,
+            R.drawable.ic_canara_logo,
+            R.drawable.ic_yes_logo,
+            R.drawable.ic_indusind_logo,
+            R.drawable.ic_idfc_logo,
+            R.drawable.ic_citi_logo,
+            R.drawable.ic_bandan_logo,
+            R.drawable.ic_boa_logo,
+            R.drawable.ic_boi_logo,
+            R.drawable.ic_bom_logo,
+            R.drawable.ic_cbi_logo,
+            R.drawable.ic_cub_logo,
+            R.drawable.ic_creditsuisse_logo,
+            R.drawable.ic_hsbc_logo,
+            R.drawable.ic_idbi_logo,
+            R.drawable.ic_iob_logo,
+            R.drawable.ic_jpm_logo,
+            R.drawable.ic_kb_logo,
+            R.drawable.ic_natwest_logo,
+            R.drawable.ic_standardchartered_logo,
+            R.drawable.ic_cash_spends,
+            R.drawable.ic_notification_logo,
+            R.drawable.ic_default_bank_logo,
+        )
+
+    /**
      * Returns the drawable resource ID for a bank's logo based on the account name.
      *
      * @param accountName The name of the account (e.g., "HDFC Bank Savings", "My SBI Card").
@@ -32,26 +76,27 @@ object BankLogoHelper {
             "axis" in lowerCaseName -> R.drawable.ic_axis_logo
             "kotak" in lowerCaseName || "kotak mahindra" in lowerCaseName -> R.drawable.ic_kotak_logo
             "pnb" in lowerCaseName || "punjab national" in lowerCaseName -> R.drawable.ic_pnb_logo
-            "baroda" in lowerCaseName -> R.drawable.ic_bob_logo
+            "baroda" in lowerCaseName || "bob" in lowerCaseName -> R.drawable.ic_bob_logo
             "canara" in lowerCaseName -> R.drawable.ic_canara_logo
             "yes" in lowerCaseName -> R.drawable.ic_yes_logo
             "indusind" in lowerCaseName -> R.drawable.ic_indusind_logo
             "idfc" in lowerCaseName -> R.drawable.ic_idfc_logo
             "citi" in lowerCaseName -> R.drawable.ic_citi_logo
-            "bandan" in lowerCaseName -> R.drawable.ic_bandan_logo
+            "bandhan" in lowerCaseName || "bandan" in lowerCaseName -> R.drawable.ic_bandan_logo
             "bank of america" in lowerCaseName || "boa" in lowerCaseName -> R.drawable.ic_boa_logo
-            "bank of india" in lowerCaseName || "boi" in lowerCaseName -> R.drawable.ic_boi_logo
-            "bank of maharastra" in lowerCaseName || "bom" in lowerCaseName -> R.drawable.ic_bom_logo
-            "central" in lowerCaseName -> R.drawable.ic_cbi_logo
+            "maharashtra" in lowerCaseName || "maharastra" in lowerCaseName || "bom" in lowerCaseName -> R.drawable.ic_bom_logo
+            "central bank" in lowerCaseName || "cbi" in lowerCaseName || "central" in lowerCaseName -> R.drawable.ic_cbi_logo
+            "city union" in lowerCaseName || "cub" in lowerCaseName -> R.drawable.ic_cub_logo
             "union" in lowerCaseName -> R.drawable.ic_cub_logo
+            "bank of india" in lowerCaseName || "boi" in lowerCaseName -> R.drawable.ic_boi_logo
             "credit suisse" in lowerCaseName -> R.drawable.ic_creditsuisse_logo
             "hsbc" in lowerCaseName -> R.drawable.ic_hsbc_logo
             "idbi" in lowerCaseName -> R.drawable.ic_idbi_logo
             "indian overseas" in lowerCaseName || "iob" in lowerCaseName -> R.drawable.ic_iob_logo
-            "jpmorgan chase" in lowerCaseName || "jpm" in lowerCaseName -> R.drawable.ic_jpm_logo
-            "karnataka" in lowerCaseName -> R.drawable.ic_kb_logo
+            "jpmorgan chase" in lowerCaseName || "jpm" in lowerCaseName || "chase" in lowerCaseName -> R.drawable.ic_jpm_logo
+            "karnataka" in lowerCaseName || "kb" in lowerCaseName -> R.drawable.ic_kb_logo
             "natwest" in lowerCaseName -> R.drawable.ic_natwest_logo
-            "standard chartered" in lowerCaseName -> R.drawable.ic_standardchartered_logo
+            "standard chartered" in lowerCaseName || "scb" in lowerCaseName -> R.drawable.ic_standardchartered_logo
             "cash" in lowerCaseName -> R.drawable.ic_cash_spends
             else -> R.drawable.ic_default_bank_logo // Default fallback icon
         }

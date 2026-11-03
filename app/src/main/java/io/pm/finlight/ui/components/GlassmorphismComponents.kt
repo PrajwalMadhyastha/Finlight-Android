@@ -51,7 +51,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -65,7 +64,6 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.theme.GlassPanelBorder
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import java.text.NumberFormat
 import java.util.Locale
@@ -535,7 +533,7 @@ private fun AccountItem(
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.account.name)),
+                painter = rememberSafeBankLogoPainter(account.account.name),
                 contentDescription = "${account.account.name} Logo",
                 modifier = Modifier.height(24.dp),
             )

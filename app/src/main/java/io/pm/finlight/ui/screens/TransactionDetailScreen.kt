@@ -60,7 +60,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -87,7 +86,6 @@ import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.FormatUtils
@@ -1067,10 +1065,15 @@ private fun TransactionSpotlightHeader(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            val isPredefined = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey) != R.drawable.bg_cat_general
+            val categoryBgRes = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey)
+            val isPredefined = categoryBgRes != R.drawable.bg_cat_general
             if (isPredefined && !isSplit) {
                 Image(
-                    painter = painterResource(id = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey)),
+                    painter =
+                        rememberSafeDrawablePainter(
+                            resId = categoryBgRes,
+                            fallbackResId = R.drawable.bg_cat_general,
+                        ),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize(),
@@ -1264,7 +1267,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
+                        painter = rememberSafeBankLogoPainter(entry.accountName),
                         contentDescription = "${entry.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1318,7 +1321,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(detail.accountName ?: "")),
+                        painter = rememberSafeBankLogoPainter(detail.accountName ?: ""),
                         contentDescription = "${detail.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1379,7 +1382,7 @@ private fun AccountCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(details.accountName ?: "")),
+                painter = rememberSafeBankLogoPainter(details.accountName ?: ""),
                 contentDescription = "${details.accountName} Logo",
                 modifier = Modifier.size(40.dp),
             )

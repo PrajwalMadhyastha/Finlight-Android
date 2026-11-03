@@ -23,7 +23,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -31,12 +30,12 @@ import io.pm.finlight.Account
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
 import io.pm.finlight.ui.viewmodel.AccountViewModel
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
@@ -153,7 +152,7 @@ private fun AccountDetailHeader(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(account.name)),
+                painter = rememberSafeBankLogoPainter(account.name),
                 contentDescription = "${account.name} Logo",
                 modifier = Modifier.size(50.dp),
             )

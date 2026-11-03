@@ -53,9 +53,9 @@ class AccountListScreenResilienceTest {
         runBlocking {
             db.accountDao().insertAll(
                 listOf(
+                    Account(name = "Bank of India Account", type = "Bank"),
                     Account(name = "Bandhan Bank Account", type = "Bank"),
                     Account(name = "NatWest Current Account", type = "Bank"),
-                    Account(name = "HDFC Salary Account", type = "Bank"),
                     Account(name = "Very Long Account Name That Exceeds Normal Length Boundary 12345", type = "General"),
                 ),
             )
@@ -80,8 +80,8 @@ class AccountListScreenResilienceTest {
         navigateToAccountList()
 
         // Verify accounts with previously crash-prone vectors render successfully
+        composeTestRule.onNodeWithText("Bank of India Account").assertIsDisplayed()
         composeTestRule.onNodeWithText("Bandhan Bank Account").assertIsDisplayed()
         composeTestRule.onNodeWithText("NatWest Current Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("HDFC Salary Account").assertIsDisplayed()
     }
 }
