@@ -99,11 +99,68 @@ class BankLogoVectorInflationTest {
     }
 
     @Test
+    fun `ic_cub_logo xml file has no individual path exceeding 5000 characters`() {
+        val candidatePaths =
+            listOf(
+                File("src/main/res/drawable/ic_cub_logo.xml"),
+                File("app/src/main/res/drawable/ic_cub_logo.xml"),
+                File("../app/src/main/res/drawable/ic_cub_logo.xml"),
+            )
+        val cubFile = candidatePaths.firstOrNull { it.exists() } ?: error("Could not find ic_cub_logo.xml")
+
+        val factory = DocumentBuilderFactory.newInstance()
+        val doc = factory.newDocumentBuilder().parse(cubFile)
+        val pathNodes = doc.getElementsByTagName("path")
+        for (i in 0 until pathNodes.length) {
+            val element = pathNodes.item(i) as Element
+            val pathData =
+                element.getAttribute("android:pathData").ifEmpty {
+                    element.getAttributeNS("http://schemas.android.com/apk/res/android", "pathData")
+                }
+            assertTrue(
+                "ic_cub_logo path index $i length (${pathData.length}) must not exceed 5000 characters",
+                pathData.length <= 5000,
+            )
+        }
+    }
+
+    @Test
     fun `Bank of India and BOI account names map to ic_boi_logo`() {
         assertEquals(R.drawable.ic_boi_logo, BankLogoHelper.getLogoForAccount("Bank of India"))
         assertEquals(R.drawable.ic_boi_logo, BankLogoHelper.getLogoForAccount("Bank of India Savings"))
         assertEquals(R.drawable.ic_boi_logo, BankLogoHelper.getLogoForAccount("BOI"))
         assertEquals(R.drawable.ic_boi_logo, BankLogoHelper.getLogoForAccount("My BOI Account"))
+    }
+
+    @Test
+    fun `Bank of Maharashtra and BOM account names map to ic_bom_logo`() {
+        assertEquals(R.drawable.ic_bom_logo, BankLogoHelper.getLogoForAccount("Bank of Maharashtra"))
+        assertEquals(R.drawable.ic_bom_logo, BankLogoHelper.getLogoForAccount("Maharashtra Bank"))
+        assertEquals(R.drawable.ic_bom_logo, BankLogoHelper.getLogoForAccount("BOM Current"))
+    }
+
+    @Test
+    fun `Bank of Baroda and BOB account names map to ic_bob_logo`() {
+        assertEquals(R.drawable.ic_bob_logo, BankLogoHelper.getLogoForAccount("Bank of Baroda"))
+        assertEquals(R.drawable.ic_bob_logo, BankLogoHelper.getLogoForAccount("BOB Savings Acct"))
+    }
+
+    @Test
+    fun `Bandhan Bank account names map to ic_bandan_logo`() {
+        assertEquals(R.drawable.ic_bandan_logo, BankLogoHelper.getLogoForAccount("Bandhan Bank"))
+        assertEquals(R.drawable.ic_bandan_logo, BankLogoHelper.getLogoForAccount("Bandhan Bank Savings"))
+    }
+
+    @Test
+    fun `City Union Bank and CUB account names map to ic_cub_logo`() {
+        assertEquals(R.drawable.ic_cub_logo, BankLogoHelper.getLogoForAccount("City Union Bank"))
+        assertEquals(R.drawable.ic_cub_logo, BankLogoHelper.getLogoForAccount("CUB Account"))
+    }
+
+    @Test
+    fun `Central Bank of India and CBI account names map to ic_cbi_logo`() {
+        assertEquals(R.drawable.ic_cbi_logo, BankLogoHelper.getLogoForAccount("Central Bank of India"))
+        assertEquals(R.drawable.ic_cbi_logo, BankLogoHelper.getLogoForAccount("CBI Savings"))
     }
 
     private fun assertAllPathDataLengths(
@@ -131,4 +188,3 @@ class BankLogoVectorInflationTest {
         }
     }
 }
-

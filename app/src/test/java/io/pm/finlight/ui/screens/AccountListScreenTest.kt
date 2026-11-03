@@ -79,4 +79,3 @@ class AccountListScreenTest {
         composeTestRule.onNodeWithContentDescription("Fallback Logo").assertIsDisplayed()
     }
 }
-

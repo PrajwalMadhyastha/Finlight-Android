@@ -48,8 +48,8 @@ fun rememberSafeBankLogoPainter(
         remember(accountName) {
             BankLogoHelper.getLogoForAccount(accountName)
         }
-    return rememberSafeBankLogoPainter(
-        logoResId = logoResId,
+    return rememberSafeDrawablePainter(
+        resId = logoResId,
         fallbackResId = fallbackResId,
     )
 }
@@ -64,12 +64,29 @@ fun rememberSafeBankLogoPainter(
 fun rememberSafeBankLogoPainter(
     @DrawableRes logoResId: Int,
     @DrawableRes fallbackResId: Int = R.drawable.ic_default_bank_logo,
+): Painter =
+    rememberSafeDrawablePainter(
+        resId = logoResId,
+        fallbackResId = fallbackResId,
+    )
+
+/**
+ * Safely loads and remembers a [Painter] for any given drawable resource ID with optional fallback.
+ * If the resource fails to inflate or parse, it gracefully falls back to [fallbackResId].
+ *
+ * @param resId The drawable resource ID to inflate.
+ * @param fallbackResId The fallback drawable resource if inflation fails (0 for transparent placeholder).
+ */
+@Composable
+fun rememberSafeDrawablePainter(
+    @DrawableRes resId: Int,
+    @DrawableRes fallbackResId: Int = 0,
 ): Painter {
     val context = LocalContext.current
     val resource =
-        remember(logoResId, fallbackResId, context.theme) {
-            safeLoadResource(context, logoResId)
-                ?: safeLoadResource(context, fallbackResId)
+        remember(resId, fallbackResId, context.theme) {
+            safeLoadResource(context, resId)
+                ?: if (fallbackResId != 0) safeLoadResource(context, fallbackResId) else null
         }
 
     return when (resource) {
