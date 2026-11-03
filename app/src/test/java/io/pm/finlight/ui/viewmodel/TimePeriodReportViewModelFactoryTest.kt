@@ -2,7 +2,8 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
+import io.pm.finlight.di.assertThrowsUnknownViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -14,7 +15,6 @@ import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,10 +69,39 @@ class TimePeriodReportViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
+        assertThrowsUnknownViewModel(factory)
+    }
 
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+    @Test
+    fun create_withExtras_returnsTimePeriodReportViewModel() {
+        val vm = factory.create(TimePeriodReportViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(vm)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockVM: TimePeriodReportViewModel = mockk(relaxed = true)
+        ServiceLocator.setTimePeriodReportViewModel(mockVM)
+
+        val resolved = factory.create(TimePeriodReportViewModel::class.java)
+        assertSame(mockVM, resolved)
+    }
+
+    @Test
+    fun create_withExplicitOverrides_usesPassedDependencies() {
+        val customTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val customUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+        val customFactory =
+            TimePeriodReportViewModelFactory(
+                application = application,
+                timePeriod = TimePeriod.MONTHLY,
+                initialDateMillis = 100L,
+                showPreviousMonth = true,
+                transactionRepository = customTxnRepo,
+                getMonthlyConsistencyDataUseCase = customUseCase,
+            )
+
+        val vm = customFactory.create(TimePeriodReportViewModel::class.java)
+        assertNotNull(vm)
     }
 }

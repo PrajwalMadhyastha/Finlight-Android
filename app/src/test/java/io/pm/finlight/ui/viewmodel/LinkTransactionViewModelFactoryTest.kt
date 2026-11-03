@@ -2,7 +2,8 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
+import io.pm.finlight.di.assertThrowsUnknownViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
@@ -13,7 +14,6 @@ import io.pm.finlight.di.ServiceLocator
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -39,6 +39,8 @@ class LinkTransactionViewModelFactoryTest {
         application = ApplicationProvider.getApplicationContext()
         factory = LinkTransactionViewModelFactory(application, potentialTxn)
         ServiceLocator.reset()
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
     }
 
     @After
@@ -64,10 +66,35 @@ class LinkTransactionViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
+        assertThrowsUnknownViewModel(factory)
+    }
 
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+    @Test
+    fun create_withExtras_returnsLinkTransactionViewModel() {
+        val vm = factory.create(LinkTransactionViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(vm)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockVM: LinkTransactionViewModel = mockk(relaxed = true)
+        ServiceLocator.setLinkTransactionViewModel(mockVM)
+
+        val resolved = factory.create(LinkTransactionViewModel::class.java)
+        assertSame(mockVM, resolved)
+    }
+
+    @Test
+    fun create_withExplicitOverrides_usesPassedDependencies() {
+        val customTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val customFactory =
+            LinkTransactionViewModelFactory(
+                application = application,
+                potentialTransaction = potentialTxn,
+                transactionRepository = customTxnRepo,
+            )
+
+        val vm = customFactory.create(LinkTransactionViewModel::class.java)
+        assertNotNull(vm)
     }
 }

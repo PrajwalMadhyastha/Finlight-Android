@@ -29,10 +29,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.dao.TripWithStats
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
-import io.pm.finlight.ui.viewmodel.TripDetailViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
 import java.util.*
@@ -45,7 +45,7 @@ fun TripDetailScreen(
     tagId: Int,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = TripDetailViewModelFactory(application, tripId, tagId)
+    val factory = FinlightViewModelFactory.createTripDetailFactory(application, tripId, tagId)
     val viewModel: TripDetailViewModel = viewModel(factory = factory)
     val transactionViewModel: TransactionViewModel = viewModel() // For category change sheet
 

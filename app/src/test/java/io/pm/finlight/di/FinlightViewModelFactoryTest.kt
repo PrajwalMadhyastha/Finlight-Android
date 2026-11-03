@@ -3,7 +3,6 @@ package io.pm.finlight.di
 import android.app.Application
 import android.content.Context
 import android.os.Build
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
@@ -26,25 +25,34 @@ import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.ml.SmsClassifier
-import io.pm.finlight.ml.SmsEntityExtractor
+import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDetailViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.AnalysisViewModel
 import io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel
+import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModel
 import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import io.pm.finlight.ui.viewmodel.CategoryViewModel
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.ui.viewmodel.DrilldownType
+import io.pm.finlight.ui.viewmodel.DrilldownViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
 import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
@@ -53,8 +61,12 @@ import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.ReportsViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
+import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
+import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
@@ -586,12 +598,8 @@ class FinlightViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
-
         val factory = FinlightViewModelFactory.create(application)
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+        assertThrowsUnknownViewModel(factory)
     }
 
     @Test
@@ -703,5 +711,166 @@ class FinlightViewModelFactoryTest {
         assertSame(mockManageIgnoreRulesViewModel, factory.create(ManageIgnoreRulesViewModel::class.java))
         assertSame(mockManageParseRulesViewModel, factory.create(ManageParseRulesViewModel::class.java))
         assertSame(mockPendingTransactionsViewModel, factory.create(PendingTransactionsViewModel::class.java))
+    }
+
+    @Test
+    fun create_withCreationExtras_parameterizedViewModels_resolvesSuccessfully() {
+        setupCommonMockRepositories()
+
+        val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
+        val factory = FinlightViewModelFactory.create(application)
+
+        val splitExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.SPLIT_TRANSACTION_ID_KEY, 12)
+            }
+        assertNotNull(factory.create(SplitTransactionViewModel::class.java, splitExtras))
+
+        val tripExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.TRIP_ID_KEY, 1)
+                set(FinlightViewModelFactory.TAG_ID_KEY, 2)
+            }
+        assertNotNull(factory.create(TripDetailViewModel::class.java, tripExtras))
+
+        val linkExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.POTENTIAL_TRANSACTION_KEY, sampleTxn)
+            }
+        assertNotNull(factory.create(LinkTransactionViewModel::class.java, linkExtras))
+        assertNotNull(factory.create(LinkRecurringTransactionViewModel::class.java, linkExtras))
+
+        val drilldownExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.DRILLDOWN_TYPE_KEY, DrilldownType.CATEGORY)
+                set(FinlightViewModelFactory.ENTITY_NAME_KEY, "Food")
+                set(FinlightViewModelFactory.MONTH_KEY, 5)
+                set(FinlightViewModelFactory.YEAR_KEY, 2026)
+            }
+        assertNotNull(factory.create(DrilldownViewModel::class.java, drilldownExtras))
+
+        val reportExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.TIME_PERIOD_KEY, TimePeriod.MONTHLY)
+            }
+        assertNotNull(factory.create(TimePeriodReportViewModel::class.java, reportExtras))
+
+        val analysisExtras =
+            MutableCreationExtras().apply {
+                set(FinlightViewModelFactory.ANALYSIS_DIMENSION_KEY, AnalysisDimension.CATEGORY)
+                set(FinlightViewModelFactory.DIMENSION_ID_KEY, "1")
+                set(FinlightViewModelFactory.START_DATE_KEY, 100L)
+                set(FinlightViewModelFactory.END_DATE_KEY, 200L)
+            }
+        assertNotNull(factory.create(AnalysisDetailViewModel::class.java, analysisExtras))
+
+        assertNotNull(factory.create(SearchViewModel::class.java, CreationExtras.Empty))
+        assertNotNull(factory.create(BatchAnalysisViewModel::class.java, CreationExtras.Empty))
+    }
+
+    @Test
+    fun create_withCreationExtras_missingRequiredKeys_throwsException() {
+        val factory = FinlightViewModelFactory.create(application)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(SplitTransactionViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(TripDetailViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(LinkTransactionViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(LinkRecurringTransactionViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(DrilldownViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(TimePeriodReportViewModel::class.java, CreationExtras.Empty)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            factory.create(AnalysisDetailViewModel::class.java, CreationExtras.Empty)
+        }
+    }
+
+    @Test
+    fun createAssistedFactories_buildsExpectedViewModels() {
+        setupCommonMockRepositories()
+
+        val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
+
+        val splitFactory = FinlightViewModelFactory.createSplitTransactionFactory(application, 12)
+        assertNotNull(splitFactory.create(SplitTransactionViewModel::class.java))
+
+        val tripFactory = FinlightViewModelFactory.createTripDetailFactory(application, 1, 2)
+        assertNotNull(tripFactory.create(TripDetailViewModel::class.java))
+
+        val linkFactory = FinlightViewModelFactory.createLinkTransactionFactory(application, sampleTxn)
+        assertNotNull(linkFactory.create(LinkTransactionViewModel::class.java))
+
+        val linkRecFactory = FinlightViewModelFactory.createLinkRecurringTransactionFactory(application, sampleTxn)
+        assertNotNull(linkRecFactory.create(LinkRecurringTransactionViewModel::class.java))
+
+        val drilldownFactory =
+            FinlightViewModelFactory.createDrilldownFactory(application, DrilldownType.MERCHANT, "Cafe", 1, 2026)
+        assertNotNull(drilldownFactory.create(DrilldownViewModel::class.java))
+
+        val reportFactory =
+            FinlightViewModelFactory.createTimePeriodReportFactory(application, TimePeriod.YEARLY, 1000L, false)
+        assertNotNull(reportFactory.create(TimePeriodReportViewModel::class.java))
+
+        val analysisFactory =
+            FinlightViewModelFactory.createAnalysisDetailFactory(
+                application,
+                AnalysisDimension.MERCHANT,
+                "Cafe",
+                0L,
+                100L,
+            )
+        assertNotNull(analysisFactory.create(AnalysisDetailViewModel::class.java))
+
+        val searchFactory = FinlightViewModelFactory.createSearchFactory(application, 1, 500L, "test")
+        assertNotNull(searchFactory.create(SearchViewModel::class.java))
+
+        val batchFactory = FinlightViewModelFactory.createBatchAnalysisFactory(application)
+        assertNotNull(batchFactory.create(BatchAnalysisViewModel::class.java))
+
+        assertThrowsUnknownViewModel(splitFactory)
+    }
+
+    @Test
+    fun create_withOverriddenParameterizedViewModels_returnsMockedInstances() {
+        val mockSplitVM: SplitTransactionViewModel = mockk(relaxed = true)
+        val mockTripVM: TripDetailViewModel = mockk(relaxed = true)
+        val mockLinkVM: LinkTransactionViewModel = mockk(relaxed = true)
+        val mockLinkRecVM: LinkRecurringTransactionViewModel = mockk(relaxed = true)
+        val mockDrilldownVM: DrilldownViewModel = mockk(relaxed = true)
+        val mockReportVM: TimePeriodReportViewModel = mockk(relaxed = true)
+        val mockAnalysisVM: AnalysisDetailViewModel = mockk(relaxed = true)
+        val mockSearchVM: SearchViewModel = mockk(relaxed = true)
+        val mockBatchVM: BatchAnalysisViewModel = mockk(relaxed = true)
+
+        ServiceLocator.setSplitTransactionViewModel(mockSplitVM)
+        ServiceLocator.setTripDetailViewModel(mockTripVM)
+        ServiceLocator.setLinkTransactionViewModel(mockLinkVM)
+        ServiceLocator.setLinkRecurringTransactionViewModel(mockLinkRecVM)
+        ServiceLocator.setDrilldownViewModel(mockDrilldownVM)
+        ServiceLocator.setTimePeriodReportViewModel(mockReportVM)
+        ServiceLocator.setAnalysisDetailViewModel(mockAnalysisVM)
+        ServiceLocator.setSearchViewModel(mockSearchVM)
+        ServiceLocator.setBatchAnalysisViewModel(mockBatchVM)
+
+        val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
+        assertSame(mockSplitVM, FinlightViewModelFactory.createSplitTransactionFactory(application, 1).create(SplitTransactionViewModel::class.java))
+        assertSame(mockTripVM, FinlightViewModelFactory.createTripDetailFactory(application, 1, 2).create(TripDetailViewModel::class.java))
+        assertSame(mockLinkVM, FinlightViewModelFactory.createLinkTransactionFactory(application, sampleTxn).create(LinkTransactionViewModel::class.java))
+        assertSame(mockLinkRecVM, FinlightViewModelFactory.createLinkRecurringTransactionFactory(application, sampleTxn).create(LinkRecurringTransactionViewModel::class.java))
+        assertSame(mockDrilldownVM, FinlightViewModelFactory.createDrilldownFactory(application, DrilldownType.CATEGORY, "F", 1, 2026).create(DrilldownViewModel::class.java))
+        assertSame(mockReportVM, FinlightViewModelFactory.createTimePeriodReportFactory(application, TimePeriod.MONTHLY, null, false).create(TimePeriodReportViewModel::class.java))
+        assertSame(mockAnalysisVM, FinlightViewModelFactory.createAnalysisDetailFactory(application, AnalysisDimension.CATEGORY, "1", 0L, 1L).create(AnalysisDetailViewModel::class.java))
+        assertSame(mockSearchVM, FinlightViewModelFactory.createSearchFactory(application).create(SearchViewModel::class.java))
+        assertSame(mockBatchVM, FinlightViewModelFactory.createBatchAnalysisFactory(application).create(BatchAnalysisViewModel::class.java))
     }
 }

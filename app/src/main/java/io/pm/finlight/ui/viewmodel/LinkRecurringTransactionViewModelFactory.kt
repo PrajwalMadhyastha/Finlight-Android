@@ -1,28 +1,34 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.di.FinlightViewModelFactory
+import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createLinkRecurringTransactionFactory(application, potentialTransaction)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class LinkRecurringTransactionViewModelFactory(
-    private val application: Application,
-    private val potentialTransaction: PotentialTransaction,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(LinkRecurringTransactionViewModel::class.java)) {
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val recurringTransactionRepository = ServiceLocator.provideRecurringTransactionRepository(application)
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            @Suppress("UNCHECKED_CAST")
-            return LinkRecurringTransactionViewModel(
-                transactionRepository = transactionRepository,
-                recurringTransactionRepository = recurringTransactionRepository,
-                potentialTransaction = potentialTransaction,
-                dispatcherProvider = dispatcherProvider,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}
+    application: Application,
+    potentialTransaction: PotentialTransaction,
+    resolvedDb: AppDatabase? = null,
+    transactionRepository: ITransactionRepository? = null,
+    recurringTransactionRepository: IRecurringTransactionRepository? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createLinkRecurringTransactionFactory(
+        context = application,
+        potentialTransaction = potentialTransaction,
+        resolvedDb = resolvedDb,
+        transactionRepository = transactionRepository,
+        recurringTransactionRepository = recurringTransactionRepository,
+        dispatcherProvider = dispatcherProvider,
+    )

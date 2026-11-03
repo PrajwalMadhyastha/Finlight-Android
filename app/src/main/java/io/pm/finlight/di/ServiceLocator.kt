@@ -76,18 +76,28 @@ import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
+import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDetailViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDimension
 import io.pm.finlight.ui.viewmodel.AnalysisViewModel
 import io.pm.finlight.ui.viewmodel.AnnualSimulatorViewModel
+import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModel
 import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import io.pm.finlight.ui.viewmodel.CategoryViewModel
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.ui.viewmodel.DrilldownType
+import io.pm.finlight.ui.viewmodel.DrilldownViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
 import io.pm.finlight.ui.viewmodel.ManageIgnoreRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageMerchantRulesViewModel
 import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
@@ -96,8 +106,12 @@ import io.pm.finlight.ui.viewmodel.PendingTransactionsViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.ReportsViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
+import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
+import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
@@ -288,6 +302,33 @@ object ServiceLocator {
 
     @Volatile
     private var pendingTransactionsViewModel: PendingTransactionsViewModel? = null
+
+    @Volatile
+    private var splitTransactionViewModel: SplitTransactionViewModel? = null
+
+    @Volatile
+    private var tripDetailViewModel: TripDetailViewModel? = null
+
+    @Volatile
+    private var linkTransactionViewModel: LinkTransactionViewModel? = null
+
+    @Volatile
+    private var linkRecurringTransactionViewModel: LinkRecurringTransactionViewModel? = null
+
+    @Volatile
+    private var drilldownViewModel: DrilldownViewModel? = null
+
+    @Volatile
+    private var timePeriodReportViewModel: TimePeriodReportViewModel? = null
+
+    @Volatile
+    private var analysisDetailViewModel: AnalysisDetailViewModel? = null
+
+    @Volatile
+    private var searchViewModel: SearchViewModel? = null
+
+    @Volatile
+    private var batchAnalysisViewModel: BatchAnalysisViewModel? = null
 
     @Volatile
     private var smsClassifier: SmsClassifier? = null
@@ -1666,6 +1707,342 @@ object ServiceLocator {
     }
 
     /**
+     * Resolves a [SplitTransactionViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param transactionId Transaction ID to split.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param categoryRepository Optional [ICategoryRepository] override.
+     * @param splitTransactionRepository Optional [ISplitTransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideSplitTransactionViewModel(
+        context: Context,
+        transactionId: Int,
+        resolvedDb: AppDatabase? = null,
+        transactionRepository: ITransactionRepository? = null,
+        categoryRepository: ICategoryRepository? = null,
+        splitTransactionRepository: ISplitTransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): SplitTransactionViewModel {
+        return splitTransactionViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val catRepo = categoryRepository ?: provideCategoryRepository(app)
+            val splitRepo = splitTransactionRepository ?: provideSplitTransactionRepository(app, db)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            SplitTransactionViewModel(
+                transactionRepository = txnRepo,
+                categoryRepository = catRepo,
+                splitTransactionRepository = splitRepo,
+                transactionId = transactionId,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [TripDetailViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param tripId Target trip ID.
+     * @param tagId Associated tag ID.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param tripRepository Optional [ITripRepository] override.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideTripDetailViewModel(
+        context: Context,
+        tripId: Int,
+        tagId: Int,
+        resolvedDb: AppDatabase? = null,
+        tripRepository: ITripRepository? = null,
+        transactionRepository: ITransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): TripDetailViewModel {
+        return tripDetailViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val tripRepo = tripRepository ?: provideTripRepository(app, db)
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            TripDetailViewModel(
+                tripRepository = tripRepo,
+                transactionRepository = txnRepo,
+                tripId = tripId,
+                tagId = tagId,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [LinkTransactionViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param potentialTransaction The potential transaction to link.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideLinkTransactionViewModel(
+        context: Context,
+        potentialTransaction: PotentialTransaction,
+        transactionRepository: ITransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): LinkTransactionViewModel {
+        return linkTransactionViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            LinkTransactionViewModel(
+                transactionRepository = txnRepo,
+                potentialTransaction = potentialTransaction,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [LinkRecurringTransactionViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param potentialTransaction The potential recurring transaction to link.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param recurringTransactionRepository Optional [IRecurringTransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideLinkRecurringTransactionViewModel(
+        context: Context,
+        potentialTransaction: PotentialTransaction,
+        resolvedDb: AppDatabase? = null,
+        transactionRepository: ITransactionRepository? = null,
+        recurringTransactionRepository: IRecurringTransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): LinkRecurringTransactionViewModel {
+        return linkRecurringTransactionViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val recurringRepo = recurringTransactionRepository ?: provideRecurringTransactionRepository(app, db)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            LinkRecurringTransactionViewModel(
+                transactionRepository = txnRepo,
+                recurringTransactionRepository = recurringRepo,
+                potentialTransaction = potentialTransaction,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [DrilldownViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param drilldownType Type of drilldown (Category or Merchant).
+     * @param entityName Name of the category or merchant.
+     * @param month Selected month.
+     * @param year Selected year.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideDrilldownViewModel(
+        context: Context,
+        drilldownType: DrilldownType,
+        entityName: String,
+        month: Int,
+        year: Int,
+        transactionRepository: ITransactionRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): DrilldownViewModel {
+        return drilldownViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            DrilldownViewModel(
+                transactionRepository = txnRepo,
+                drilldownType = drilldownType,
+                entityName = entityName,
+                month = month,
+                year = year,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [TimePeriodReportViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param timePeriod Time period reporting scope.
+     * @param initialDateMillis Optional initial date in milliseconds.
+     * @param showPreviousMonth Whether to show the previous month.
+     * @param settingsRepository Optional [ISettingsRepository] override.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param getMonthlyConsistencyDataUseCase Optional [GetMonthlyConsistencyDataUseCase] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideTimePeriodReportViewModel(
+        context: Context,
+        timePeriod: TimePeriod,
+        initialDateMillis: Long?,
+        showPreviousMonth: Boolean,
+        settingsRepository: ISettingsRepository? = null,
+        transactionRepository: ITransactionRepository? = null,
+        getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): TimePeriodReportViewModel {
+        return timePeriodReportViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val settingsRepo = settingsRepository ?: provideSettingsRepository(app)
+            val consistencyUseCase = getMonthlyConsistencyDataUseCase ?: provideGetMonthlyConsistencyDataUseCase(app)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            TimePeriodReportViewModel(
+                transactionRepository = txnRepo,
+                settingsRepository = settingsRepo,
+                timePeriod = timePeriod,
+                initialDateMillis = initialDateMillis,
+                showPreviousMonth = showPreviousMonth,
+                dispatcherProvider = dispatchers,
+                getMonthlyConsistencyDataUseCase = consistencyUseCase,
+            )
+        }
+    }
+
+    /**
+     * Resolves an [AnalysisDetailViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param dimension Dimension to analyze.
+     * @param dimensionId Dimension identifier.
+     * @param startDate Range start timestamp.
+     * @param endDate Range end timestamp.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     * @param transactionAnalyticsDao Optional [TransactionAnalyticsDao] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideAnalysisDetailViewModel(
+        context: Context,
+        dimension: AnalysisDimension,
+        dimensionId: String,
+        startDate: Long,
+        endDate: Long,
+        resolvedDb: AppDatabase? = null,
+        transactionAnalyticsDao: TransactionAnalyticsDao? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): AnalysisDetailViewModel {
+        return analysisDetailViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val db = resolvedDb ?: AppDatabase.getInstance(app)
+            val analyticsDao = transactionAnalyticsDao ?: db.transactionAnalyticsDao()
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            AnalysisDetailViewModel(
+                transactionAnalyticsDao = analyticsDao,
+                dimension = dimension,
+                dimensionId = dimensionId,
+                startDate = startDate,
+                endDate = endDate,
+                dispatcherProvider = dispatchers,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [SearchViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param initialCategoryId Optional initial category filter.
+     * @param initialDateMillis Optional initial date filter.
+     * @param initialQuery Optional initial search text.
+     * @param transactionRepository Optional [ITransactionRepository] override.
+     * @param accountRepository Optional [IAccountRepository] override.
+     * @param categoryRepository Optional [ICategoryRepository] override.
+     * @param tagRepository Optional [ITagRepository] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideSearchViewModel(
+        context: Context,
+        initialCategoryId: Int? = null,
+        initialDateMillis: Long? = null,
+        initialQuery: String? = null,
+        transactionRepository: ITransactionRepository? = null,
+        accountRepository: IAccountRepository? = null,
+        categoryRepository: ICategoryRepository? = null,
+        tagRepository: ITagRepository? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): SearchViewModel {
+        return searchViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application)
+                    ?: throw IllegalArgumentException("Context must be an Application or provide an Application context")
+            val txnRepo = transactionRepository ?: provideTransactionRepository(app)
+            val acctRepo = accountRepository ?: provideAccountRepository(app)
+            val catRepo = categoryRepository ?: provideCategoryRepository(app)
+            val tagRepo = tagRepository ?: provideTagRepository(app)
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(app)
+            SearchViewModel(
+                transactionRepository = txnRepo,
+                accountRepository = acctRepo,
+                categoryRepository = catRepo,
+                tagRepository = tagRepo,
+                dispatcherProvider = dispatchers,
+                initialCategoryId = initialCategoryId,
+                initialDateMillis = initialDateMillis,
+                initialQuery = initialQuery,
+            )
+        }
+    }
+
+    /**
+     * Resolves a [BatchAnalysisViewModel] instance.
+     *
+     * @param context Application or activity context.
+     * @param nerExtractorProvider Optional NER extractor provider override.
+     * @param classifier Optional [SmsClassifier] override.
+     * @param dispatcherProvider Optional [DispatcherProvider] override.
+     */
+    fun provideBatchAnalysisViewModel(
+        context: Context,
+        nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+        classifier: SmsClassifier? = null,
+        dispatcherProvider: DispatcherProvider? = null,
+    ): BatchAnalysisViewModel {
+        return batchAnalysisViewModel ?: run {
+            val app =
+                (context as? Application) ?: (context.applicationContext as? Application) ?: context
+            val appContext = app.applicationContext ?: app
+            val resolvedClassifier = classifier ?: this.smsClassifier ?: MlModelFactory.getClassifier(appContext)
+            val resolvedNerProvider =
+                nerExtractorProvider ?: this.nerExtractorProvider ?: { MlModelFactory.getNerExtractor(appContext) }
+            val dispatchers = dispatcherProvider ?: provideDispatcherProvider(appContext)
+            BatchAnalysisViewModel(
+                context = appContext,
+                dispatcherProvider = dispatchers,
+                nerExtractorProvider = resolvedNerProvider,
+                classifier = resolvedClassifier,
+            )
+        }
+    }
+
+    /**
      * Resolves the centralized [ViewModelProvider.Factory].
      *
      * @param context Optional context fallback.
@@ -1970,6 +2347,51 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setSplitTransactionViewModel(viewModel: SplitTransactionViewModel?) {
+        splitTransactionViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setTripDetailViewModel(viewModel: TripDetailViewModel?) {
+        tripDetailViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setLinkTransactionViewModel(viewModel: LinkTransactionViewModel?) {
+        linkTransactionViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setLinkRecurringTransactionViewModel(viewModel: LinkRecurringTransactionViewModel?) {
+        linkRecurringTransactionViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setDrilldownViewModel(viewModel: DrilldownViewModel?) {
+        drilldownViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setTimePeriodReportViewModel(viewModel: TimePeriodReportViewModel?) {
+        timePeriodReportViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setAnalysisDetailViewModel(viewModel: AnalysisDetailViewModel?) {
+        analysisDetailViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setSearchViewModel(viewModel: SearchViewModel?) {
+        searchViewModel = viewModel
+    }
+
+    @VisibleForTesting
+    fun setBatchAnalysisViewModel(viewModel: BatchAnalysisViewModel?) {
+        batchAnalysisViewModel = viewModel
+    }
+
+    @VisibleForTesting
     fun setSmsClassifier(classifier: SmsClassifier?) {
         smsClassifier = classifier
     }
@@ -2040,6 +2462,15 @@ object ServiceLocator {
         manageIgnoreRulesViewModel = null
         manageParseRulesViewModel = null
         pendingTransactionsViewModel = null
+        splitTransactionViewModel = null
+        tripDetailViewModel = null
+        linkTransactionViewModel = null
+        linkRecurringTransactionViewModel = null
+        drilldownViewModel = null
+        timePeriodReportViewModel = null
+        analysisDetailViewModel = null
+        searchViewModel = null
+        batchAnalysisViewModel = null
         smsClassifier = null
         nerExtractorProvider = null
     }

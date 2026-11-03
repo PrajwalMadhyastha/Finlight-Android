@@ -30,9 +30,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.data.model.TimePeriod
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.MonthlyBreakdown
 import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
-import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModelFactory
 import io.pm.finlight.ui.components.ConsistencyCalendar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.ModernTrendChart
@@ -53,7 +53,7 @@ fun TimePeriodReportScreen(
     showPreviousMonth: Boolean = false,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = TimePeriodReportViewModelFactory(application, timePeriod, initialDateMillis, showPreviousMonth)
+    val factory = FinlightViewModelFactory.createTimePeriodReportFactory(application, timePeriod, initialDateMillis, showPreviousMonth)
     val viewModel: TimePeriodReportViewModel = viewModel(factory = factory)
 
     val selectedDate by viewModel.selectedDate.collectAsState()

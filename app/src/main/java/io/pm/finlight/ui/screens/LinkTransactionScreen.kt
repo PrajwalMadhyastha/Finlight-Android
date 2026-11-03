@@ -30,9 +30,9 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
-import io.pm.finlight.ui.viewmodel.LinkTransactionViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.util.*
@@ -48,7 +48,7 @@ fun LinkTransactionScreen(
         }
 
     val application = LocalContext.current.applicationContext as Application
-    val factory = LinkTransactionViewModelFactory(application, potentialTxn)
+    val factory = FinlightViewModelFactory.createLinkTransactionFactory(application, potentialTxn)
     val viewModel: LinkTransactionViewModel = viewModel(factory = factory)
 
     val context = LocalContext.current

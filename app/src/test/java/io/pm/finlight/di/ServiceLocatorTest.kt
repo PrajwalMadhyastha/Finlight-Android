@@ -29,6 +29,7 @@ import io.pm.finlight.IgnoreRuleRepository
 import io.pm.finlight.IMerchantMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ISmsRepository
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITagRepository
@@ -47,21 +48,34 @@ import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
+import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.data.db.AppDatabase
+import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.ui.viewmodel.AccountViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDetailViewModel
+import io.pm.finlight.ui.viewmodel.AnalysisDimension
+import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModel
 import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import io.pm.finlight.ui.viewmodel.CategoryViewModel
 import io.pm.finlight.ui.viewmodel.CurrencyViewModel
+import io.pm.finlight.ui.viewmodel.DrilldownType
+import io.pm.finlight.ui.viewmodel.DrilldownViewModel
 import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.viewmodel.HistoricTripsViewModel
 import io.pm.finlight.ui.viewmodel.IncomeViewModel
+import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModel
+import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
 import io.pm.finlight.ui.viewmodel.OnboardingViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
+import io.pm.finlight.ui.viewmodel.SearchViewModel
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
+import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
+import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
@@ -69,6 +83,7 @@ import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -103,6 +118,7 @@ class ServiceLocatorTest {
         val mockNerExtractor: SmsEntityExtractor = mockk(relaxed = true)
         ServiceLocator.setSmsClassifier(mockClassifier)
         ServiceLocator.setNerExtractorProvider { mockNerExtractor }
+        ServiceLocator.setDispatcherProvider(TestDispatcherProvider())
     }
 
     @After
@@ -1290,6 +1306,7 @@ class ServiceLocatorTest {
         val mockNerExtractor: SmsEntityExtractor = mockk(relaxed = true)
         ServiceLocator.setSmsClassifier(mockClassifier)
         ServiceLocator.setNerExtractorProvider { mockNerExtractor }
+        ServiceLocator.setDispatcherProvider(TestDispatcherProvider())
         val newViewModel = provider()
         assertNotNull(newViewModel)
         assertNotSame(mockViewModel, newViewModel)
@@ -1576,6 +1593,8 @@ class ServiceLocatorTest {
     fun provideViewModels_resolvesInstance_whenContextIsNotApplicationButProvidesApplicationContext() {
         val nonAppContext = mockk<Context>()
         every { nonAppContext.applicationContext } returns application
+        setupCommonMockRepositories()
+        val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
 
         val viewModels =
             listOf(
@@ -1601,6 +1620,15 @@ class ServiceLocatorTest {
                 ServiceLocator.provideManageIgnoreRulesViewModel(nonAppContext),
                 ServiceLocator.provideManageParseRulesViewModel(nonAppContext),
                 ServiceLocator.providePendingTransactionsViewModel(nonAppContext),
+                ServiceLocator.provideSplitTransactionViewModel(nonAppContext, 1),
+                ServiceLocator.provideTripDetailViewModel(nonAppContext, 1, 1),
+                ServiceLocator.provideLinkTransactionViewModel(nonAppContext, sampleTxn),
+                ServiceLocator.provideLinkRecurringTransactionViewModel(nonAppContext, sampleTxn),
+                ServiceLocator.provideDrilldownViewModel(nonAppContext, DrilldownType.CATEGORY, "F", 1, 2026),
+                ServiceLocator.provideTimePeriodReportViewModel(nonAppContext, TimePeriod.MONTHLY, null, false),
+                ServiceLocator.provideAnalysisDetailViewModel(nonAppContext, AnalysisDimension.CATEGORY, "1", 0L, 100L),
+                ServiceLocator.provideSearchViewModel(nonAppContext),
+                ServiceLocator.provideBatchAnalysisViewModel(nonAppContext),
             )
 
         for (viewModel in viewModels) {
@@ -1614,6 +1642,7 @@ class ServiceLocatorTest {
         val nestedNonAppContext = mockk<Context>()
         every { nonAppContext.applicationContext } returns nestedNonAppContext
         every { nestedNonAppContext.applicationContext } returns null
+        val sampleTxn = PotentialTransaction(1L, "Bank", 10.0, "expense", "Shop", "SMS")
 
         val viewModelProviders: List<() -> Unit> =
             listOf(
@@ -1639,6 +1668,14 @@ class ServiceLocatorTest {
                 { ServiceLocator.provideManageIgnoreRulesViewModel(nonAppContext) },
                 { ServiceLocator.provideManageParseRulesViewModel(nonAppContext) },
                 { ServiceLocator.providePendingTransactionsViewModel(nonAppContext) },
+                { ServiceLocator.provideSplitTransactionViewModel(nonAppContext, 1) },
+                { ServiceLocator.provideTripDetailViewModel(nonAppContext, 1, 1) },
+                { ServiceLocator.provideLinkTransactionViewModel(nonAppContext, sampleTxn) },
+                { ServiceLocator.provideLinkRecurringTransactionViewModel(nonAppContext, sampleTxn) },
+                { ServiceLocator.provideDrilldownViewModel(nonAppContext, DrilldownType.CATEGORY, "F", 1, 2026) },
+                { ServiceLocator.provideTimePeriodReportViewModel(nonAppContext, TimePeriod.MONTHLY, null, false) },
+                { ServiceLocator.provideAnalysisDetailViewModel(nonAppContext, AnalysisDimension.CATEGORY, "1", 0L, 100L) },
+                { ServiceLocator.provideSearchViewModel(nonAppContext) },
             )
 
         for (provider in viewModelProviders) {
@@ -1646,5 +1683,218 @@ class ServiceLocatorTest {
                 provider()
             }
         }
+    }
+
+    @Test
+    fun provideParameterizedViewModels_resolvesInstancesAndForwardsArguments() {
+        setupCommonMockRepositories()
+
+        val sampleTxn = PotentialTransaction(101L, "Bank", 75.0, "expense", "Grocery", "SMS Body")
+
+        val splitVM = ServiceLocator.provideSplitTransactionViewModel(application, 42)
+        assertNotNull(splitVM)
+        val splitTxnId =
+            SplitTransactionViewModel::class.java.getDeclaredField("transactionId").apply {
+                isAccessible = true
+            }.get(splitVM)
+        org.junit.Assert.assertEquals(42, splitTxnId)
+
+        val tripVM = ServiceLocator.provideTripDetailViewModel(application, 5, 10)
+        assertNotNull(tripVM)
+
+        val linkVM = ServiceLocator.provideLinkTransactionViewModel(application, sampleTxn)
+        assertNotNull(linkVM)
+        org.junit.Assert.assertSame(sampleTxn, linkVM.potentialTransaction)
+
+        val linkRecVM = ServiceLocator.provideLinkRecurringTransactionViewModel(application, sampleTxn)
+        assertNotNull(linkRecVM)
+        org.junit.Assert.assertSame(sampleTxn, linkRecVM.potentialTransaction)
+
+        val drilldownVM =
+            ServiceLocator.provideDrilldownViewModel(application, DrilldownType.MERCHANT, "Supermarket", 3, 2026)
+        assertNotNull(drilldownVM)
+        org.junit.Assert.assertEquals("Supermarket", drilldownVM.entityName)
+
+        val reportVM =
+            ServiceLocator.provideTimePeriodReportViewModel(application, TimePeriod.YEARLY, 1000L, true)
+        assertNotNull(reportVM)
+
+        val analysisVM =
+            ServiceLocator.provideAnalysisDetailViewModel(
+                application,
+                AnalysisDimension.TAG,
+                "9",
+                1000L,
+                2000L,
+            )
+        assertNotNull(analysisVM)
+
+        val searchVM = ServiceLocator.provideSearchViewModel(application, 4, 1234L, "Coffee")
+        assertNotNull(searchVM)
+        org.junit.Assert.assertEquals("Coffee", searchVM.uiState.value.keyword)
+
+        val batchVM = ServiceLocator.provideBatchAnalysisViewModel(application)
+        assertNotNull(batchVM)
+    }
+
+    @Test
+    fun provideParameterizedViewModels_usesOverridesWhenSet() {
+        val mockSplit: SplitTransactionViewModel = mockk(relaxed = true)
+        val mockTrip: TripDetailViewModel = mockk(relaxed = true)
+        val mockLink: LinkTransactionViewModel = mockk(relaxed = true)
+        val mockLinkRec: LinkRecurringTransactionViewModel = mockk(relaxed = true)
+        val mockDrilldown: DrilldownViewModel = mockk(relaxed = true)
+        val mockReport: TimePeriodReportViewModel = mockk(relaxed = true)
+        val mockAnalysis: AnalysisDetailViewModel = mockk(relaxed = true)
+        val mockSearch: SearchViewModel = mockk(relaxed = true)
+        val mockBatch: BatchAnalysisViewModel = mockk(relaxed = true)
+
+        ServiceLocator.setSplitTransactionViewModel(mockSplit)
+        ServiceLocator.setTripDetailViewModel(mockTrip)
+        ServiceLocator.setLinkTransactionViewModel(mockLink)
+        ServiceLocator.setLinkRecurringTransactionViewModel(mockLinkRec)
+        ServiceLocator.setDrilldownViewModel(mockDrilldown)
+        ServiceLocator.setTimePeriodReportViewModel(mockReport)
+        ServiceLocator.setAnalysisDetailViewModel(mockAnalysis)
+        ServiceLocator.setSearchViewModel(mockSearch)
+        ServiceLocator.setBatchAnalysisViewModel(mockBatch)
+
+        val sampleTxn = PotentialTransaction(1L, "B", 1.0, "expense", "M", "S")
+        org.junit.Assert.assertSame(mockSplit, ServiceLocator.provideSplitTransactionViewModel(application, 1))
+        org.junit.Assert.assertSame(mockTrip, ServiceLocator.provideTripDetailViewModel(application, 1, 1))
+        org.junit.Assert.assertSame(mockLink, ServiceLocator.provideLinkTransactionViewModel(application, sampleTxn))
+        org.junit.Assert.assertSame(mockLinkRec, ServiceLocator.provideLinkRecurringTransactionViewModel(application, sampleTxn))
+        org.junit.Assert.assertSame(mockDrilldown, ServiceLocator.provideDrilldownViewModel(application, DrilldownType.CATEGORY, "F", 1, 2026))
+        org.junit.Assert.assertSame(mockReport, ServiceLocator.provideTimePeriodReportViewModel(application, TimePeriod.MONTHLY, null, false))
+        org.junit.Assert.assertSame(mockAnalysis, ServiceLocator.provideAnalysisDetailViewModel(application, AnalysisDimension.CATEGORY, "1", 0L, 1L))
+        org.junit.Assert.assertSame(mockSearch, ServiceLocator.provideSearchViewModel(application))
+        org.junit.Assert.assertSame(mockBatch, ServiceLocator.provideBatchAnalysisViewModel(application))
+
+        ServiceLocator.reset()
+        val freshClassifier: SmsClassifier = mockk(relaxed = true)
+        val freshNer: SmsEntityExtractor = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(freshClassifier)
+        ServiceLocator.setNerExtractorProvider { freshNer }
+        setupCommonMockRepositories()
+        ServiceLocator.setDispatcherProvider(TestDispatcherProvider())
+
+        org.junit.Assert.assertNotSame(mockSplit, ServiceLocator.provideSplitTransactionViewModel(application, 1))
+        org.junit.Assert.assertNotSame(mockTrip, ServiceLocator.provideTripDetailViewModel(application, 1, 1))
+        org.junit.Assert.assertNotSame(mockLink, ServiceLocator.provideLinkTransactionViewModel(application, sampleTxn))
+        org.junit.Assert.assertNotSame(mockLinkRec, ServiceLocator.provideLinkRecurringTransactionViewModel(application, sampleTxn))
+        org.junit.Assert.assertNotSame(mockDrilldown, ServiceLocator.provideDrilldownViewModel(application, DrilldownType.CATEGORY, "F", 1, 2026))
+        org.junit.Assert.assertNotSame(mockReport, ServiceLocator.provideTimePeriodReportViewModel(application, TimePeriod.MONTHLY, null, false))
+        org.junit.Assert.assertNotSame(mockAnalysis, ServiceLocator.provideAnalysisDetailViewModel(application, AnalysisDimension.CATEGORY, "1", 0L, 1L))
+        org.junit.Assert.assertNotSame(mockSearch, ServiceLocator.provideSearchViewModel(application))
+        org.junit.Assert.assertNotSame(mockBatch, ServiceLocator.provideBatchAnalysisViewModel(application))
+    }
+
+    @Test
+    fun provideParameterizedViewModels_usesExplicitParameterOverrides() {
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockCatRepo: ICategoryRepository = mockk(relaxed = true)
+        val mockSplitRepo: ISplitTransactionRepository = mockk(relaxed = true)
+        val mockTripRepo: ITripRepository = mockk(relaxed = true)
+        val mockRecurringRepo: IRecurringTransactionRepository = mockk(relaxed = true)
+        val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockUseCase: GetMonthlyConsistencyDataUseCase = mockk(relaxed = true)
+        val mockDao: io.pm.finlight.data.db.dao.TransactionAnalyticsDao = mockk(relaxed = true)
+        val mockAccountRepo: io.pm.finlight.IAccountRepository = mockk(relaxed = true)
+        val mockTagRepo: ITagRepository = mockk(relaxed = true)
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        val mockNer: SmsEntityExtractor = mockk(relaxed = true)
+        val sampleTxn = PotentialTransaction(1L, "B", 1.0, "expense", "M", "S")
+
+        val splitVM =
+            ServiceLocator.provideSplitTransactionViewModel(
+                context = application,
+                transactionId = 88,
+                transactionRepository = mockTxnRepo,
+                categoryRepository = mockCatRepo,
+                splitTransactionRepository = mockSplitRepo,
+            )
+        assertNotNull(splitVM)
+
+        val tripVM =
+            ServiceLocator.provideTripDetailViewModel(
+                context = application,
+                tripId = 2,
+                tagId = 3,
+                tripRepository = mockTripRepo,
+                transactionRepository = mockTxnRepo,
+            )
+        assertNotNull(tripVM)
+
+        val linkVM =
+            ServiceLocator.provideLinkTransactionViewModel(
+                context = application,
+                potentialTransaction = sampleTxn,
+                transactionRepository = mockTxnRepo,
+            )
+        assertNotNull(linkVM)
+
+        val linkRecVM =
+            ServiceLocator.provideLinkRecurringTransactionViewModel(
+                context = application,
+                potentialTransaction = sampleTxn,
+                transactionRepository = mockTxnRepo,
+                recurringTransactionRepository = mockRecurringRepo,
+            )
+        assertNotNull(linkRecVM)
+
+        val drilldownVM =
+            ServiceLocator.provideDrilldownViewModel(
+                context = application,
+                drilldownType = DrilldownType.CATEGORY,
+                entityName = "Groceries",
+                month = 2,
+                year = 2026,
+                transactionRepository = mockTxnRepo,
+            )
+        assertNotNull(drilldownVM)
+
+        val reportVM =
+            ServiceLocator.provideTimePeriodReportViewModel(
+                context = application,
+                timePeriod = TimePeriod.MONTHLY,
+                initialDateMillis = 500L,
+                showPreviousMonth = false,
+                settingsRepository = mockSettingsRepo,
+                transactionRepository = mockTxnRepo,
+                getMonthlyConsistencyDataUseCase = mockUseCase,
+            )
+        assertNotNull(reportVM)
+
+        val analysisVM =
+            ServiceLocator.provideAnalysisDetailViewModel(
+                context = application,
+                dimension = AnalysisDimension.CATEGORY,
+                dimensionId = "1",
+                startDate = 0L,
+                endDate = 500L,
+                transactionAnalyticsDao = mockDao,
+            )
+        assertNotNull(analysisVM)
+
+        val searchVM =
+            ServiceLocator.provideSearchViewModel(
+                context = application,
+                initialCategoryId = 2,
+                initialDateMillis = 300L,
+                initialQuery = "Query",
+                transactionRepository = mockTxnRepo,
+                accountRepository = mockAccountRepo,
+                categoryRepository = mockCatRepo,
+                tagRepository = mockTagRepo,
+            )
+        assertNotNull(searchVM)
+
+        val batchVM =
+            ServiceLocator.provideBatchAnalysisViewModel(
+                context = application,
+                nerExtractorProvider = { mockNer },
+                classifier = mockClassifier,
+            )
+        assertNotNull(batchVM)
     }
 }

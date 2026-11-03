@@ -33,11 +33,11 @@ import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.Transaction
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModel
-import io.pm.finlight.ui.viewmodel.LinkRecurringTransactionViewModelFactory
 import io.pm.finlight.utils.FormatUtils
 import java.net.URLDecoder
 import java.text.NumberFormat
@@ -58,7 +58,7 @@ fun LinkRecurringTransactionScreen(
         }
 
     val application = LocalContext.current.applicationContext as Application
-    val factory = LinkRecurringTransactionViewModelFactory(application, potentialTxn)
+    val factory = FinlightViewModelFactory.createLinkRecurringTransactionFactory(application, potentialTxn)
     val viewModel: LinkRecurringTransactionViewModel = viewModel(factory = factory)
 
     val candidates by viewModel.linkableTransactions.collectAsState()

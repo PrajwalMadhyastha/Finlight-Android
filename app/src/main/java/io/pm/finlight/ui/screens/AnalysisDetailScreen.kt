@@ -22,9 +22,9 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.TransactionViewModel
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.TransactionItem
 import io.pm.finlight.ui.viewmodel.AnalysisDetailViewModel
-import io.pm.finlight.ui.viewmodel.AnalysisDetailViewModelFactory
 import io.pm.finlight.ui.viewmodel.AnalysisDimension
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,7 +40,7 @@ fun AnalysisDetailScreen(
     transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = AnalysisDetailViewModelFactory(application, dimension, dimensionId, startDate, endDate)
+    val factory = FinlightViewModelFactory.createAnalysisDetailFactory(application, dimension, dimensionId, startDate, endDate)
     val viewModel: AnalysisDetailViewModel = viewModel(factory = factory)
     // val transactionViewModel: TransactionViewModel = viewModel() // --- REMOVED: Buggy line ---
 

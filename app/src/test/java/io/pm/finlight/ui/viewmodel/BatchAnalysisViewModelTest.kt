@@ -334,7 +334,7 @@ class BatchAnalysisViewModelTest : BaseViewModelTest() {
             factory.create(UnknownViewModel::class.java)
             org.junit.Assert.fail("Expected IllegalArgumentException for unknown ViewModel class")
         } catch (e: IllegalArgumentException) {
-            assertEquals("Unknown ViewModel class", e.message)
+            org.junit.Assert.assertTrue(e.message?.startsWith("Unknown ViewModel class") == true)
         }
     }
 

@@ -14,10 +14,10 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 
 class TripDetailViewModel(
-    tripRepository: ITripRepository,
-    transactionRepository: ITransactionRepository,
-    tripId: Int,
-    tagId: Int,
+    private val tripRepository: ITripRepository,
+    private val transactionRepository: ITransactionRepository,
+    private val tripId: Int,
+    private val tagId: Int,
     dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     val tripDetails: StateFlow<TripWithStats?>
