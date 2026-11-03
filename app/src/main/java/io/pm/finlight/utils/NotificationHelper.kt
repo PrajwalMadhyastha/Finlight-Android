@@ -161,6 +161,7 @@ object NotificationHelper {
         details: TransactionDetails,
         monthlyTotal: Double,
         visitCount: Int,
+        merchantTotalSpent: Double = 0.0,
     ) {
         val canShowNotification =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -215,6 +216,9 @@ object NotificationHelper {
                     else -> "This is your ${visitCount}th visit here."
                 }
             inboxStyle.addLine(visitText)
+            if (merchantTotalSpent > 0.0) {
+                inboxStyle.addLine("Total spent here: ${currencyFormat.format(merchantTotalSpent)}")
+            }
         }
 
         val builder =

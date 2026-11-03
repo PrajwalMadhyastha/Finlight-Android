@@ -289,6 +289,16 @@ interface TransactionQueryDao {
 
     @Query(
         """
+        SELECT COALESCE(SUM(amount), 0.0) FROM transactions
+        WHERE (LOWER(description) = LOWER(:description) OR LOWER(originalDescription) = LOWER(:description))
+        AND transactionType = $SQL_EXPENSE
+        AND isExcluded = 0 AND $SQL_STATUS_ACTIVE
+    """,
+    )
+    fun getTotalSpentForMerchant(description: String): Flow<Double>
+
+    @Query(
+        """
         SELECT * FROM transactions
         WHERE LOWER(originalDescription) = LOWER(:description)
         AND originalDescription IS NOT NULL
