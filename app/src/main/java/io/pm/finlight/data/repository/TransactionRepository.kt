@@ -397,6 +397,10 @@ class TransactionRepository(
         return transactionQueryDao.getTransactionCountForMerchant(description)
     }
 
+    override fun getTotalSpentForMerchant(description: String): Flow<Double> {
+        return transactionQueryDao.getTotalSpentForMerchant(description)
+    }
+
     override suspend fun findSimilarTransactions(
         description: String,
         excludeId: Int,

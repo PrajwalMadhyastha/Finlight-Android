@@ -63,14 +63,20 @@ class TransactionNotificationWorker(
                 val summary = transactionAnalyticsDao.getFinancialSummaryForRange(monthStart, monthEnd)
                 val monthlyTotal = if (details.transaction.transactionType == TransactionType.INCOME) summary?.totalIncome else summary?.totalExpenses
 
-                // 3. Get visit count
-                val visitCount =
+                // 3. Get visit count and merchant total spent
+                val (visitCount, merchantTotalSpent) =
                     if (details.transaction.transactionType != TransactionType.INCOME) {
-                        transactionQueryDao.getTransactionCountForMerchant(
-                            details.transaction.description,
-                        ).first()
+                        val count =
+                            transactionQueryDao.getTransactionCountForMerchant(
+                                details.transaction.description,
+                            ).first()
+                        val totalSpent =
+                            transactionQueryDao.getTotalSpentForMerchant(
+                                details.transaction.description,
+                            ).first()
+                        Pair(count, totalSpent)
                     } else {
-                        0
+                        Pair(0, 0.0)
                     }
 
                 // 4. Show the rich notification
@@ -79,6 +85,7 @@ class TransactionNotificationWorker(
                     details = details,
                     monthlyTotal = monthlyTotal ?: 0.0,
                     visitCount = visitCount,
+                    merchantTotalSpent = merchantTotalSpent,
                 )
 
                 Result.success()

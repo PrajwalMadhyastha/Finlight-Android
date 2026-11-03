@@ -867,4 +867,32 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             assertEquals(expectedHashes, actualHashes)
             verify(transactionDao).getSmsHashesByIds(listOf(1, 2))
         }
+
+    @Test
+    fun `getTransactionCountForMerchant delegates to transactionQueryDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            `when`(transactionDao.getTransactionCountForMerchant("Starbucks")).thenReturn(flowOf(4))
+
+            repository.getTransactionCountForMerchant("Starbucks").test {
+                assertEquals(4, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTransactionCountForMerchant("Starbucks")
+        }
+
+    @Test
+    fun `getTotalSpentForMerchant delegates to transactionQueryDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            `when`(transactionDao.getTotalSpentForMerchant("Starbucks")).thenReturn(flowOf(1250.0))
+
+            repository.getTotalSpentForMerchant("Starbucks").test {
+                assertEquals(1250.0, awaitItem())
+                awaitComplete()
+            }
+            verify(transactionDao).getTotalSpentForMerchant("Starbucks")
+        }
 }

@@ -196,6 +196,8 @@ interface ITransactionRepository {
 
     fun getTransactionCountForMerchant(description: String): Flow<Int>
 
+    fun getTotalSpentForMerchant(description: String): Flow<Double>
+
     suspend fun findSimilarTransactions(
         description: String,
         excludeId: Int,

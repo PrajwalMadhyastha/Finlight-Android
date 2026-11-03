@@ -58,7 +58,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
         mockkObject(NotificationHelper)
-        every { NotificationHelper.showRichTransactionNotification(any(), any(), any(), any()) } just runs
+        every { NotificationHelper.showRichTransactionNotification(any(), any(), any(), any(), any()) } just runs
     }
 
     @After
@@ -88,6 +88,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
             coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns summary
             every { transactionQueryDao.getTransactionCountForMerchant("Test") } returns flowOf(visitCount)
+            every { transactionQueryDao.getTotalSpentForMerchant("Test") } returns flowOf(500.0)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -98,6 +99,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             val detailsCaptor = slot<TransactionDetails>()
             val totalCaptor = slot<Double>()
             val visitCaptor = slot<Int>()
+            val merchantTotalCaptor = slot<Double>()
 
             // Act
             val result = worker.doWork()
@@ -110,11 +112,13 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     details = capture(detailsCaptor),
                     monthlyTotal = capture(totalCaptor),
                     visitCount = capture(visitCaptor),
+                    merchantTotalSpent = capture(merchantTotalCaptor),
                 )
             }
             assertEquals(details, detailsCaptor.captured)
             assertEquals(summary.totalExpenses, totalCaptor.captured, 0.0)
             assertEquals(visitCount, visitCaptor.captured)
+            assertEquals(500.0, merchantTotalCaptor.captured, 0.0)
         }
 
     @Test
@@ -214,6 +218,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     details = any(),
                     monthlyTotal = capture(totalCaptor),
                     visitCount = capture(visitCaptor),
+                    merchantTotalSpent = any(),
                 )
             }
             assertEquals(0.0, totalCaptor.captured, 0.0) // null summary fallback to 0.0
@@ -257,6 +262,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     details = any(),
                     monthlyTotal = capture(totalCaptor),
                     visitCount = capture(visitCaptor),
+                    merchantTotalSpent = any(),
                 )
             }
             assertEquals(50000.0, totalCaptor.captured, 0.0)
@@ -282,6 +288,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
             coEvery { transactionQueryDao.getTransactionDetailsById(transactionId) } returns flowOf(details)
             coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns summary
             every { transactionQueryDao.getTransactionCountForMerchant("Transfer") } returns flowOf(3)
+            every { transactionQueryDao.getTotalSpentForMerchant("Transfer") } returns flowOf(3000.0)
 
             val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
             val worker =
@@ -301,6 +308,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
                     details = any(),
                     monthlyTotal = capture(totalCaptor),
                     visitCount = capture(visitCaptor),
+                    merchantTotalSpent = any(),
                 )
             }
             assertEquals(5000.0, totalCaptor.captured, 0.0)

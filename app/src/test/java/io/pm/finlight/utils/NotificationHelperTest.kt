@@ -170,6 +170,48 @@ class NotificationHelperTest : BaseViewModelTest() {
     }
 
     @Test
+    fun `showRichTransactionNotification_withMerchantTotalSpent`() {
+        val transactionId = 42
+        val details =
+            TransactionDetails(
+                Transaction(
+                    id = transactionId,
+                    description = "Starbucks",
+                    amount = 450.0,
+                    date = System.currentTimeMillis(),
+                    accountId = 1,
+                    categoryId = 1,
+                    transactionType = TransactionType.EXPENSE,
+                    notes = null,
+                ),
+                emptyList(),
+                accountName = "HDFC",
+                categoryName = "Coffee",
+                categoryIconKey = null,
+                categoryColorKey = null,
+                tagNames = null,
+            )
+
+        NotificationHelper.showRichTransactionNotification(
+            context = context,
+            details = details,
+            monthlyTotal = 12450.0,
+            visitCount = 3,
+            merchantTotalSpent = 1350.0,
+        )
+
+        val notification = shadowNotificationManager.getNotification(transactionId)
+        assertNotNull(notification)
+        val inboxLines = notification.extras.getCharSequenceArray(NotificationCompat.EXTRA_TEXT_LINES)
+        assertNotNull(inboxLines)
+        assertEquals(3, inboxLines!!.size)
+        assertTrue(inboxLines[0].toString().contains("spent this month"))
+        assertTrue(inboxLines[1].toString().contains("This is your 3rd visit here."))
+        assertTrue(inboxLines[2].toString().contains("Total spent here:"))
+        assertTrue(inboxLines[2].toString().contains("1,350"))
+    }
+
+    @Test
     fun `showRecurringTransactionDueNotification_buildsCorrectlyWithDeepLinkAndAction`() {
         // Arrange
         val potentialTxn =
