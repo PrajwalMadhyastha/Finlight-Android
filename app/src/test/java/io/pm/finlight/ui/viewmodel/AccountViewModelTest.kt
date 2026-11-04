@@ -860,4 +860,135 @@ class AccountViewModelTest : BaseViewModelTest() {
             val bankMetrics = viewModel.getCreditCardMetrics(21).first()
             assertEquals(null, bankMetrics)
         }
+
+    @Test
+    fun `creditCardMetrics emits empty map when accountsWithBalance has no credit cards`() =
+        runTest {
+            val nonCcAccounts =
+                listOf(
+                    AccountWithBalance(Account(id = 1, name = "Savings", type = "Bank"), 1000.0),
+                    AccountWithBalance(Account(id = 2, name = "Card No Limit", type = "Credit Card", creditLimit = null), 0.0),
+                )
+            `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(nonCcAccounts))
+
+            viewModel =
+                AccountViewModel(
+                    accountRepository,
+                    transactionRepository,
+                    settingsRepository,
+                    mergeAccountsUseCase,
+                    testDispatcher,
+                )
+
+            viewModel.creditCardMetrics.test {
+                val emission = awaitItem()
+                assertEquals(emptyMap<Int, CreditCardMetrics>(), emission)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `creditCardMetrics emits map of metrics for active credit cards`() =
+        runTest {
+            val card = Account(id = 10, name = "HDFC Card", type = "Credit Card", creditLimit = 50000.0, billingCycleDay = 15)
+            val accounts =
+                listOf(
+                    AccountWithBalance(card, 0.0),
+                    AccountWithBalance(Account(id = 11, name = "SBI Savings", type = "Savings"), 2000.0),
+                )
+            val txns =
+                listOf(
+                    Transaction(
+                        id = 1,
+                        description = "Amazon",
+                        amount = 5000.0,
+                        date = System.currentTimeMillis(),
+                        accountId = 10,
+                        categoryId = 1,
+                        notes = null,
+                        transactionType = TransactionType.EXPENSE,
+                    ),
+                )
+
+            `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(accounts))
+            `when`(transactionRepository.getTransactionsForAccount(10)).thenReturn(flowOf(txns))
+
+            viewModel =
+                AccountViewModel(
+                    accountRepository,
+                    transactionRepository,
+                    settingsRepository,
+                    mergeAccountsUseCase,
+                    testDispatcher,
+                )
+
+            viewModel.creditCardMetrics.test {
+                var item = awaitItem()
+                if (item.isEmpty()) {
+                    item = awaitItem()
+                }
+                assertTrue(item.containsKey(10))
+                assertEquals(50000.0, item[10]?.creditLimit ?: 0.0, 0.01)
+                assertEquals(5000.0, item[10]?.currentCycleSpend ?: 0.0, 0.01)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `getCreditCardMetrics returns null for null account, null limit, or non-positive limit`() =
+        runTest {
+            // Null account
+            `when`(accountRepository.getAccountById(99)).thenReturn(flowOf(null))
+            assertEquals(null, viewModel.getCreditCardMetrics(99).first())
+
+            // Null limit
+            val cardNullLimit = Account(id = 101, name = "Card", type = "Credit Card", creditLimit = null)
+            `when`(accountRepository.getAccountById(101)).thenReturn(flowOf(cardNullLimit))
+            assertEquals(null, viewModel.getCreditCardMetrics(101).first())
+
+            // 0.0 limit
+            val cardZeroLimit = Account(id = 102, name = "Card", type = "Credit Card", creditLimit = 0.0)
+            `when`(accountRepository.getAccountById(102)).thenReturn(flowOf(cardZeroLimit))
+            assertEquals(null, viewModel.getCreditCardMetrics(102).first())
+
+            // Negative limit
+            val cardNegLimit = Account(id = 103, name = "Card", type = "Credit Card", creditLimit = -100.0)
+            `when`(accountRepository.getAccountById(103)).thenReturn(flowOf(cardNegLimit))
+            assertEquals(null, viewModel.getCreditCardMetrics(103).first())
+        }
+
+    @Test
+    fun `calculateCreditCardMetrics defaults billing cycle day to 1 when null`() {
+        val card = Account(id = 10, name = "Card", type = "Credit Card", creditLimit = 50000.0, billingCycleDay = null)
+        val metrics = viewModel.calculateCreditCardMetrics(card, emptyList())
+        org.junit.Assert.assertNotNull(metrics)
+        assertEquals(1, metrics?.billingCycleDay)
+    }
+
+    @Test
+    fun `addAccount delegating overload passes null limit and billing cycle day`() =
+        runTest {
+            var callbackTriggered = false
+            var successResult = false
+
+            viewModel.addAccount(
+                name = "Kotak Savings",
+                type = "Savings",
+            ) { success ->
+                callbackTriggered = true
+                successResult = success
+            }
+            advanceUntilIdle()
+
+            verify(accountRepository).insert(
+                Account(
+                    name = "Kotak Savings",
+                    type = "Savings",
+                    creditLimit = null,
+                    billingCycleDay = null,
+                ),
+            )
+            assertTrue(callbackTriggered)
+            assertTrue(successResult)
+        }
 }

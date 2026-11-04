@@ -53,7 +53,7 @@ fun AccountDetailScreen(
     val account by viewModel.getAccountById(accountId).collectAsState(initial = null)
     val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0L)
     val transactions by viewModel.getTransactionsForAccount(accountId).collectAsState(initial = emptyList())
-    val creditCardMetrics by viewModel.getCreditCardMetrics(accountId).collectAsState(initial = null)
+    val creditCardMetrics by remember(accountId) { viewModel.getCreditCardMetrics(accountId) }.collectAsState(initial = null)
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
@@ -121,7 +121,7 @@ private fun AccountDetailHeader(
 ) {
     val currencyFormat =
         remember {
-            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN"))
                 .apply { maximumFractionDigits = 0 }
         }
     val balanceColor =
@@ -183,6 +183,13 @@ private fun AccountDetailHeader(
                         text = "Cycle: $startFormatted – $endFormatted (${creditCardMetrics.daysRemainingInCycle}d left)",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Total Balance: ${currencyFormat.format(balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = balanceColor,
                     )
                 }
 
@@ -258,6 +265,13 @@ private fun AccountDetailHeader(
                         style = MaterialTheme.typography.displaySmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Total Balance: ${currencyFormat.format(balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = balanceColor,
                     )
                 }
             } else {

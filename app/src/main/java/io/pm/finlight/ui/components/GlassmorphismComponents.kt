@@ -527,7 +527,7 @@ private fun AccountItem(
 ) {
     val currencyFormat =
         remember {
-            NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+            NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).apply {
                 maximumFractionDigits = 0
             }
         }

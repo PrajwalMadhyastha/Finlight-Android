@@ -1922,14 +1922,18 @@ private fun AccountPickerItem(
                 Text(account.name, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
             },
             supportingContent = {
-                val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+                val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
                 val hasLimit = account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0
-                if (isCurrent && hasLimit) {
-                    Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
-                } else if (isCurrent) {
-                    Text("Currently Selected")
-                } else if (hasLimit) {
-                    Text("Limit: ${currencyFormat.format(account.creditLimit)}")
+                when {
+                    isCurrent && hasLimit -> {
+                        Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
+                    }
+                    isCurrent -> {
+                        Text("Currently Selected")
+                    }
+                    hasLimit -> {
+                        Text("Limit: ${currencyFormat.format(account.creditLimit)}")
+                    }
                 }
             },
             modifier = Modifier.clickable(onClick = onSelectClick),

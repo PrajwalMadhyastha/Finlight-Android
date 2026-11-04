@@ -6,6 +6,7 @@ import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.TestApplication
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -317,5 +318,16 @@ class DateUtilsTest : BaseViewModelTest() {
         val (_, end50) = DateUtils.getCreditCardBillingCycleRange(50, currentTime)
         val (_, end31) = DateUtils.getCreditCardBillingCycleRange(31, currentTime)
         assertEquals(end31, end50)
+    }
+
+    @Test
+    fun `getCreditCardBillingCycleRange uses current time millis when not provided`() {
+        val before = System.currentTimeMillis()
+        val (start, end) = DateUtils.getCreditCardBillingCycleRange(15)
+        val after = System.currentTimeMillis()
+
+        assertTrue(start <= end)
+        assertTrue(start <= after)
+        assertTrue(before <= end)
     }
 }

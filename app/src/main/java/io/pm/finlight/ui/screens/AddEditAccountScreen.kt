@@ -50,6 +50,13 @@ fun AddEditAccountScreen(
     var creditLimitText by remember { mutableStateOf(TextFieldValue("")) }
     var billingDayText by remember { mutableStateOf(TextFieldValue("")) }
     val isCreditCard = AccountType.fromString(accountType.text) == AccountType.CREDIT_CARD
+    val isCreditLimitInvalid =
+        isCreditCard && creditLimitText.text.isNotBlank() &&
+            (creditLimitText.text.toDoubleOrNull() == null || (creditLimitText.text.toDoubleOrNull() ?: 0.0) < 0.0)
+    val billingDayInt = billingDayText.text.toIntOrNull()
+    val isBillingDayInvalid =
+        isCreditCard && billingDayText.text.isNotBlank() &&
+            (billingDayInt == null || billingDayInt !in 1..31)
 
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -59,6 +66,35 @@ fun AddEditAccountScreen(
         viewModel.getAccountById(accountId!!).collectAsState(initial = null)
     } else {
         remember { mutableStateOf(null) }
+    }
+
+    fun saveAccount() {
+        val onComplete = { success: Boolean ->
+            if (success) navController.popBackStack()
+        }
+        val parsedLimit = if (isCreditCard) creditLimitText.text.toDoubleOrNull() else null
+        val parsedBillingDay = if (isCreditCard) billingDayText.text.toIntOrNull()?.coerceIn(1, 31) else null
+        if (isEditMode) {
+            accountToEdit?.let {
+                viewModel.updateAccount(
+                    it.copy(
+                        name = accountName.text,
+                        type = accountType.text,
+                        creditLimit = parsedLimit,
+                        billingCycleDay = parsedBillingDay,
+                    ),
+                    onComplete,
+                )
+            }
+        } else {
+            viewModel.addAccount(
+                name = accountName.text,
+                type = accountType.text,
+                creditLimit = parsedLimit,
+                billingCycleDay = parsedBillingDay,
+                onComplete = onComplete,
+            )
+        }
     }
 
     LaunchedEffect(accountToEdit) {
@@ -147,6 +183,13 @@ fun AddEditAccountScreen(
                                     }
                                 },
                                 label = { Text("Credit Limit (e.g., 100000)") },
+                                isError = isCreditLimitInvalid,
+                                supportingText =
+                                    if (isCreditLimitInvalid) {
+                                        { Text("Please enter a valid credit limit") }
+                                    } else {
+                                        null
+                                    },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors =
@@ -170,7 +213,14 @@ fun AddEditAccountScreen(
                                     }
                                 },
                                 label = { Text("Billing Day of Month (1 - 31)") },
-                                supportingText = { Text("Day each month when your statement is generated") },
+                                isError = isBillingDayInvalid,
+                                supportingText = {
+                                    if (isBillingDayInvalid) {
+                                        Text("Billing day must be between 1 and 31")
+                                    } else {
+                                        Text("Day each month when your statement is generated")
+                                    }
+                                },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.fillMaxWidth(),
                                 colors =
@@ -221,37 +271,12 @@ fun AddEditAccountScreen(
                         if (match.matchType != MatchType.NONE) {
                             matchDialogState = match
                         } else {
-                            val onComplete = { success: Boolean ->
-                                if (success) navController.popBackStack()
-                            }
-                            val parsedLimit = if (isCreditCard) creditLimitText.text.toDoubleOrNull() else null
-                            val parsedBillingDay = if (isCreditCard) billingDayText.text.toIntOrNull()?.coerceIn(1, 31) else null
-                            if (isEditMode) {
-                                accountToEdit?.let {
-                                    viewModel.updateAccount(
-                                        it.copy(
-                                            name = accountName.text,
-                                            type = accountType.text,
-                                            creditLimit = parsedLimit,
-                                            billingCycleDay = parsedBillingDay,
-                                        ),
-                                        onComplete,
-                                    )
-                                }
-                            } else {
-                                viewModel.addAccount(
-                                    name = accountName.text,
-                                    type = accountType.text,
-                                    creditLimit = parsedLimit,
-                                    billingCycleDay = parsedBillingDay,
-                                    onComplete = onComplete,
-                                )
-                            }
+                            saveAccount()
                         }
                     }
                 },
                 modifier = Modifier.weight(1f),
-                enabled = accountName.text.isNotBlank() && accountType.text.isNotBlank(),
+                enabled = accountName.text.isNotBlank() && accountType.text.isNotBlank() && !isCreditLimitInvalid && !isBillingDayInvalid,
             ) {
                 Text(if (isEditMode) "Update" else "Save")
             }
@@ -295,32 +320,7 @@ fun AddEditAccountScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!isExact) {
                         TextButton(onClick = {
-                            val onComplete = { success: Boolean ->
-                                if (success) navController.popBackStack()
-                            }
-                            val parsedLimit = if (isCreditCard) creditLimitText.text.toDoubleOrNull() else null
-                            val parsedBillingDay = if (isCreditCard) billingDayText.text.toIntOrNull()?.coerceIn(1, 31) else null
-                            if (isEditMode) {
-                                accountToEdit?.let {
-                                    viewModel.updateAccount(
-                                        it.copy(
-                                            name = accountName.text,
-                                            type = accountType.text,
-                                            creditLimit = parsedLimit,
-                                            billingCycleDay = parsedBillingDay,
-                                        ),
-                                        onComplete,
-                                    )
-                                }
-                            } else {
-                                viewModel.addAccount(
-                                    name = accountName.text,
-                                    type = accountType.text,
-                                    creditLimit = parsedLimit,
-                                    billingCycleDay = parsedBillingDay,
-                                    onComplete = onComplete,
-                                )
-                            }
+                            saveAccount()
                             matchDialogState = null
                         }) {
                             Text("Save Anyway")

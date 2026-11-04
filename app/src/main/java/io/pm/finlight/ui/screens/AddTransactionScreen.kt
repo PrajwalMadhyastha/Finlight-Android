@@ -1269,7 +1269,7 @@ private fun AccountPickerSheet(
                         supportingContent =
                             if (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0) {
                                 {
-                                    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+                                    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
                                     Text(
                                         "Limit: ${currencyFormat.format(account.creditLimit)}",
                                         style = MaterialTheme.typography.bodySmall,

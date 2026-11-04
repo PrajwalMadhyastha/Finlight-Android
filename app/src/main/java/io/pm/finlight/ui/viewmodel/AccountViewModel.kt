@@ -286,6 +286,14 @@ class AccountViewModel(
         }
     }
 
+    /**
+     * Calculates the credit card utilization metrics for a given billing cycle.
+     *
+     * Note: Current cycle spend is calculated as `(expenseSum - incomeSum).coerceAtLeast(0.0)`.
+     * `incomeSum` accounts for merchant refunds during the active billing cycle; note that any
+     * bill payments recorded as income directly on the credit card account during the active
+     * billing cycle will also offset current-cycle spend.
+     */
     fun calculateCreditCardMetrics(
         account: Account,
         transactions: List<Transaction>,
