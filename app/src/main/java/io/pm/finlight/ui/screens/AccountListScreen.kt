@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -43,6 +42,7 @@ import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import java.text.NumberFormat
 import java.util.*
@@ -220,7 +220,7 @@ private fun AccountListItem(
     onNavigateToDetail: () -> Unit,
     onEditClick: () -> Unit,
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent
 
     GlassPanel(
@@ -261,12 +261,7 @@ private fun AccountListItem(
                     )
                     Spacer(Modifier.height(6.dp))
                     val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                    val progressColor =
-                        when {
-                            creditCardMetrics.utilizationPercentage <= 30f -> MaterialTheme.colorScheme.primary
-                            creditCardMetrics.utilizationPercentage <= 50f -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.error
-                        }
+                    val progressColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
                     LinearProgressIndicator(
                         progress = { progress },
                         modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
@@ -325,7 +320,7 @@ private fun MergeConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = popupContainerColor,
-        icon = { Icon(Icons.Default.MergeType, contentDescription = "Merge") },
+        icon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge") },
         title = { Text("Merge Accounts") },
         text = {
             Column {

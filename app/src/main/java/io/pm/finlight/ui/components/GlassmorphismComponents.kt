@@ -65,6 +65,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.theme.GlassPanelBorder
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.utils.CategoryIconHelper
 import java.text.NumberFormat
 import java.util.Locale
@@ -566,12 +567,7 @@ private fun AccountItem(
                 if (metrics != null) {
                     Spacer(Modifier.height(2.dp))
                     val progress = (metrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                    val progressColor =
-                        when {
-                            metrics.utilizationPercentage <= 30f -> MaterialTheme.colorScheme.primary
-                            metrics.utilizationPercentage <= 50f -> MaterialTheme.colorScheme.tertiary
-                            else -> MaterialTheme.colorScheme.error
-                        }
+                    val progressColor = getUtilizationColor(metrics.utilizationPercentage)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -733,7 +729,7 @@ private fun CategoryBudgetGauge(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(remaining.toInt())} left",
+                text = "₹${NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).format(remaining.toInt())} left",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

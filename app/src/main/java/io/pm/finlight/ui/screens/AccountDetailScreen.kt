@@ -38,6 +38,7 @@ import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
@@ -203,12 +204,7 @@ private fun AccountDetailHeader(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                        val statusColor =
-                            when {
-                                creditCardMetrics.utilizationPercentage <= 30f -> MaterialTheme.colorScheme.primary
-                                creditCardMetrics.utilizationPercentage <= 50f -> MaterialTheme.colorScheme.tertiary
-                                else -> MaterialTheme.colorScheme.error
-                            }
+                        val statusColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -300,7 +296,7 @@ private fun AccountDetailTransactionItem(
     onClick: () -> Unit,
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
     val dateFormatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     // --- UPDATED: Apply the clickable modifier to the GlassPanel ---

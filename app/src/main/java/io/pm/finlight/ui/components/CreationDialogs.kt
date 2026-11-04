@@ -69,7 +69,7 @@ fun CreateAccountDialog(
     val isCreditCard = AccountType.fromString(type.text) == AccountType.CREDIT_CARD
     val isCreditLimitInvalid =
         isCreditCard && creditLimitText.text.isNotBlank() &&
-            (creditLimitText.text.toDoubleOrNull() == null || (creditLimitText.text.toDoubleOrNull() ?: 0.0) < 0.0)
+            (creditLimitText.text.toDoubleOrNull() == null || (creditLimitText.text.toDoubleOrNull() ?: 0.0) <= 0.0)
     val billingDayInt = billingDayText.text.toIntOrNull()
     val isBillingDayInvalid =
         isCreditCard && billingDayText.text.isNotBlank() &&
