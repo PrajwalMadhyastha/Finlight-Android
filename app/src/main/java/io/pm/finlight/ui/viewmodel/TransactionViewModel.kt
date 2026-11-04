@@ -754,7 +754,9 @@ class TransactionViewModel(
     fun createAccount(
         name: String,
         type: String,
-        onAccountCreated: (Account) -> Unit
+        creditLimit: Double? = null,
+        billingCycleDay: Int? = null,
+        onAccountCreated: (Account) -> Unit,
     ) {
         if (name.isBlank() || type.isBlank()) return
         viewModelScope.launch {
@@ -762,7 +764,15 @@ class TransactionViewModel(
                 _validationError.value = "An account named '$name' already exists."
                 return@launch
             }
-            val newAccountId = accountRepository.insert(Account(name = name, type = type))
+            val newAccountId =
+                accountRepository.insert(
+                    Account(
+                        name = name,
+                        type = type,
+                        creditLimit = creditLimit,
+                        billingCycleDay = billingCycleDay,
+                    ),
+                )
             accountRepository.getAccountByIdSync(newAccountId.toInt())?.let(onAccountCreated)
         }
     }

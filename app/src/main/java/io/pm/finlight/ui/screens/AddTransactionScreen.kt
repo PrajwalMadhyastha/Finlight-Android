@@ -647,8 +647,8 @@ fun AddTransactionScreen(
     if (showCreateAccountDialog) {
         CreateAccountDialog(
             onDismiss = { showCreateAccountDialog = false },
-            onConfirm = { name, type ->
-                viewModel.createAccount(name, type) { newAccount ->
+            onConfirm = { name, type, creditLimit, billingCycleDay ->
+                viewModel.createAccount(name, type, creditLimit, billingCycleDay) { newAccount ->
                     viewModel.onAddTransactionAccountChanged(newAccount)
                 }
                 showCreateAccountDialog = false
@@ -1266,6 +1266,19 @@ private fun AccountPickerSheet(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         },
+                        supportingContent =
+                            if (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0) {
+                                {
+                                    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
+                                    Text(
+                                        "Limit: ${currencyFormat.format(account.creditLimit)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         leadingContent = {
                             Image(
                                 painter = rememberSafeBankLogoPainter(account.name),

@@ -23,18 +23,22 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
+import io.pm.finlight.CreditCardMetrics
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
+import io.pm.finlight.isCreditCard
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.ExpenseRedLight
 import io.pm.finlight.ui.theme.IncomeGreenDark
 import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.utils.FormatUtils
 import java.text.NumberFormat
@@ -50,6 +54,7 @@ fun AccountDetailScreen(
     val account by viewModel.getAccountById(accountId).collectAsState(initial = null)
     val balance by viewModel.getAccountBalance(accountId).collectAsState(initial = 0L)
     val transactions by viewModel.getTransactionsForAccount(accountId).collectAsState(initial = emptyList())
+    val creditCardMetrics by remember(accountId) { viewModel.getCreditCardMetrics(accountId) }.collectAsState(initial = null)
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
@@ -65,6 +70,7 @@ fun AccountDetailScreen(
                 account = currentAccount,
                 balance = balance,
                 transactionCount = transactions.size,
+                creditCardMetrics = creditCardMetrics,
             )
         }
 
@@ -112,10 +118,11 @@ private fun AccountDetailHeader(
     account: Account,
     balance: Long,
     transactionCount: Int,
+    creditCardMetrics: CreditCardMetrics? = null,
 ) {
     val currencyFormat =
         remember {
-            NumberFormat.getCurrencyInstance(Locale("en", "IN"))
+            NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN"))
                 .apply { maximumFractionDigits = 0 }
         }
     val balanceColor =
@@ -156,18 +163,127 @@ private fun AccountDetailHeader(
                 contentDescription = "${account.name} Logo",
                 modifier = Modifier.size(50.dp),
             )
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "Current Balance",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = currencyFormat.format(balance),
-                    style = MaterialTheme.typography.displaySmall,
-                    fontWeight = FontWeight.Bold,
-                    color = balanceColor,
-                )
+
+            if (creditCardMetrics != null) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Current Cycle Spend",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = currencyFormat.format(creditCardMetrics.currentCycleSpend),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    val cycleDateFormatter = remember { FormatUtils.getFormatter("dd MMM", Locale.getDefault()) }
+                    val startFormatted = cycleDateFormatter.format(Date(creditCardMetrics.cycleStartDate))
+                    val endFormatted = cycleDateFormatter.format(Date(creditCardMetrics.cycleEndDate))
+                    Text(
+                        text = "Cycle: $startFormatted – $endFormatted (${creditCardMetrics.daysRemainingInCycle}d left)",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Total Balance: ${currencyFormat.format(balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = balanceColor,
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
+                        val statusColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Credit Utilization",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                text = "${String.format(Locale.getDefault(), "%.1f", creditCardMetrics.utilizationPercentage)}%",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = statusColor,
+                            )
+                        }
+
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                            color = statusColor,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                text = "Available: ${currencyFormat.format(creditCardMetrics.availableLimit)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = "Limit: ${currencyFormat.format(creditCardMetrics.creditLimit)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            } else if (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Credit Limit",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = currencyFormat.format(account.creditLimit),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Total Balance: ${currencyFormat.format(balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = balanceColor,
+                    )
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "Current Balance",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = currencyFormat.format(balance),
+                        style = MaterialTheme.typography.displaySmall,
+                        fontWeight = FontWeight.Bold,
+                        color = balanceColor,
+                    )
+                }
             }
         }
     }
@@ -180,7 +296,7 @@ private fun AccountDetailTransactionItem(
     onClick: () -> Unit,
 ) {
     val contentAlpha = if (transactionDetails.transaction.isExcluded) 0.5f else 1f
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
     val dateFormatter = remember { FormatUtils.getFormatter("dd MMM, yyyy", Locale.getDefault()) }
 
     // --- UPDATED: Apply the clickable modifier to the GlassPanel ---

@@ -7,6 +7,9 @@
 // =================================================================================
 package io.pm.finlight.ui.theme
 
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // --- Aurora Theme (Dark Purple) ---
@@ -50,3 +53,23 @@ val IncomeGreenDark = Color(0xFF66BB6A)
 val ExpenseRedDark = Color(0xFFEF5350)
 val IncomeGreenLight = Color(0xFF2E7D32)
 val ExpenseRedLight = Color(0xFFC62828)
+
+/**
+ * Resolves the color for credit card utilization percentage based on standard financial health thresholds:
+ * - <= 30%: primary (healthy utilization)
+ * - <= 50%: tertiary (moderate utilization)
+ * - > 50%: error (high utilization)
+ */
+fun ColorScheme.getUtilizationColor(utilizationPercentage: Float): Color =
+    when {
+        utilizationPercentage <= 30f -> primary
+        utilizationPercentage <= 50f -> tertiary
+        else -> error
+    }
+
+/**
+ * Composable helper resolving credit card utilization color from the active [MaterialTheme.colorScheme].
+ */
+@Composable
+fun getUtilizationColor(utilizationPercentage: Float): Color =
+    MaterialTheme.colorScheme.getUtilizationColor(utilizationPercentage)

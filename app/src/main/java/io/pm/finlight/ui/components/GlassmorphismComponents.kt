@@ -36,6 +36,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,6 +65,7 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.theme.GlassPanelBorder
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.utils.CategoryIconHelper
 import java.text.NumberFormat
 import java.util.Locale
@@ -474,6 +476,7 @@ internal fun AuroraProgressBar(progress: Float) {
 @Composable
 fun AccountsCarouselCard(
     accounts: List<AccountWithBalance>,
+    creditCardMetrics: Map<Int, CreditCardMetrics> = emptyMap(),
     navController: NavController,
 ) {
     Column(
@@ -507,7 +510,11 @@ fun AccountsCarouselCard(
             contentPadding = PaddingValues(horizontal = 4.dp),
         ) {
             items(accounts) { account ->
-                AccountItem(account = account, navController = navController)
+                AccountItem(
+                    account = account,
+                    metrics = creditCardMetrics[account.account.id],
+                    navController = navController,
+                )
             }
         }
     }
@@ -516,20 +523,31 @@ fun AccountsCarouselCard(
 @Composable
 private fun AccountItem(
     account: AccountWithBalance,
+    metrics: CreditCardMetrics? = null,
     navController: NavController,
 ) {
+    val currencyFormat =
+        remember {
+            NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).apply {
+                maximumFractionDigits = 0
+            }
+        }
+    val isCreditCard = account.account.isCreditCard
+    val creditLimit = account.account.creditLimit
+    val hasLimit = isCreditCard && creditLimit != null && creditLimit > 0.0
+
     GlassPanel(
         modifier =
             Modifier
-                .width(180.dp)
-                .height(110.dp)
+                .width(190.dp)
+                .height(124.dp)
                 .clickable { navController.navigate("account_detail/${account.account.id}") },
     ) {
         Column(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Image(
@@ -543,12 +561,69 @@ private fun AccountItem(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Text(
-                    text = "₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(account.balance)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (metrics != null) {
+                    Spacer(Modifier.height(2.dp))
+                    val progress = (metrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
+                    val progressColor = getUtilizationColor(metrics.utilizationPercentage)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Limit: ${currencyFormat.format(metrics.creditLimit)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        Text(
+                            text = "${String.format(Locale.getDefault(), "%.0f", metrics.utilizationPercentage)}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = progressColor,
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(1.5.dp)),
+                        color = progressColor,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Text(
+                        text = "${currencyFormat.format(metrics.currentCycleSpend)} spent • ${metrics.daysRemainingInCycle}d left",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else if (hasLimit) {
+                    Text(
+                        text = "Limit: ${currencyFormat.format(creditLimit)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    Text(
+                        text = currencyFormat.format(account.balance),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -654,7 +729,7 @@ private fun CategoryBudgetGauge(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "₹${NumberFormat.getNumberInstance(Locale("en", "IN")).format(remaining.toInt())} left",
+                text = "₹${NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).format(remaining.toInt())} left",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

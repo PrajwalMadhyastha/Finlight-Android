@@ -934,4 +934,31 @@ class AppDatabaseMigrationTest {
         assertEquals("Cash Spend", cursor4.getString(0))
         cursor4.close()
     }
+
+    @Test
+    fun migrate58To59_addsCreditLimitAndBillingCycleDayToAccounts() {
+        val testDbName = "migration-58-59-test"
+        val db = helper.createDatabase(testDbName, 58)
+
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (1, 'HDFC Salary', 'Bank')")
+        db.execSQL("INSERT INTO accounts (id, name, type) VALUES (2, 'SBI Cashback', 'Credit Card')")
+        db.close()
+
+        val migratedDb = helper.runMigrationsAndValidate(testDbName, 59, true, AppDatabase.MIGRATION_58_59)
+
+        val cursor1 = migratedDb.query("SELECT id, name, type, creditLimit, billingCycleDay FROM accounts WHERE id = 1")
+        assertTrue(cursor1.moveToFirst())
+        assertEquals("HDFC Salary", cursor1.getString(1))
+        assertEquals("Bank", cursor1.getString(2))
+        assertTrue(cursor1.isNull(3))
+        assertTrue(cursor1.isNull(4))
+        cursor1.close()
+
+        migratedDb.execSQL("UPDATE accounts SET creditLimit = 150000.0, billingCycleDay = 24 WHERE id = 2")
+        val cursor2 = migratedDb.query("SELECT creditLimit, billingCycleDay FROM accounts WHERE id = 2")
+        assertTrue(cursor2.moveToFirst())
+        assertEquals(150000.0, cursor2.getDouble(0), 0.01)
+        assertEquals(24, cursor2.getInt(1))
+        cursor2.close()
+    }
 }

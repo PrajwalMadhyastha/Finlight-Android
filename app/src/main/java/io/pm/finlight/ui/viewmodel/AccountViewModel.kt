@@ -16,24 +16,31 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
+import io.pm.finlight.CreditCardMetrics
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import io.pm.finlight.isCreditCard
+import io.pm.finlight.utils.DateUtils
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AccountViewModel(
     private val repository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
@@ -74,6 +81,28 @@ class AccountViewModel(
 
     private val _suggestedMerges = MutableStateFlow<List<Pair<Account, Account>>>(emptyList())
     val suggestedMerges = _suggestedMerges.asStateFlow()
+
+    val creditCardMetrics: StateFlow<Map<Int, CreditCardMetrics>> =
+        repository.accountsWithBalance.flatMapLatest { accounts ->
+            val creditCardAccounts =
+                accounts
+                    .map { it.account }
+                    .filter { it.isCreditCard && (it.creditLimit ?: 0.0) > 0.0 }
+
+            if (creditCardAccounts.isEmpty()) {
+                flowOf(emptyMap())
+            } else {
+                val accountMetricFlows =
+                    creditCardAccounts.map { acc ->
+                        transactionRepository.getTransactionsForAccount(acc.id).map { txns ->
+                            acc.id to calculateCreditCardMetrics(acc, txns)
+                        }
+                    }
+                combine(accountMetricFlows) { pairs ->
+                    pairs.filter { it.second != null }.associate { it.first to it.second!! }
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     init {
         viewModelScope.launch(dispatcherProvider.default) {
@@ -245,6 +274,73 @@ class AccountViewModel(
 
     fun getAccountById(accountId: Int): Flow<Account?> = repository.getAccountById(accountId)
 
+    fun getCreditCardMetrics(accountId: Int): Flow<CreditCardMetrics?> {
+        return repository.getAccountById(accountId).flatMapLatest { account ->
+            if (account == null || !account.isCreditCard || account.creditLimit == null || account.creditLimit <= 0.0) {
+                flowOf(null)
+            } else {
+                transactionRepository.getTransactionsForAccount(accountId).map { txns ->
+                    calculateCreditCardMetrics(account, txns)
+                }
+            }
+        }
+    }
+
+    /**
+     * Calculates the credit card utilization metrics for a given billing cycle.
+     *
+     * Note: Current cycle spend is calculated as `(expenseSum - incomeSum).coerceAtLeast(0.0)`.
+     * `incomeSum` accounts for merchant refunds during the active billing cycle; note that any
+     * bill payments recorded as income directly on the credit card account during the active
+     * billing cycle will also offset current-cycle spend.
+     */
+    fun calculateCreditCardMetrics(
+        account: Account,
+        transactions: List<Transaction>,
+        currentTimeMillis: Long = System.currentTimeMillis(),
+    ): CreditCardMetrics? {
+        val limit = account.creditLimit ?: return null
+        if (limit <= 0.0 || !account.isCreditCard) return null
+
+        val billingDay = account.billingCycleDay ?: 1
+        val (cycleStart, cycleEnd) = DateUtils.getCreditCardBillingCycleRange(billingDay, currentTimeMillis)
+
+        val cycleTransactions =
+            transactions.filter {
+                it.date in cycleStart..cycleEnd && !it.isExcluded
+            }
+
+        val expenseSum =
+            cycleTransactions
+                .filter { it.transactionType == TransactionType.EXPENSE }
+                .sumOf { it.amount }
+        val incomeSum =
+            cycleTransactions
+                .filter { it.transactionType == TransactionType.INCOME }
+                .sumOf { it.amount }
+
+        val currentCycleSpend = (expenseSum - incomeSum).coerceAtLeast(0.0)
+        val availableLimit = (limit - currentCycleSpend).coerceAtLeast(0.0)
+        val utilization = ((currentCycleSpend / limit) * 100.0).toFloat().coerceIn(0f, 1000f)
+
+        val daysRemaining =
+            max(
+                0,
+                ceil((cycleEnd - currentTimeMillis).toDouble() / (1000 * 60 * 60 * 24)).toInt(),
+            )
+
+        return CreditCardMetrics(
+            creditLimit = limit,
+            billingCycleDay = billingDay,
+            currentCycleSpend = currentCycleSpend,
+            availableLimit = availableLimit,
+            utilizationPercentage = utilization,
+            cycleStartDate = cycleStart,
+            cycleEndDate = cycleEnd,
+            daysRemainingInCycle = daysRemaining,
+        )
+    }
+
     fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
             transactions.sumOf { if (it.transactionType == TransactionType.INCOME) it.amount else -it.amount }.roundToLong()
@@ -299,6 +395,14 @@ class AccountViewModel(
         name: String,
         type: String,
         onComplete: (Boolean) -> Unit = {},
+    ) = addAccount(name, type, null, null, onComplete)
+
+    fun addAccount(
+        name: String,
+        type: String,
+        creditLimit: Double?,
+        billingCycleDay: Int?,
+        onComplete: (Boolean) -> Unit = {},
     ) = viewModelScope.launch(dispatcherProvider.io) {
         try {
             if (name.isNotBlank() && type.isNotBlank()) {
@@ -307,7 +411,14 @@ class AccountViewModel(
                     _uiEvent.send("An account named '$name' already exists.")
                     withContext(dispatcherProvider.main) { onComplete(false) }
                 } else {
-                    repository.insert(Account(name = name, type = type))
+                    repository.insert(
+                        Account(
+                            name = name,
+                            type = type,
+                            creditLimit = creditLimit,
+                            billingCycleDay = billingCycleDay,
+                        ),
+                    )
                     _uiEvent.send("Account '$name' created.")
                     withContext(dispatcherProvider.main) { onComplete(true) }
                 }

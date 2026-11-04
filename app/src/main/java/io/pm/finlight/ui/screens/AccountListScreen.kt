@@ -25,7 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.MergeType
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,10 +36,13 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
+import io.pm.finlight.CreditCardMetrics
+import io.pm.finlight.isCreditCard
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import java.text.NumberFormat
 import java.util.*
@@ -59,6 +61,7 @@ fun AccountListScreen(
     val isSelectionMode by viewModel.isSelectionModeActive.collectAsState()
     val selectedIds by viewModel.selectedAccountIds.collectAsState()
     val suggestedMerges by viewModel.suggestedMerges.collectAsState()
+    val ccMetricsMap by viewModel.creditCardMetrics.collectAsState()
     var showMergeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = viewModel.uiEvent) {
@@ -129,6 +132,7 @@ fun AccountListScreen(
                 AccountListItem(
                     modifier = Modifier.animateItemPlacement(),
                     accountWithBalance = accountWithBalance,
+                    creditCardMetrics = ccMetricsMap[accountWithBalance.account.id],
                     isSelectionMode = isSelectionMode,
                     isSelected = accountWithBalance.account.id in selectedIds,
                     onToggleSelection = { viewModel.toggleAccountSelection(accountWithBalance.account.id) },
@@ -208,6 +212,7 @@ private fun MergeSuggestionCard(
 private fun AccountListItem(
     modifier: Modifier = Modifier,
     accountWithBalance: AccountWithBalance,
+    creditCardMetrics: CreditCardMetrics? = null,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onToggleSelection: () -> Unit,
@@ -215,7 +220,7 @@ private fun AccountListItem(
     onNavigateToDetail: () -> Unit,
     onEditClick: () -> Unit,
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
     val backgroundColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else Color.Transparent
 
     GlassPanel(
@@ -247,11 +252,41 @@ private fun AccountListItem(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = "Balance: ${currencyFormat.format(accountWithBalance.balance)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (creditCardMetrics != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Spent: ${currencyFormat.format(creditCardMetrics.currentCycleSpend)} / ${currencyFormat.format(creditCardMetrics.creditLimit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
+                    val progressColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = progressColor,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "${String.format(Locale.getDefault(), "%.1f", creditCardMetrics.utilizationPercentage)}% used • ${creditCardMetrics.daysRemainingInCycle}d left",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = progressColor,
+                    )
+                } else if (accountWithBalance.account.isCreditCard && (accountWithBalance.account.creditLimit ?: 0.0) > 0.0) {
+                    Text(
+                        text = "Limit: ${currencyFormat.format(accountWithBalance.account.creditLimit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = "Balance: ${currencyFormat.format(accountWithBalance.balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             if (isSelectionMode) {
@@ -285,7 +320,7 @@ private fun MergeConfirmationDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = popupContainerColor,
-        icon = { Icon(Icons.Default.MergeType, contentDescription = "Merge") },
+        icon = { Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge") },
         title = { Text("Merge Accounts") },
         text = {
             Column {

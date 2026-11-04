@@ -20,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.viewmodel.AccountViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Calendar
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
@@ -28,11 +30,13 @@ fun DashboardScreen(
     navController: NavController,
     dashboardViewModel: DashboardViewModel,
     transactionViewModel: TransactionViewModel,
+    accountViewModel: AccountViewModel? = null,
 ) {
     val visibleCards by dashboardViewModel.visibleCards.collectAsState()
     val yearlyConsistencyData by dashboardViewModel.yearlyConsistencyData.collectAsState()
     val budgetHealthSummary by dashboardViewModel.budgetHealthSummary.collectAsState()
     val isPrivacyModeEnabled by dashboardViewModel.privacyModeEnabled.collectAsState()
+    val creditCardMetrics by (accountViewModel?.creditCardMetrics ?: MutableStateFlow(emptyMap())).collectAsState()
 
     // --- NEW: Collect state for the summary card ---
     val showLastMonthSummary by dashboardViewModel.showLastMonthSummaryCard.collectAsState()
@@ -59,6 +63,7 @@ fun DashboardScreen(
                     navController = navController,
                     dashboardViewModel = dashboardViewModel,
                     transactionViewModel = transactionViewModel,
+                    creditCardMetrics = creditCardMetrics,
                     yearlyConsistencyData = yearlyConsistencyData,
                     budgetHealthSummary = budgetHealthSummary,
                     isPrivacyModeEnabled = isPrivacyModeEnabled,
@@ -103,6 +108,7 @@ fun DashboardScreen(
                     navController = navController,
                     dashboardViewModel = dashboardViewModel,
                     transactionViewModel = transactionViewModel,
+                    creditCardMetrics = creditCardMetrics,
                     yearlyConsistencyData = yearlyConsistencyData,
                     budgetHealthSummary = budgetHealthSummary,
                     isPrivacyModeEnabled = isPrivacyModeEnabled,
@@ -118,6 +124,7 @@ private fun DashboardCard(
     navController: NavController,
     dashboardViewModel: DashboardViewModel,
     transactionViewModel: TransactionViewModel,
+    creditCardMetrics: Map<Int, CreditCardMetrics> = emptyMap(),
     yearlyConsistencyData: List<CalendarDayStatus>,
     budgetHealthSummary: String,
     isPrivacyModeEnabled: Boolean,
@@ -152,7 +159,12 @@ private fun DashboardCard(
                 navController = navController,
                 onCategoryClick = { transactionViewModel.requestCategoryChange(it) },
             )
-        DashboardCardType.ACCOUNTS_CAROUSEL -> AccountsCarouselCard(accounts = accountsSummary, navController = navController)
+        DashboardCardType.ACCOUNTS_CAROUSEL ->
+            AccountsCarouselCard(
+                accounts = accountsSummary,
+                creditCardMetrics = creditCardMetrics,
+                navController = navController,
+            )
         DashboardCardType.BUDGET_WATCH ->
             BudgetWatchCard(
                 budgetStatus = budgetStatus,

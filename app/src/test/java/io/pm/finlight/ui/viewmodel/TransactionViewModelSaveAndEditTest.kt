@@ -525,6 +525,43 @@ class TransactionViewModelSaveAndEditTest : TransactionViewModelBaseSetup() {
         }
 
     @Test
+    fun `createAccount with credit card fields inserts account with limit and billing cycle day`() =
+        runTest {
+            val cardName = "Axis Atlas"
+            val cardType = "Credit Card"
+            val limit = 300000.0
+            val billingDay = 20
+            val cardAccount = Account(1, cardName, cardType, creditLimit = limit, billingCycleDay = billingDay)
+            var createdAccount: Account? = null
+
+            whenever(accountRepository.findByName(cardName)).thenReturn(null)
+            whenever(
+                accountRepository.insert(
+                    Account(
+                        name = cardName,
+                        type = cardType,
+                        creditLimit = limit,
+                        billingCycleDay = billingDay,
+                    ),
+                ),
+            ).thenReturn(1L)
+            whenever(accountRepository.getAccountByIdSync(1)).thenReturn(cardAccount)
+
+            viewModel.createAccount(cardName, cardType, limit, billingDay) { createdAccount = it }
+            advanceUntilIdle()
+
+            verify(accountRepository).insert(
+                Account(
+                    name = cardName,
+                    type = cardType,
+                    creditLimit = limit,
+                    billingCycleDay = billingDay,
+                ),
+            )
+            assertEquals(cardAccount, createdAccount)
+        }
+
+    @Test
     fun `createAccount when getAccountByIdSync returns null does not invoke callback`() =
         runTest {
             val newAccountName = "New Bank Null"
