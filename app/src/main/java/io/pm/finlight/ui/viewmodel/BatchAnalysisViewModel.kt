@@ -13,6 +13,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.DEFAULT_IGNORE_PHRASES
 import io.pm.finlight.RuleType
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
@@ -269,23 +270,22 @@ class BatchAnalysisViewModel(
     }
 }
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createBatchAnalysisFactory(context)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class BatchAnalysisViewModelFactory(
-    private val context: Context,
-    private val nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
-    private val classifier: SmsClassifier? = null,
-    private val dispatcherProvider: DispatcherProvider? = null,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(BatchAnalysisViewModel::class.java)) {
-            val appContext = context.applicationContext ?: context
-            @Suppress("UNCHECKED_CAST")
-            return BatchAnalysisViewModel(
-                context = appContext,
-                dispatcherProvider = dispatcherProvider ?: DefaultDispatcherProvider(),
-                nerExtractorProvider = nerExtractorProvider ?: { MlModelFactory.getNerExtractor(appContext) },
-                classifier = classifier ?: MlModelFactory.getClassifier(appContext),
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    context: Context,
+    nerExtractorProvider: (() -> SmsEntityExtractor)? = null,
+    classifier: SmsClassifier? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createBatchAnalysisFactory(
+        context = context,
+        nerExtractorProvider = nerExtractorProvider,
+        classifier = classifier,
+        dispatcherProvider = dispatcherProvider,
+    )

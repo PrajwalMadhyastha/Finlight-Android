@@ -1,23 +1,47 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/RuleCreationViewModelFactory.kt
-// REASON: NEW FILE - This factory provides the CustomSmsRuleDao dependency to the
-// RuleCreationViewModel, enabling constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.RuleCreationViewModel
-import io.pm.finlight.data.db.AppDatabase
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.viewmodel.CreationExtras
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DispatcherProvider
 
-class RuleCreationViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
+class RuleCreationViewModelFactory(
+    private val application: Application,
+    private val customSmsRuleRepository: ICustomSmsRuleRepository? = null,
+    private val dispatcherProvider: DispatcherProvider? = null,
+    private val savedStateHandle: SavedStateHandle? = null,
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
         if (modelClass.isAssignableFrom(RuleCreationViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
+            val handle = savedStateHandle ?: runCatching { extras.createSavedStateHandle() }.getOrElse { SavedStateHandle() }
             @Suppress("UNCHECKED_CAST")
-            return RuleCreationViewModel(db.customSmsRuleDao()) as T
+            return ServiceLocator.provideRuleCreationViewModel(
+                context = application,
+                savedStateHandle = handle,
+                customSmsRuleRepository = customSmsRuleRepository,
+                dispatcherProvider = dispatcherProvider,
+            ) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return create(modelClass, CreationExtras.Empty)
     }
 }

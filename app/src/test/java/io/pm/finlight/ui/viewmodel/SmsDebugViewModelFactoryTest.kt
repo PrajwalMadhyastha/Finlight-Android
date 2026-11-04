@@ -12,7 +12,12 @@ import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkAll
 import io.mockk.verify
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
 import io.pm.finlight.ISmsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.TestApplication
 import io.pm.finlight.data.db.AppDatabase
@@ -46,6 +51,8 @@ class SmsDebugViewModelFactoryTest {
                 .build()
         AppDatabase.setTestInstance(db)
         ServiceLocator.reset()
+        val mockClassifier: SmsClassifier = mockk(relaxed = true)
+        ServiceLocator.setSmsClassifier(mockClassifier)
     }
 
     @After
@@ -61,8 +68,19 @@ class SmsDebugViewModelFactoryTest {
             mockk(relaxed = true) {
                 coEvery { fetchAllSms(any()) } returns emptyList()
             }
+        val mockTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val mockCustomSmsRuleRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
+        val mockMerchantRenameRepo: IMerchantRenameRuleRepository = mockk(relaxed = true)
+        val mockIgnoreRuleRepo: IIgnoreRuleRepository = mockk(relaxed = true)
+        val mockMerchantCategoryMappingRepo: IMerchantCategoryMappingRepository = mockk(relaxed = true)
         val mockAutoSaveUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
+
         ServiceLocator.setSmsRepository(mockSmsRepo)
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRuleRepo)
+        ServiceLocator.setMerchantRenameRuleRepository(mockMerchantRenameRepo)
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockMerchantCategoryMappingRepo)
         ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSaveUseCase)
 
         mockkObject(MlModelFactory)
@@ -70,6 +88,7 @@ class SmsDebugViewModelFactoryTest {
         val mockNerExtractor: NerExtractor = mockk(relaxed = true)
         every { MlModelFactory.getClassifier(any()) } returns mockClassifier
         every { MlModelFactory.getNerExtractor(any()) } returns mockNerExtractor
+        ServiceLocator.setSmsClassifier(mockClassifier)
 
         val factory = SmsDebugViewModelFactory(application)
 
@@ -82,6 +101,36 @@ class SmsDebugViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockAutoSaveUseCase, autoSaveUseCaseField)
+
+        val txnRepoField =
+            SmsDebugViewModel::class.java.getDeclaredField("transactionRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockTxnRepo, txnRepoField)
+
+        val customSmsRuleRepoField =
+            SmsDebugViewModel::class.java.getDeclaredField("customSmsRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockCustomSmsRuleRepo, customSmsRuleRepoField)
+
+        val merchantRenameRepoField =
+            SmsDebugViewModel::class.java.getDeclaredField("merchantRenameRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantRenameRepo, merchantRenameRepoField)
+
+        val ignoreRuleRepoField =
+            SmsDebugViewModel::class.java.getDeclaredField("ignoreRuleRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockIgnoreRuleRepo, ignoreRuleRepoField)
+
+        val merchantCategoryMappingRepoField =
+            SmsDebugViewModel::class.java.getDeclaredField("merchantCategoryMappingRepository").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockMerchantCategoryMappingRepo, merchantCategoryMappingRepoField)
 
         // NerExtractor is NOT eagerly instantiated on creation
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
@@ -116,6 +165,23 @@ class SmsDebugViewModelFactoryTest {
 
         assertSame(customExtractor, viewModel.nerExtractorProvider.invoke())
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }
+    }
+
+    @Test
+    fun create_withExtras_returnsSmsDebugViewModel() {
+        val factory = SmsDebugViewModelFactory(application)
+        val viewModel = factory.create(SmsDebugViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: SmsDebugViewModel = mockk(relaxed = true)
+        ServiceLocator.setSmsDebugViewModel(mockViewModel)
+
+        val factory = SmsDebugViewModelFactory(application)
+        val resolved = factory.create(SmsDebugViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

@@ -259,4 +259,15 @@ class TransactionViewModelReimbursementTest : TransactionViewModelBaseSetup() {
                 viewModel.linkedExpenseForCurrentIncome.value,
             )
         }
+
+    @Test
+    fun `resetDetailReimbursementState clears reimbursement states via delegate`() =
+        runTest {
+            initializeViewModel()
+            viewModel.resetDetailReimbursementState()
+            advanceUntilIdle()
+
+            assertEquals(emptyList<TransactionDetails>(), viewModel.reimbursementsForCurrentExpense.value)
+            assertNull(viewModel.linkedExpenseForCurrentIncome.value)
+        }
 }

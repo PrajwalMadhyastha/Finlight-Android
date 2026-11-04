@@ -164,7 +164,7 @@ class AutoSaveSmsTransactionUseCase(
         }
     }
 
-    private suspend fun isDuplicateOrDeleted(potentialTxn: PotentialTransaction): Boolean {
+    suspend fun isDuplicateOrDeleted(potentialTxn: PotentialTransaction): Boolean {
         val hash = potentialTxn.sourceSmsHash ?: return false
 
         // 1. Check existing transaction by current hash

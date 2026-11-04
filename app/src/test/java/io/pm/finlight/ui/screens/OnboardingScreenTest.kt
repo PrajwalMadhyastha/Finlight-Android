@@ -9,8 +9,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
-import io.pm.finlight.OnboardingViewModel
 import io.pm.finlight.TestApplication
+import io.pm.finlight.ui.viewmodel.OnboardingViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Rule
 import org.junit.Test

@@ -36,7 +36,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import android.app.Application
 import androidx.compose.ui.platform.LocalContext
-import io.pm.finlight.ui.viewmodel.RecurringTransactionViewModelFactory
+import io.pm.finlight.di.FinlightViewModelFactory
 import java.util.Locale
 import androidx.compose.ui.Alignment
 import io.pm.finlight.Account
@@ -58,11 +58,11 @@ fun AddRecurringTransactionScreen(
     val context = LocalContext.current
     val recurringViewModel: RecurringTransactionViewModel =
         viewModel(
-            factory = RecurringTransactionViewModelFactory(context.applicationContext as Application)
+            factory = FinlightViewModelFactory.create(context.applicationContext as Application)
         )
     val transactionViewModel: TransactionViewModel =
         viewModel(
-            factory = io.pm.finlight.ui.viewmodel.TransactionViewModelFactory(context.applicationContext as Application)
+            factory = FinlightViewModelFactory.create(context.applicationContext as Application)
         )
 
     val isEditMode = ruleId != null

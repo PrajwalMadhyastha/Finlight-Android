@@ -10,10 +10,13 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,7 +63,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
 
             // Act
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.uiState.test {
@@ -84,7 +87,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
 
             // Act
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.uiState.test {
@@ -122,7 +125,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
             `when`(categoryRepository.getCategoryById(1)).thenReturn(category)
 
             // Act
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.uiState.test {
@@ -152,7 +155,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
                     notes = null,
                 )
             `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
             // wait for init
             viewModel.uiState.test { awaitItem() }
 
@@ -187,7 +190,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
                     notes = null,
                 )
             `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
             viewModel.uiState.test { awaitItem() } // Consume initial state
             viewModel.addSplitItem()
             val itemToRemove = viewModel.uiState.value.splitItems.first()
@@ -222,7 +225,7 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
                     notes = null,
                 )
             `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flowOf(parentTxn))
-            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId)
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
             viewModel.uiState.test { awaitItem() } // Consume initial state
 
             // Act
@@ -235,6 +238,21 @@ class SplitTransactionViewModelTest : BaseViewModelTest() {
                 val state = awaitItem()
                 // Parent=150, splits=80+30=110, remaining=40
                 assertEquals(40.0, state.remainingAmount, 0.001)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `init failure sets error state when repository throws`() =
+        runTest {
+            val transactionId = 1
+            `when`(transactionRepository.getTransactionById(transactionId)).thenReturn(flow { throw RuntimeException("DB crash") })
+
+            viewModel = SplitTransactionViewModel(transactionRepository, categoryRepository, splitTransactionRepository, transactionId, TestDispatcherProvider(testDispatcher))
+
+            viewModel.uiState.test {
+                val state = awaitItem()
+                assertTrue(state.error?.contains("DB crash") == true)
                 cancelAndIgnoreRemainingEvents()
             }
         }

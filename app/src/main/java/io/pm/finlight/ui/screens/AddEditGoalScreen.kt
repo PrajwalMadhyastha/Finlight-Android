@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.FormatUtils

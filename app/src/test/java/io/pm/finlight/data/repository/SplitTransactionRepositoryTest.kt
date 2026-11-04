@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.data.db.dao.TransactionWriteDao
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -23,12 +24,15 @@ class SplitTransactionRepositoryTest : BaseViewModelTest() {
     @Mock
     private lateinit var splitTransactionDao: SplitTransactionDao
 
+    @Mock
+    private lateinit var transactionWriteDao: TransactionWriteDao
+
     private lateinit var repository: SplitTransactionRepository
 
     @Before
     override fun setup() {
         super.setup()
-        repository = SplitTransactionRepository(splitTransactionDao)
+        repository = SplitTransactionRepository(splitTransactionDao, transactionWriteDao)
     }
 
     @Test
@@ -53,5 +57,70 @@ class SplitTransactionRepositoryTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
             verify(splitTransactionDao).getSplitsForParent(parentId)
+        }
+
+    @Test
+    fun `saveSplits executes transactionRunner and delegates to DAOs`() =
+        runTest {
+            val splits = listOf(SplitTransaction(id = 1, parentTransactionId = 10, amount = 25.0, categoryId = 1, notes = "Snack"))
+
+            repository.saveSplits(10, splits)
+
+            verify(transactionWriteDao).markAsSplit(10, true)
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(splitTransactionDao).insertAll(splits)
+        }
+
+    @Test
+    fun `unmarkSplit with existing splits restores first category and delegates to DAOs`() =
+        runTest {
+            val splits =
+                listOf(
+                    SplitTransactionDetails(
+                        splitTransaction = SplitTransaction(id = 1, parentTransactionId = 10, amount = 25.0, categoryId = 42, notes = "Snack"),
+                        categoryName = "Food",
+                        categoryIconKey = "icon",
+                        categoryColorKey = "color",
+                    )
+                )
+            `when`(splitTransactionDao.getSplitsForParentSimple(10)).thenReturn(splits)
+
+            repository.unmarkSplit(10, "Original Desc")
+
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(transactionWriteDao).unmarkAsSplit(10, "Original Desc", 42)
+        }
+
+    @Test
+    fun `unmarkSplit with null splits passes null category`() =
+        runTest {
+            `when`(splitTransactionDao.getSplitsForParentSimple(10)).thenReturn(null)
+
+            repository.unmarkSplit(10, "Original Desc")
+
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(transactionWriteDao).unmarkAsSplit(10, "Original Desc", null)
+        }
+
+    @Test
+    fun `unmarkSplit with empty splits passes null category`() =
+        runTest {
+            `when`(splitTransactionDao.getSplitsForParentSimple(10)).thenReturn(emptyList())
+
+            repository.unmarkSplit(10, "Original Desc")
+
+            verify(splitTransactionDao).deleteSplitsForParent(10)
+            verify(transactionWriteDao).unmarkAsSplit(10, "Original Desc", null)
+        }
+
+    @Test
+    fun `insertAll proxies call to DAO`() =
+        runTest {
+            val splits =
+                listOf(
+                    SplitTransaction(id = 1, parentTransactionId = 10, amount = 25.0, categoryId = 1, notes = "Snack"),
+                )
+            repository.insertAll(splits)
+            verify(splitTransactionDao).insertAll(splits)
         }
 }

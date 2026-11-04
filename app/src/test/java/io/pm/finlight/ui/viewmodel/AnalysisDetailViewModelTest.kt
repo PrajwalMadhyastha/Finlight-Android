@@ -14,6 +14,7 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -65,7 +66,7 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
             ).thenReturn(flowOf(mockTransactionDetails))
 
             // Act
-            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.CATEGORY, categoryId, startDate, endDate)
+            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.CATEGORY, categoryId, startDate, endDate, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.transactions.test {
@@ -87,7 +88,7 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
             ).thenReturn(flowOf(mockTransactionDetails))
 
             // Act
-            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.TAG, tagId, startDate, endDate)
+            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.TAG, tagId, startDate, endDate, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.transactions.test {
@@ -109,7 +110,7 @@ class AnalysisDetailViewModelTest : BaseViewModelTest() {
             ).thenReturn(flowOf(mockTransactionDetails))
 
             // Act
-            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.MERCHANT, merchantName, startDate, endDate)
+            viewModel = AnalysisDetailViewModel(transactionAnalyticsDao, AnalysisDimension.MERCHANT, merchantName, startDate, endDate, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.transactions.test {

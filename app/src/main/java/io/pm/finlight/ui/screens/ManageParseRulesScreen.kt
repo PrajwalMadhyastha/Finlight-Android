@@ -26,19 +26,20 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.CustomSmsRule
-import io.pm.finlight.ManageParseRulesViewModel
+import io.pm.finlight.TransactionType
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.viewmodel.ManageParseRulesViewModel
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -47,49 +48,74 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 @Composable
 fun ManageParseRulesScreen(
     navController: NavController,
-    viewModel: ManageParseRulesViewModel = viewModel(),
+    viewModel: ManageParseRulesViewModel,
 ) {
     val rules by viewModel.allRules.collectAsState()
-    var ruleToDelete by remember { mutableStateOf<CustomSmsRule?>(null) }
-
-    if (rules.isEmpty()) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            EmptyStateMessage(
-                message = "No custom parsing rules have been created yet.",
-                icon = Icons.Default.Info,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-            )
-            Spacer(Modifier.height(16.dp))
-            Button(onClick = { navController.navigate("rule_creation_screen") }) {
-                Text("Add New Rule")
-            }
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var ruleIdToDelete by rememberSaveable { mutableStateOf<Int?>(null) }
+    val ruleToDelete =
+        remember(ruleIdToDelete, rules) {
+            rules.find { it.id == ruleIdToDelete }
         }
-    } else {
-        LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let { msg ->
+            snackbarHostState.showSnackbar(msg)
+            viewModel.clearError()
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Transparent,
+    ) { innerPadding ->
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
         ) {
-            items(rules, key = { it.id }) { rule ->
-                RuleItemCard(
-                    modifier = Modifier.animateItemPlacement(),
-                    rule = rule,
-                    onEditClick = {
-                        navController.navigate("rule_creation_screen?ruleId=${rule.id}")
-                    },
-                    onDeleteClick = { ruleToDelete = rule },
-                )
-            }
-            item {
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = { navController.navigate("rule_creation_screen") },
-                    modifier = Modifier.fillMaxWidth()
+            if (rules.isEmpty()) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("Add New Rule")
+                    EmptyStateMessage(
+                        message = "No custom parsing rules have been created yet.",
+                        icon = Icons.Default.Info,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(onClick = { navController.navigate("rule_creation_screen") }) {
+                        Text("Add New Rule")
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    items(rules, key = { it.id }) { rule ->
+                        RuleItemCard(
+                            modifier = Modifier.animateItemPlacement(),
+                            rule = rule,
+                            onEditClick = {
+                                navController.navigate("rule_creation_screen?ruleId=${rule.id}")
+                            },
+                            onDeleteClick = { ruleIdToDelete = rule.id },
+                        )
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { navController.navigate("rule_creation_screen") },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Add New Rule")
+                        }
+                    }
                 }
             }
         }
@@ -101,10 +127,10 @@ fun ManageParseRulesScreen(
             text = "Are you sure you want to delete this parsing rule? This action cannot be undone.",
             confirmButtonText = "Delete",
             isDestructive = true,
-            onDismiss = { ruleToDelete = null },
+            onDismiss = { ruleIdToDelete = null },
             onConfirm = {
-                viewModel.deleteRule(ruleToDelete!!)
-                ruleToDelete = null
+                viewModel.deleteRule(ruleToDelete)
+                ruleIdToDelete = null
             },
         )
     }
@@ -154,6 +180,14 @@ private fun RuleItemCard(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                val txnTypeLabel =
+                    when (TransactionType.fromStringOrNull(rule.transactionType)) {
+                        TransactionType.EXPENSE -> "Expense"
+                        TransactionType.INCOME -> "Income"
+                        TransactionType.TRANSFER -> "Transfer"
+                        null -> "Auto-Detect"
+                    }
+                RuleDetailRow(label = "Transaction Type", value = txnTypeLabel)
                 rule.merchantNameExample?.let {
                     RuleDetailRow(label = "Merchant Name", value = it)
                 }

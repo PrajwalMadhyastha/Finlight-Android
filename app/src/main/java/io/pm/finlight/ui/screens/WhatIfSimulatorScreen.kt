@@ -28,12 +28,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import io.pm.finlight.WhatIfViewModel
 import io.pm.finlight.ui.components.AuroraProgressBar
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.PrivacyAwareText
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 
 // Helper to detect perceived luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -50,6 +50,7 @@ fun WhatIfSimulatorScreen(
     val simulatedExpenses by viewModel.simulatedExpenses.collectAsState()
     val simulatedAmountRemaining by viewModel.simulatedAmountRemaining.collectAsState()
     val simulatedSafeToSpendPerDay by viewModel.simulatedSafeToSpendPerDay.collectAsState()
+    val isDeficit by viewModel.isDeficitSpending.collectAsState()
     val privacyModeEnabled by viewModel.privacyModeEnabled.collectAsState()
     val monthYear = viewModel.monthYear
 
@@ -115,6 +116,7 @@ fun WhatIfSimulatorScreen(
                     amountSpent = simulatedExpenses,
                     amountRemaining = simulatedAmountRemaining,
                     safeToSpend = simulatedSafeToSpendPerDay,
+                    isDeficit = isDeficit,
                     isPrivacyModeEnabled = privacyModeEnabled
                 )
             }
@@ -133,7 +135,12 @@ fun WhatIfSimulatorScreen(
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    TextButton(onClick = { showAddDialog = true }) {
+                    TextButton(
+                        onClick = {
+                            viewModel.clearValidationError()
+                            showAddDialog = true
+                        }
+                    ) {
                         Icon(
                             Icons.Default.Add,
                             contentDescription = "Add Expense",
@@ -170,16 +177,30 @@ fun WhatIfSimulatorScreen(
     if (showAddDialog) {
         var name by remember { mutableStateOf("") }
         var amountStr by remember { mutableStateOf("") }
+        val validationError by viewModel.validationError.collectAsState()
 
         AlertDialog(
-            onDismissRequest = { showAddDialog = false },
+            onDismissRequest = {
+                viewModel.clearValidationError()
+                showAddDialog = false
+            },
             title = { Text("Add Hypothetical Expense") },
             containerColor = popupContainerColor,
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (validationError != null) {
+                        Text(
+                            text = validationError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     OutlinedTextField(
                         value = name,
-                        onValueChange = { name = it },
+                        onValueChange = {
+                            name = it
+                            if (validationError != null) viewModel.clearValidationError()
+                        },
                         label = { Text("Expense Name (e.g., Car EMI)") },
                         singleLine = true,
                         colors =
@@ -200,6 +221,7 @@ fun WhatIfSimulatorScreen(
                         onValueChange = { str ->
                             if (str.all { it.isDigit() }) {
                                 amountStr = str
+                                if (validationError != null) viewModel.clearValidationError()
                             }
                         },
                         label = { Text("Amount") },
@@ -224,19 +246,24 @@ fun WhatIfSimulatorScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = amountStr.toLongOrNull()
-                        if (name.isNotBlank() && amount != null && amount > 0) {
-                            viewModel.addHypotheticalExpense(name, amount)
+                        val amount = amountStr.toLongOrNull() ?: 0L
+                        val result = viewModel.addHypotheticalExpense(name, amount)
+                        if (result.isSuccess) {
                             showAddDialog = false
                         }
                     },
-                    enabled = name.isNotBlank() && amountStr.isNotBlank()
+                    enabled = name.isNotBlank() && (amountStr.toLongOrNull() ?: 0L) > 0L
                 ) {
                     Text("Add")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showAddDialog = false }) {
+                TextButton(
+                    onClick = {
+                        viewModel.clearValidationError()
+                        showAddDialog = false
+                    }
+                ) {
                     Text("Cancel")
                 }
             }
@@ -250,6 +277,7 @@ private fun SimulatedHeroCard(
     amountSpent: Long,
     amountRemaining: Long,
     safeToSpend: Long,
+    isDeficit: Boolean,
     isPrivacyModeEnabled: Boolean
 ) {
     val progress = if (totalBudget > 0) (amountSpent.toFloat() / totalBudget.toFloat()) else 0f
@@ -258,6 +286,13 @@ private fun SimulatedHeroCard(
         animationSpec = tween(durationMillis = 400, easing = EaseOutCubic),
         label = "SimulatedBudgetProgress"
     )
+
+    val safeBoxColor =
+        if (isDeficit) {
+            MaterialTheme.colorScheme.error.copy(alpha = 0.15f)
+        } else {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+        }
 
     GlassPanel {
         Column(
@@ -293,11 +328,11 @@ private fun SimulatedHeroCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     PrivacyAwareText(
-                        amount = amountRemaining,
+                        amount = if (isDeficit) kotlin.math.abs(amountRemaining) else amountRemaining,
                         isPrivacyMode = isPrivacyModeEnabled,
-                        prefix = "Remaining: ",
+                        prefix = if (isDeficit) "Deficit: " else "Remaining: ",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isDeficit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     PrivacyAwareText(
                         amount = totalBudget,
@@ -321,7 +356,7 @@ private fun SimulatedHeroCard(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f))
+                        .background(safeBoxColor)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -330,7 +365,7 @@ private fun SimulatedHeroCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = "Simulated Safe to Spend",
+                        text = if (isDeficit) "Simulated Deficit per Day" else "Simulated Safe to Spend",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -340,7 +375,7 @@ private fun SimulatedHeroCard(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         PrivacyAwareText(
-                            amount = safeToSpend,
+                            amount = if (isDeficit) kotlin.math.abs(safeToSpend) else safeToSpend,
                             isPrivacyMode = isPrivacyModeEnabled,
                             isCurrency = true,
                             style =
@@ -349,7 +384,7 @@ private fun SimulatedHeroCard(
                                     letterSpacing = 0.5.sp
                                 ),
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (isDeficit) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = "/day",

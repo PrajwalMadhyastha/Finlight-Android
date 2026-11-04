@@ -5,15 +5,13 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.navigation.NavController
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.mockk
 import io.pm.finlight.ParseResult
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.SmsDebugResult
+import io.pm.finlight.SmsDebugViewModel
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.TestApplication
-import io.pm.finlight.TransactionViewModel
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,7 +26,7 @@ class SmsDebugScreenTest {
     @Test
     fun `force save button is displayed on success and clicking it saves transaction`() {
         val mockNavController: NavController = mockk(relaxed = true)
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
+        val mockSmsDebugViewModel: SmsDebugViewModel = mockk(relaxed = true)
 
         val potentialTxn =
             PotentialTransaction(
@@ -46,13 +44,11 @@ class SmsDebugScreenTest {
                 parseResult = ParseResult.Success(potentialTxn),
             )
 
-        coEvery { mockTransactionViewModel.autoSaveSmsTransaction(any(), any()) } returns true
-
         composeTestRule.setContent {
             SmsDebugItem(
                 result = successResult,
                 navController = mockNavController,
-                transactionViewModel = mockTransactionViewModel,
+                viewModel = mockSmsDebugViewModel,
             )
         }
 
@@ -63,13 +59,13 @@ class SmsDebugScreenTest {
         composeTestRule.onNodeWithText("Force Save Transaction").performClick()
 
         // Verify view model was called
-        coVerify(exactly = 1) { mockTransactionViewModel.autoSaveSmsTransaction(potentialTxn, "Manual Import") }
+        io.mockk.verify(exactly = 1) { mockSmsDebugViewModel.forceSaveTransaction(potentialTxn, any()) }
     }
 
     @Test
     fun `force save button is not displayed on failure`() {
         val mockNavController: NavController = mockk(relaxed = true)
-        val mockTransactionViewModel: TransactionViewModel = mockk(relaxed = true)
+        val mockSmsDebugViewModel: SmsDebugViewModel = mockk(relaxed = true)
 
         val failureResult =
             SmsDebugResult(
@@ -81,7 +77,7 @@ class SmsDebugScreenTest {
             SmsDebugItem(
                 result = failureResult,
                 navController = mockNavController,
-                transactionViewModel = mockTransactionViewModel,
+                viewModel = mockSmsDebugViewModel,
             )
         }
 

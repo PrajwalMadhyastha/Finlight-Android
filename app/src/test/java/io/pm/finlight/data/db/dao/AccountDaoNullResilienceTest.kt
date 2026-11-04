@@ -28,7 +28,7 @@ class AccountDaoNullResilienceTest {
 
             // Recreate accounts table without NOT NULL constraints to simulate legacy migration
             db.execSQL("DROP TABLE IF EXISTS accounts")
-            db.execSQL("CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT, type TEXT)")
+            db.execSQL("CREATE TABLE accounts (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT, type TEXT, creditLimit REAL, billingCycleDay INTEGER)")
             db.execSQL("INSERT INTO accounts (id, name, type) VALUES (99, NULL, NULL)")
 
             val dao = dbRule.db.accountDao()

@@ -338,4 +338,12 @@ class TransactionViewModelSelectionTest : TransactionViewModelBaseSetup() {
             verify(transactionRepository).updateCategoryId(eq(id), eq(catId))
             verify(transactionRepository).updateNotes(eq(id), eq(notes))
         }
+
+    @Test
+    fun `resetMergedTransactionBreakdown clears breakdown via delegate`() =
+        runTest {
+            initializeViewModel()
+            viewModel.resetMergedTransactionBreakdown()
+            assertTrue(viewModel.mergedTransactionBreakdown.value.isEmpty())
+        }
 }

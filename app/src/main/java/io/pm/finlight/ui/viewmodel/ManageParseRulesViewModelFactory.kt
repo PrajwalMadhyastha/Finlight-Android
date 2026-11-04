@@ -1,23 +1,42 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/ManageParseRulesViewModelFactory.kt
-// REASON: NEW FILE - This factory provides the CustomSmsRuleDao dependency to the
-// ManageParseRulesViewModel, enabling constructor injection for better testability.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.ManageParseRulesViewModel
-import io.pm.finlight.data.db.AppDatabase
+import androidx.lifecycle.viewmodel.CreationExtras
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.DispatcherProvider
 
-class ManageParseRulesViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
+class ManageParseRulesViewModelFactory(
+    private val application: Application,
+    private val customSmsRuleRepository: ICustomSmsRuleRepository? = null,
+    private val dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ManageParseRulesViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
             @Suppress("UNCHECKED_CAST")
-            return ManageParseRulesViewModel(db.customSmsRuleDao()) as T
+            return ServiceLocator.provideManageParseRulesViewModel(
+                context = application,
+                customSmsRuleRepository = customSmsRuleRepository,
+                dispatcherProvider = dispatcherProvider,
+            ) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

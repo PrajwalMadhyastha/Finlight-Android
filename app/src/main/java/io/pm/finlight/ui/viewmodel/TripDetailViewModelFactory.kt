@@ -1,31 +1,35 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.repository.TripRepository
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.data.repository.ITripRepository
+import io.pm.finlight.di.FinlightViewModelFactory
+import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createTripDetailFactory(application, tripId, tagId)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class TripDetailViewModelFactory(
-    private val application: Application,
-    private val tripId: Int,
-    private val tagId: Int,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(TripDetailViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val tripRepository = TripRepository(db.tripDao())
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-
-            @Suppress("UNCHECKED_CAST")
-            return TripDetailViewModel(
-                tripRepository,
-                transactionRepository,
-                tripId,
-                tagId,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    application: Application,
+    tripId: Int,
+    tagId: Int,
+    resolvedDb: AppDatabase? = null,
+    tripRepository: ITripRepository? = null,
+    transactionRepository: ITransactionRepository? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createTripDetailFactory(
+        context = application,
+        tripId = tripId,
+        tagId = tagId,
+        resolvedDb = resolvedDb,
+        tripRepository = tripRepository,
+        transactionRepository = transactionRepository,
+        dispatcherProvider = dispatcherProvider,
+    )

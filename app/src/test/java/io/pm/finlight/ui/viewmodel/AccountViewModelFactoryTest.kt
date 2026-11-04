@@ -90,6 +90,21 @@ class AccountViewModelFactoryTest {
     }
 
     @Test
+    fun create_withExtras_returnsAccountViewModel() {
+        val viewModel = factory.create(AccountViewModel::class.java, androidx.lifecycle.viewmodel.CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: AccountViewModel = mockk(relaxed = true)
+        ServiceLocator.setAccountViewModel(mockViewModel)
+
+        val resolved = factory.create(AccountViewModel::class.java)
+        assertSame(mockViewModel, resolved)
+    }
+
+    @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
         class UnknownViewModel : ViewModel()
 

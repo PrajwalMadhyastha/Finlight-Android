@@ -24,17 +24,21 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import io.pm.finlight.GoalViewModel
 import io.pm.finlight.Transaction
 import io.pm.finlight.data.db.entity.GoalContribution
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.GoalViewModel
 import io.pm.finlight.ui.components.TransactionPickerSheet
 import io.pm.finlight.utils.FormatUtils
 import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
+
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.ui.text.style.TextAlign
+import kotlinx.coroutines.delay
 
 // Helper function to determine if a color is 'dark' based on luminance.
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
@@ -47,13 +51,23 @@ private fun getPopupContainerColor() = if (MaterialTheme.colorScheme.background.
 fun GoalDetailScreen(
     goalId: Int,
     navController: NavController,
-    goalViewModel: GoalViewModel = viewModel()
+    goalViewModel: GoalViewModel = viewModel(),
 ) {
-    val goal by goalViewModel.getGoalById(goalId).collectAsState(initial = null)
-    val linkedTotal by goalViewModel.getLinkedTotal(goalId).collectAsState(initial = 0.0)
-    val offlineTotal by goalViewModel.getTotalContributionForGoal(goalId).collectAsState(initial = 0.0)
+    val allGoalsWithProgress by goalViewModel.goalsWithProgress.collectAsState()
+    val goalProgress =
+        remember(goalId) { goalViewModel.getGoalProgress(goalId) }
+            .collectAsState(initial = null).value
     val offlineContributions by goalViewModel.getContributionsForGoal(goalId).collectAsState(initial = emptyList())
     val linkedTransactions by goalViewModel.getLinkedTransactions(goalId).collectAsState(initial = emptyList<Transaction>())
+
+    var isTimedOut by remember(goalId) { mutableStateOf(false) }
+
+    LaunchedEffect(goalId) {
+        delay(1500)
+        isTimedOut = true
+    }
+
+    val isNotFound = (allGoalsWithProgress.isNotEmpty() && goalProgress == null) || (isTimedOut && goalProgress == null)
 
     // We'll just fetch all recent transactions for the picker and filter out already linked ones.
     val cal = Calendar.getInstance()
@@ -62,20 +76,73 @@ fun GoalDetailScreen(
 
     var showTransactionPicker by remember { mutableStateOf(false) }
 
-    if (goal == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+    if (goalProgress == null) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(if (isNotFound) "Goal Details" else "") },
+                    navigationIcon = {
+                        IconButton(onClick = { navController.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    colors =
+                        TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent,
+                        ),
+                )
+            },
+            containerColor = MaterialTheme.colorScheme.background,
+        ) { innerPadding ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (isNotFound) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(24.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "Goal Not Found",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            text = "This savings goal may have been deleted or does not exist.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                        )
+                        Button(onClick = { navController.popBackStack() }) {
+                            Text("Go Back")
+                        }
+                    }
+                } else {
+                    CircularProgressIndicator()
+                }
+            }
         }
         return
     }
 
-    val currentGoal = goal!!
-    val totalSaved = linkedTotal + offlineTotal
-    val progress = if (currentGoal.targetAmount > 0) (totalSaved / currentGoal.targetAmount).toFloat().coerceIn(0f, 1f) else 0f
+    val currentGoal = goalProgress.goalWithAccount
+    val totalSaved = goalProgress.totalSaved
+    val progress = goalProgress.progressPercentage
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
         animationSpec = tween(durationMillis = 1500, easing = EaseOutCubic),
-        label = "DetailGoalProgress"
+        label = "DetailGoalProgress",
     )
 
     var showContributionDialog by remember { mutableStateOf(false) }
@@ -108,11 +175,11 @@ fun GoalDetailScreen(
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
+                        containerColor = Color.Transparent,
+                    ),
             )
         },
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
     ) { innerPadding ->
         LazyColumn(
             modifier =
@@ -121,7 +188,7 @@ fun GoalDetailScreen(
                     .padding(innerPadding)
                     .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 80.dp)
+            contentPadding = PaddingValues(bottom = 80.dp),
         ) {
             item {
                 GlassPanel {
@@ -130,7 +197,7 @@ fun GoalDetailScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(200.dp)) {
                             CircularProgressIndicator(
@@ -138,15 +205,15 @@ fun GoalDetailScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 color = MaterialTheme.colorScheme.surfaceVariant,
                                 strokeWidth = 12.dp,
-                                trackColor = Color.Transparent
+                                trackColor = Color.Transparent,
                             )
                             CircularProgressIndicator(
                                 progress = { animatedProgress },
                                 modifier = Modifier.fillMaxSize(),
-                                color = if (progress >= 1f) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
+                                color = if (goalProgress.isCompleted) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,
                                 strokeWidth = 12.dp,
                                 strokeCap = StrokeCap.Round,
-                                trackColor = Color.Transparent
+                                trackColor = Color.Transparent,
                             )
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 if (!currentGoal.iconEmoji.isNullOrBlank()) {
@@ -156,7 +223,7 @@ fun GoalDetailScreen(
                                     text = "${(progress * 100).roundToInt()}%",
                                     style = MaterialTheme.typography.headlineMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
                                 )
                             }
                         }
@@ -166,14 +233,14 @@ fun GoalDetailScreen(
                         Text(
                             text = "${currencyFormat.format(totalSaved)} saved of ${currencyFormat.format(currentGoal.targetAmount)}",
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        if (offlineTotal > 0.0) {
+                        if (goalProgress.totalOfflineSavings > 0.0) {
                             Text(
-                                text = "(${currencyFormat.format(linkedTotal)} linked + ${currencyFormat.format(offlineTotal)} offline)",
+                                text = "(${currencyFormat.format(goalProgress.linkedTotal)} linked + ${currencyFormat.format(goalProgress.totalOfflineSavings)} offline)",
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = 4.dp),
                             )
                         }
 

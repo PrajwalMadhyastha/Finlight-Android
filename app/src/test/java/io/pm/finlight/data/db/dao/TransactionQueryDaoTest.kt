@@ -136,6 +136,20 @@ class TransactionQueryDaoTest {
         }
 
     @Test
+    fun testMerchantTotalSpent() =
+        runTest {
+            val t1 = Transaction(description = "Starbucks", amount = 300.0, date = 1000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            val t2 = Transaction(description = "Starbucks", amount = 320.0, date = 2000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            val tIncome = Transaction(description = "Starbucks", amount = 1000.0, date = 3000L, transactionType = TransactionType.INCOME, accountId = 1, categoryId = 1, notes = null, source = "Manual")
+            writeDao.insert(t1)
+            writeDao.insert(t2)
+            writeDao.insert(tIncome)
+
+            val totalSpentFlow = queryDao.getTotalSpentForMerchant("Starbucks").first()
+            assertEquals(620.0, totalSpentFlow, 0.0)
+        }
+
+    @Test
     fun testFindRecentTransactionForMerge() =
         runTest {
             val t1 = Transaction(description = "Zomato", amount = 400.0, date = 5000L, transactionType = TransactionType.EXPENSE, accountId = 1, categoryId = 1, notes = null, source = "Manual")

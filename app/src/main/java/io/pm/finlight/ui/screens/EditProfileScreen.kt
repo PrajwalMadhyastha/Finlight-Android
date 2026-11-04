@@ -51,10 +51,10 @@ import com.canhub.cropper.CropImageContract
 import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
-import io.pm.finlight.ProfileViewModel
 import io.pm.finlight.R
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.utils.FormatUtils
 import java.io.File
 import java.util.*

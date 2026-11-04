@@ -1,5 +1,5 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/IncomeViewModel.kt
+// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/IncomeViewModel.kt
 // REASON: REFACTOR (Testing) - The ViewModel has been refactored to use
 // constructor dependency injection for its repository dependencies. It now extends
 // ViewModel instead of AndroidViewModel, decoupling it from the Android framework
@@ -13,6 +13,8 @@ package io.pm.finlight.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -26,8 +28,8 @@ class IncomeViewModel(
     private val transactionRepository: ITransactionRepository,
     val accountRepository: IAccountRepository,
     val categoryRepository: ICategoryRepository,
-    // --- NEW: Add SettingsRepository dependency ---
     private val settingsRepository: ISettingsRepository,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val _selectedMonth = MutableStateFlow(Calendar.getInstance())
     val selectedMonth: StateFlow<Calendar> = _selectedMonth.asStateFlow()
@@ -79,7 +81,8 @@ class IncomeViewModel(
                 filters.account?.id,
                 filters.category?.id,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(dispatcherProvider.io)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val totalIncomeForSelectedMonth: StateFlow<Long> =
         incomeTransactionsForSelectedMonth.map { transactions ->
@@ -113,7 +116,8 @@ class IncomeViewModel(
                 filters.account?.id,
                 filters.category?.id,
             )
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        }.flowOn(dispatcherProvider.io)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val monthlySummaries: StateFlow<List<MonthlySummaryItem>>
 
@@ -152,7 +156,8 @@ class IncomeViewModel(
                         }
                         monthList.reversed()
                     }
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+            }.flowOn(dispatcherProvider.io)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
 
     fun setSelectedMonth(calendar: Calendar) {

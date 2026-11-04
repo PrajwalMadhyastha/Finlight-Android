@@ -1,35 +1,38 @@
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.data.model.TimePeriod
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.FinlightViewModelFactory
+import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
+import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createTimePeriodReportFactory(application, timePeriod, initialDateMillis, showPreviousMonth)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class TimePeriodReportViewModelFactory(
-    private val application: Application,
-    private val timePeriod: TimePeriod,
-    private val initialDateMillis: Long?,
-    private val showPreviousMonth: Boolean,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(TimePeriodReportViewModel::class.java)) {
-            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val getMonthlyConsistencyDataUseCase = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
-
-            @Suppress("UNCHECKED_CAST")
-            return TimePeriodReportViewModel(
-                transactionRepository = transactionRepository,
-                settingsRepository = settingsRepository,
-                timePeriod = timePeriod,
-                initialDateMillis = initialDateMillis,
-                showPreviousMonth = showPreviousMonth,
-                dispatcherProvider = dispatcherProvider,
-                getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    application: Application,
+    timePeriod: TimePeriod,
+    initialDateMillis: Long?,
+    showPreviousMonth: Boolean,
+    settingsRepository: ISettingsRepository? = null,
+    transactionRepository: ITransactionRepository? = null,
+    getMonthlyConsistencyDataUseCase: GetMonthlyConsistencyDataUseCase? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createTimePeriodReportFactory(
+        context = application,
+        timePeriod = timePeriod,
+        initialDateMillis = initialDateMillis,
+        showPreviousMonth = showPreviousMonth,
+        settingsRepository = settingsRepository,
+        transactionRepository = transactionRepository,
+        getMonthlyConsistencyDataUseCase = getMonthlyConsistencyDataUseCase,
+        dispatcherProvider = dispatcherProvider,
+    )

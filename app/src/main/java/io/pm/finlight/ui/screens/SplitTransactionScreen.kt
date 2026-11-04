@@ -47,9 +47,12 @@ import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.SplitItem
+import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import java.text.NumberFormat
@@ -66,7 +69,7 @@ fun SplitTransactionScreen(
     transactionViewModel: TransactionViewModel,
 ) {
     val application = LocalContext.current.applicationContext as Application
-    val factory = SplitTransactionViewModelFactory(application, transactionId)
+    val factory = FinlightViewModelFactory.createSplitTransactionFactory(application, transactionId)
     val viewModel: SplitTransactionViewModel = viewModel(factory = factory)
     // --- FIX: Remove the local viewModel() call that was crashing ---
     // val transactionViewModel: TransactionViewModel = viewModel()
@@ -171,9 +174,13 @@ fun SplitTransactionScreen(
                     }
                     Button(
                         onClick = {
-                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) {
-                                Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
+                            transactionViewModel.saveTransactionSplits(transactionId, uiState.splitItems) { success ->
+                                if (success) {
+                                    Toast.makeText(context, "Transaction split saved!", Toast.LENGTH_SHORT).show()
+                                    navController.popBackStack()
+                                } else {
+                                    Toast.makeText(context, "Failed to save transaction split", Toast.LENGTH_SHORT).show()
+                                }
                             }
                         },
                         modifier = Modifier.weight(1f).height(48.dp),

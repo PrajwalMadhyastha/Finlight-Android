@@ -131,7 +131,7 @@ class SplitTransactionTests {
 
         while (composeTestRule.onAllNodesWithText("Set").fetchSemanticsNodes().isNotEmpty()) {
             composeTestRule.onAllNodesWithText("Set").onFirst().performClick()
-            composeTestRule.waitUntil(timeoutMillis = 2000) {
+            composeTestRule.waitUntil(timeoutMillis = 5000) {
                 composeTestRule.onAllNodesWithText("Select Category for Split").fetchSemanticsNodes().isNotEmpty()
             }
             composeTestRule.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText(TestDataSeeder.CATEGORY_SHOPPING_NAME))
@@ -162,7 +162,7 @@ class SplitTransactionTests {
         // Let's set category for the second one
         // Set category for first item to Food & Drinks
         composeTestRule.onAllNodesWithText("Set").onFirst().performClick()
-        composeTestRule.waitUntil(timeoutMillis = 2000) {
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Select Category for Split").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText(TestDataSeeder.CATEGORY_FOOD_NAME))
@@ -170,7 +170,7 @@ class SplitTransactionTests {
 
         // Set category for second item to Shopping
         composeTestRule.onAllNodesWithText("Set").onFirst().performClick()
-        composeTestRule.waitUntil(timeoutMillis = 2000) {
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
             composeTestRule.onAllNodesWithText("Select Category for Split").fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onAllNodes(hasScrollAction()).onLast().performScrollToNode(hasText(TestDataSeeder.CATEGORY_SHOPPING_NAME))

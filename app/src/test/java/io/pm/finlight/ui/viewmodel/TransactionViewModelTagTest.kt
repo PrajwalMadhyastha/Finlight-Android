@@ -158,7 +158,7 @@ class TransactionViewModelTagTest : TransactionViewModelBaseSetup() {
     fun `addTagOnTheGo fails for existing tag name`() =
         runTest {
             // Arrange
-            whenever(db.tagDao().findByName("Work")).thenReturn(Tag(1, "Work"))
+            whenever(tagRepository.findByName("Work")).thenReturn(Tag(1, "Work"))
 
             // Act
             viewModel.addTagOnTheGo("Work")

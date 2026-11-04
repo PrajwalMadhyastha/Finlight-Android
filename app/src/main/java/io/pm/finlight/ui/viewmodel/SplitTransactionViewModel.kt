@@ -1,14 +1,14 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SplitTransactionViewModel.kt
-// REASON: REFACTOR (Testing) - The ViewModel now uses constructor dependency
-// injection for its repository dependencies and extends ViewModel instead of
-// AndroidViewModel. This decouples it from the Android framework and direct
-// database instantiation, making it fully unit-testable.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.Category
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.ISplitTransactionRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.Transaction
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
@@ -36,6 +36,7 @@ class SplitTransactionViewModel(
     val categoryRepository: ICategoryRepository,
     private val splitTransactionRepository: ISplitTransactionRepository,
     private val transactionId: Int,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SplitTransactionUiState())
     val uiState = _uiState.asStateFlow()
@@ -43,37 +44,41 @@ class SplitTransactionViewModel(
     private var nextTempId = -1 // For unique keys for new items
 
     init {
-        viewModelScope.launch {
-            val parentTxn = transactionRepository.getTransactionById(transactionId).firstOrNull()
-            if (parentTxn != null) {
-                if (parentTxn.isSplit) {
-                    val existingSplits = splitTransactionRepository.getSplitsForParent(transactionId).firstOrNull()
-                    if (!existingSplits.isNullOrEmpty()) {
-                        val splitItems =
-                            existingSplits.map { details ->
-                                // --- UPDATED: Use originalAmount if available, otherwise fallback to home currency amount ---
-                                val displayAmount = details.splitTransaction.originalAmount ?: details.splitTransaction.amount
-                                SplitItem(
-                                    id = details.splitTransaction.id,
-                                    amount = displayAmount.toString(),
-                                    category = categoryRepository.getCategoryById(details.splitTransaction.categoryId ?: -1),
-                                    notes = details.splitTransaction.notes,
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val parentTxn = transactionRepository.getTransactionById(transactionId).firstOrNull()
+                if (parentTxn != null) {
+                    if (parentTxn.isSplit) {
+                        val existingSplits = splitTransactionRepository.getSplitsForParent(transactionId).firstOrNull()
+                        if (!existingSplits.isNullOrEmpty()) {
+                            val splitItems =
+                                existingSplits.map { details ->
+                                    // --- UPDATED: Use originalAmount if available, otherwise fallback to home currency amount ---
+                                    val displayAmount = details.splitTransaction.originalAmount ?: details.splitTransaction.amount
+                                    SplitItem(
+                                        id = details.splitTransaction.id,
+                                        amount = displayAmount.toString(),
+                                        category = categoryRepository.getCategoryById(details.splitTransaction.categoryId ?: -1),
+                                        notes = details.splitTransaction.notes,
+                                    )
+                                }
+                            _uiState.value =
+                                SplitTransactionUiState(
+                                    parentTransaction = parentTxn,
+                                    splitItems = splitItems,
+                                    remainingAmount = 0.0,
                                 )
-                            }
-                        _uiState.value =
-                            SplitTransactionUiState(
-                                parentTransaction = parentTxn,
-                                splitItems = splitItems,
-                                remainingAmount = 0.0,
-                            )
+                        } else {
+                            initializeForCreation(parentTxn)
+                        }
                     } else {
                         initializeForCreation(parentTxn)
                     }
                 } else {
-                    initializeForCreation(parentTxn)
+                    _uiState.value = SplitTransactionUiState(error = "Transaction not found.")
                 }
-            } else {
-                _uiState.value = SplitTransactionUiState(error = "Transaction not found.")
+            } catch (e: Exception) {
+                _uiState.value = SplitTransactionUiState(error = "Error loading transaction: ${e.message}")
             }
         }
     }

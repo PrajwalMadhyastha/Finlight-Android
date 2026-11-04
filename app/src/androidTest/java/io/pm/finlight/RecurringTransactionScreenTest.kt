@@ -11,7 +11,6 @@ import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 
-@org.junit.Ignore("Temporarily disabled (Issue #105)")
 @RunWith(AndroidJUnit4::class)
 class RecurringTransactionScreenTest {
     private val composeTestRule = createAndroidComposeRule<MainActivity>()
@@ -36,6 +35,7 @@ class RecurringTransactionScreenTest {
     fun testUpcomingPaymentsCardRendersAndOpensBottomSheet() {
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
+            FeatureSettingsRepository(context).saveRecurringTransactionsEnabled(true)
             val db = AppDatabase.getInstance(context)
 
             val ruleId =
@@ -88,6 +88,7 @@ class RecurringTransactionScreenTest {
     fun testRecurringSuggestionsCardRenders() {
         runBlocking {
             val context = InstrumentationRegistry.getInstrumentation().targetContext
+            FeatureSettingsRepository(context).saveRecurringTransactionsEnabled(true)
             val db = AppDatabase.getInstance(context)
 
             db.recurringPatternDao().insert(

@@ -27,6 +27,8 @@ import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.model.SpendingAnalysisItem
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.*
@@ -94,6 +96,7 @@ class AnalysisViewModel(
     private val transactionAnalyticsDao: TransactionAnalyticsDao,
     private val categoryDao: CategoryDao,
     private val tagDao: TagDao,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
     // --- INPUTS: StateFlows to hold user selections ---
     private val _selectedDimension = MutableStateFlow(AnalysisDimension.CATEGORY)
@@ -194,6 +197,7 @@ class AnalysisViewModel(
                         )
                 }
             }
+            .flowOn(dispatcherProvider.io)
 
     // 3. Combine the input flow, data flows, and result flow into the final UI state.
     val uiState: StateFlow<AnalysisUiState> =
@@ -244,11 +248,12 @@ class AnalysisViewModel(
                 includeExcluded = inputs.includeExcluded,
                 selectedTransactionType = inputs.transactionType,
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = AnalysisUiState(isLoading = true),
-        )
+        }.flowOn(dispatcherProvider.io)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = AnalysisUiState(isLoading = true),
+            )
 
     fun selectDimension(dimension: AnalysisDimension) {
         _selectedDimension.value = dimension

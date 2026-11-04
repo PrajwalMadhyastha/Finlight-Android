@@ -6,26 +6,31 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.db.entity.Trip
 import io.pm.finlight.data.repository.ITripRepository
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 class CurrencyViewModel(
-    application: Application,
     private val settingsRepository: ISettingsRepository,
     private val tripRepository: ITripRepository,
     private val transactionRepository: ITransactionRepository,
     private val tagRepository: ITagRepository,
-) : AndroidViewModel(application) {
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+) : ViewModel() {
     private val mutex = Mutex()
+
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
 
     val homeCurrency: StateFlow<String> =
         settingsRepository.getHomeCurrency()
@@ -86,9 +91,13 @@ class CurrencyViewModel(
         )
 
     fun loadTripForEditing(tripId: Int) {
-        viewModelScope.launch {
-            tripRepository.getTripWithStatsById(tripId).collect {
-                _tripToEdit.value = it
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                tripRepository.getTripWithStatsById(tripId).collect {
+                    _tripToEdit.value = it
+                }
+            } catch (e: Exception) {
+                _uiEvent.send("Error loading trip: ${e.message}")
             }
         }
     }
@@ -101,110 +110,134 @@ class CurrencyViewModel(
         tripId: Int,
         tagId: Int,
     ) {
-        viewModelScope.launch {
-            transactionRepository.removeAllTransactionsForTag(tagId)
-            tripRepository.deleteTripById(tripId)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                transactionRepository.removeAllTransactionsForTag(tagId)
+                tripRepository.deleteTripById(tripId)
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting trip: ${e.message}")
+            }
         }
     }
 
     fun saveHomeCurrency(currencyCode: String) {
-        viewModelScope.launch {
-            settingsRepository.saveHomeCurrency(currencyCode)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                settingsRepository.saveHomeCurrency(currencyCode)
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving home currency: ${e.message}")
+            }
         }
     }
 
     fun saveActiveTravelPlan(newSettings: TravelModeSettings) {
-        viewModelScope.launch {
-            mutex.withLock {
-                val oldSettings = travelModeSettings.first()
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                mutex.withLock {
+                    val oldSettings = travelModeSettings.first()
 
-                if (oldSettings != null && (oldSettings.tripName != newSettings.tripName || oldSettings.startDate != newSettings.startDate || oldSettings.endDate != newSettings.endDate)) {
-                    val oldTripTag = tagRepository.findOrCreateTag(oldSettings.tripName)
-                    transactionRepository.removeTagForDateRange(oldTripTag.id, oldSettings.startDate, oldSettings.endDate)
+                    if (oldSettings != null && (oldSettings.tripName != newSettings.tripName || oldSettings.startDate != newSettings.startDate || oldSettings.endDate != newSettings.endDate)) {
+                        val oldTripTag = tagRepository.findOrCreateTag(oldSettings.tripName)
+                        transactionRepository.removeTagForDateRange(oldTripTag.id, oldSettings.startDate, oldSettings.endDate)
 
-                    val isOldTagUsedByOtherTrips = tripRepository.isTagUsedByTrip(oldTripTag.id)
-                    val isOldTagUsedByOtherTxns = transactionRepository.getTransactionsByTagId(oldTripTag.id).first().isNotEmpty()
-                    if (!isOldTagUsedByOtherTrips && !isOldTagUsedByOtherTxns) {
-                        tagRepository.delete(oldTripTag)
+                        val isOldTagUsedByOtherTrips = tripRepository.isTagUsedByTrip(oldTripTag.id)
+                        val isOldTagUsedByOtherTxns = transactionRepository.getTransactionsByTagId(oldTripTag.id).first().isNotEmpty()
+                        if (!isOldTagUsedByOtherTrips && !isOldTagUsedByOtherTxns) {
+                            tagRepository.delete(oldTripTag)
+                        }
                     }
+
+                    settingsRepository.saveTravelModeSettings(newSettings)
+                    val newTripTag = tagRepository.findOrCreateTag(newSettings.tripName)
+                    transactionRepository.addTagForDateRange(newTripTag.id, newSettings.startDate, newSettings.endDate)
+                    val oldTag = oldSettings?.let { tagRepository.findOrCreateTag(it.tripName) }
+                    val existingTrip = oldTag?.let { tripRepository.getTripByTagId(it.id) }
+
+                    val tripRecord =
+                        Trip(
+                            id = existingTrip?.id ?: 0,
+                            name = newSettings.tripName,
+                            startDate = newSettings.startDate,
+                            endDate = newSettings.endDate,
+                            tagId = newTripTag.id,
+                            tripType = newSettings.tripType,
+                            currencyCode = newSettings.currencyCode,
+                            conversionRate = newSettings.conversionRate,
+                        )
+                    tripRepository.insert(tripRecord)
                 }
-
-                settingsRepository.saveTravelModeSettings(newSettings)
-                val newTripTag = tagRepository.findOrCreateTag(newSettings.tripName)
-                transactionRepository.addTagForDateRange(newTripTag.id, newSettings.startDate, newSettings.endDate)
-                val oldTag = oldSettings?.let { tagRepository.findOrCreateTag(it.tripName) }
-                val existingTrip = oldTag?.let { tripRepository.getTripByTagId(it.id) }
-
-                val tripRecord =
-                    Trip(
-                        id = existingTrip?.id ?: 0,
-                        name = newSettings.tripName,
-                        startDate = newSettings.startDate,
-                        endDate = newSettings.endDate,
-                        tagId = newTripTag.id,
-                        tripType = newSettings.tripType,
-                        currencyCode = newSettings.currencyCode,
-                        conversionRate = newSettings.conversionRate,
-                    )
-                tripRepository.insert(tripRecord)
+            } catch (e: Exception) {
+                _uiEvent.send("Error saving travel plan: ${e.message}")
             }
         }
     }
 
     fun updateHistoricTrip(updatedSettings: TravelModeSettings) {
-        viewModelScope.launch {
-            val originalTrip = _tripToEdit.value ?: return@launch
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val originalTrip = _tripToEdit.value ?: return@launch
 
-            val originalTag = tagRepository.findTagById(originalTrip.tagId) ?: return@launch
-            val newTag = tagRepository.findOrCreateTag(updatedSettings.tripName)
+                val originalTag = tagRepository.findTagById(originalTrip.tagId) ?: return@launch
+                val newTag = tagRepository.findOrCreateTag(updatedSettings.tripName)
 
-            if (originalTrip.startDate != updatedSettings.startDate || originalTrip.endDate != updatedSettings.endDate || originalTag.id != newTag.id) {
-                transactionRepository.removeTagForDateRange(originalTag.id, originalTrip.startDate, originalTrip.endDate)
-            }
-
-            transactionRepository.addTagForDateRange(newTag.id, updatedSettings.startDate, updatedSettings.endDate)
-
-            if (originalTag.id != newTag.id) {
-                val isOldTagUsedByOtherTrips = tripRepository.isTagUsedByTrip(originalTag.id)
-                val isOldTagUsedByOtherTxns = transactionRepository.getTransactionsByTagId(originalTag.id).first().isNotEmpty()
-                if (!isOldTagUsedByOtherTrips && !isOldTagUsedByOtherTxns) {
-                    tagRepository.delete(originalTag)
+                if (originalTrip.startDate != updatedSettings.startDate || originalTrip.endDate != updatedSettings.endDate || originalTag.id != newTag.id) {
+                    transactionRepository.removeTagForDateRange(originalTag.id, originalTrip.startDate, originalTrip.endDate)
                 }
-            }
 
-            val updatedTripRecord =
-                Trip(
-                    id = originalTrip.tripId,
-                    name = updatedSettings.tripName,
-                    startDate = updatedSettings.startDate,
-                    endDate = updatedSettings.endDate,
-                    tagId = newTag.id,
-                    tripType = updatedSettings.tripType,
-                    currencyCode = updatedSettings.currencyCode,
-                    conversionRate = updatedSettings.conversionRate,
-                )
-            tripRepository.insert(updatedTripRecord)
+                transactionRepository.addTagForDateRange(newTag.id, updatedSettings.startDate, updatedSettings.endDate)
+
+                if (originalTag.id != newTag.id) {
+                    val isOldTagUsedByOtherTrips = tripRepository.isTagUsedByTrip(originalTag.id)
+                    val isOldTagUsedByOtherTxns = transactionRepository.getTransactionsByTagId(originalTag.id).first().isNotEmpty()
+                    if (!isOldTagUsedByOtherTrips && !isOldTagUsedByOtherTxns) {
+                        tagRepository.delete(originalTag)
+                    }
+                }
+
+                val updatedTripRecord =
+                    Trip(
+                        id = originalTrip.tripId,
+                        name = updatedSettings.tripName,
+                        startDate = updatedSettings.startDate,
+                        endDate = updatedSettings.endDate,
+                        tagId = newTag.id,
+                        tripType = updatedSettings.tripType,
+                        currencyCode = updatedSettings.currencyCode,
+                        conversionRate = updatedSettings.conversionRate,
+                    )
+                tripRepository.insert(updatedTripRecord)
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating trip: ${e.message}")
+            }
         }
     }
 
     fun completeTrip() {
-        viewModelScope.launch {
-            settingsRepository.saveTravelModeSettings(null)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                settingsRepository.saveTravelModeSettings(null)
+            } catch (e: Exception) {
+                _uiEvent.send("Error completing trip: ${e.message}")
+            }
         }
     }
 
     fun cancelTrip(settings: TravelModeSettings) {
-        viewModelScope.launch {
-            val tripTag = tagRepository.findOrCreateTag(settings.tripName)
-            val tripRecord = tripRepository.getTripByTagId(tripTag.id)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val tripTag = tagRepository.findOrCreateTag(settings.tripName)
+                val tripRecord = tripRepository.getTripByTagId(tripTag.id)
 
-            transactionRepository.removeTagForDateRange(tripTag.id, settings.startDate, settings.endDate)
+                transactionRepository.removeTagForDateRange(tripTag.id, settings.startDate, settings.endDate)
 
-            if (tripRecord != null && tripRecord.startDate == settings.startDate && tripRecord.endDate == settings.endDate) {
-                tripRepository.deleteTripById(tripRecord.id)
+                if (tripRecord != null && tripRecord.startDate == settings.startDate && tripRecord.endDate == settings.endDate) {
+                    tripRepository.deleteTripById(tripRecord.id)
+                }
+
+                settingsRepository.saveTravelModeSettings(null)
+            } catch (e: Exception) {
+                _uiEvent.send("Error cancelling trip: ${e.message}")
             }
-
-            settingsRepository.saveTravelModeSettings(null)
         }
     }
 }

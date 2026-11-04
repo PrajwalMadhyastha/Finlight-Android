@@ -9,6 +9,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
+import java.util.Calendar
 
 @RunWith(AndroidJUnit4::class)
 class SimulatorFeatureTests {
@@ -57,9 +58,12 @@ class SimulatorFeatureTests {
 
         // Confirm
         composeTestRule.onAllNodesWithText("Add").onLast().performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify expense is added to the list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Test Expense").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("what_if_lazy_column").performScrollToNode(hasText("Test Expense"))
         composeTestRule.onNodeWithText("Test Expense").assertIsDisplayed()
         composeTestRule.onAllNodes(hasText("500", substring = true)).onFirst().assertIsDisplayed()
@@ -92,9 +96,12 @@ class SimulatorFeatureTests {
 
         // Confirm
         composeTestRule.onAllNodesWithText("Add").onLast().performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify event is added to the list
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Test Event").fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("annual_lazy_column").performScrollToNode(hasText("Test Event"))
         composeTestRule.onNodeWithText("Test Event").assertIsDisplayed()
         composeTestRule.onAllNodes(hasText("1,000", substring = true)).onFirst().assertIsDisplayed()
@@ -122,9 +129,12 @@ class SimulatorFeatureTests {
 
         // Click Privacy Toggle
         composeTestRule.onNode(hasContentDescription("Toggle Privacy")).performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify it is obfuscated
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("****", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onAllNodes(hasText("****", substring = true)).onFirst().assertExists()
     }
 
@@ -147,9 +157,83 @@ class SimulatorFeatureTests {
 
         // Click Privacy Toggle
         composeTestRule.onNode(hasContentDescription("Toggle Privacy")).performClick()
-        Thread.sleep(2000)
+        composeTestRule.waitForIdle()
 
         // Verify it is obfuscated
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("****", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onAllNodes(hasText("****", substring = true)).onFirst().assertExists()
+    }
+
+    @Test
+    fun test_navigationToAnnualSimulator_yearNavigation() {
+        // Wait for dashboard
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Scroll to and Click on Annual Sandbox
+        val lazyColumn = composeTestRule.onNodeWithTag("dashboard_lazy_column")
+        lazyColumn.performScrollToNode(hasTestTag("btn_annual_simulator"))
+        composeTestRule.onNodeWithTag("btn_annual_simulator").performClick()
+
+        // Wait for screen
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("Projected Annual Balance ($currentYear)")).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Projected Annual Balance ($currentYear)").assertIsDisplayed()
+
+        // Click previous year button
+        composeTestRule.onNodeWithTag("btn_prev_year").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("Projected Annual Balance (${currentYear - 1})")).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Projected Annual Balance (${currentYear - 1})").assertIsDisplayed()
+
+        // Click next year button to return to current year
+        composeTestRule.onNodeWithTag("btn_next_year").performClick()
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("Projected Annual Balance ($currentYear)")).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Projected Annual Balance ($currentYear)").assertIsDisplayed()
+    }
+
+    @Test
+    fun test_navigationToWhatIfSimulator_deficitSpendingFormatting() {
+        // Wait for dashboard
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Scroll to and Click on Monthly What-If
+        val lazyColumn = composeTestRule.onNodeWithTag("dashboard_lazy_column")
+        lazyColumn.performScrollToNode(hasTestTag("btn_monthly_simulator"))
+        composeTestRule.onNodeWithTag("btn_monthly_simulator").performClick()
+
+        // Wait for screen
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Sandbox Mode").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Click Add
+        composeTestRule.onNode(hasContentDescription("Add Expense")).performClick()
+
+        // Fill dialog with massive amount to trigger deficit
+        composeTestRule.onNodeWithText("Expense Name (e.g., Car EMI)").performTextReplacement("Luxury Vacation")
+        composeTestRule.onNodeWithText("Amount").performTextReplacement("9999999")
+
+        // Confirm
+        composeTestRule.onAllNodesWithText("Add").onLast().performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify deficit display without double negatives
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodes(hasText("Deficit:", substring = true)).fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNode(hasText("Deficit:", substring = true)).assertIsDisplayed()
+        composeTestRule.onAllNodes(hasText("Deficit: -", substring = true)).assertCountEquals(0)
+        composeTestRule.onNode(hasText("Simulated Deficit per Day", substring = true)).assertIsDisplayed()
     }
 }

@@ -6,10 +6,9 @@
 // =================================================================================
 package io.pm.finlight
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,25 +16,24 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 class RecurringTransactionViewModel(
-    private val application: Application,
     private val repository: IRecurringTransactionRepository,
-    private val patternDao: RecurringPatternDao,
+    private val scheduleWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase,
 ) : ViewModel() {
     val allRecurringTransactions: Flow<List<RecurringTransaction>> = repository.getAll()
 
     val patternSuggestions: StateFlow<List<RecurringPattern>> =
-        patternDao.getUnacknowledgedPatterns()
+        repository.getUnacknowledgedPatterns()
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
+                initialValue = emptyList(),
             )
 
     fun getRuleById(id: Int): Flow<RecurringTransaction?> = repository.getById(id)
 
     fun dismissPatternSuggestion(pattern: RecurringPattern) =
         viewModelScope.launch {
-            patternDao.update(pattern.copy(isDismissed = true))
+            repository.dismissPatternSuggestion(pattern)
         }
 
     fun saveRule(
@@ -80,7 +78,7 @@ class RecurringTransactionViewModel(
         } else {
             repository.insert(rule)
             // Only schedule the worker when a new rule is added for the first time
-            ReminderManager.scheduleRecurringTransactionWorker(application)
+            scheduleWorkerUseCase()
         }
     }
 

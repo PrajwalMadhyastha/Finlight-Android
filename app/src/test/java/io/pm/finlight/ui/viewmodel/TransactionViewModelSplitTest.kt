@@ -1,54 +1,49 @@
 package io.pm.finlight.ui.viewmodel
 
-import androidx.room.withTransaction
 import app.cash.turbine.test
-import io.mockk.*
-import io.pm.finlight.*
-import io.pm.finlight.core.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.*
-import io.pm.finlight.data.db.entity.*
+import io.pm.finlight.SplitTransaction
+import io.pm.finlight.SplitTransactionDetails
+import io.pm.finlight.Transaction
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.Assert.*
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.times
-import org.mockito.kotlin.verify
 import org.mockito.Mockito.`when` as whenever
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
 
 class TransactionViewModelSplitTest : TransactionViewModelBaseSetup() {
     @Test
-    fun `unsplitTransaction correctly calls DAO methods`() =
+    fun `unsplitTransaction correctly calls repository`() =
         runTest {
-            // ARRANGE
-            mockkStatic("androidx.room.RoomDatabaseKt")
-
-            // Use a more robust mock for withTransaction that doesn't rely on complex arg matching if possible
-            coEvery { any<AppDatabase>().withTransaction<Any?>(any()) } coAnswers {
-                val block = secondArg<suspend () -> Any?>()
-                block()
-            }
-
             val transaction =
                 Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
-            val splits = listOf(SplitTransactionDetails(SplitTransaction(1, 1, 50.0, 1, null), "Cat1", "", ""))
 
-            whenever(splitTransactionDao.getSplitsForParentSimple(1)).thenReturn(splits)
-
-            // ACT
             viewModel.unsplitTransaction(transaction)
             advanceUntilIdle()
 
-            // ASSERT
-            verify(splitTransactionDao).deleteSplitsForParent(1)
-            verify(transactionWriteDao).unmarkAsSplit(1, "Original Desc", 1)
-
-            unmockkStatic("androidx.room.RoomDatabaseKt")
+            verify(splitTransactionRepository).unmarkSplit(1, "Original Desc")
         }
 
-    // --- NEW: Test for getSplitDetailsForTransaction ---
+    @Test
+    fun `saveTransactionSplits calls repository and executes callback`() =
+        runTest {
+            val transaction = Transaction(id = 1, description = "Test", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(transaction))
+            val splitItems = listOf(SplitItem(id = 1, amount = "50.0", category = null, notes = "Notes"))
+            var completeCalled = false
+
+            viewModel.saveTransactionSplits(1, splitItems) {
+                completeCalled = true
+            }
+            advanceUntilIdle()
+
+            verify(splitTransactionRepository).saveSplits(eq(1), any())
+            assertTrue(completeCalled)
+        }
 
     @Test
     fun `getSplitDetailsForTransaction calls repository`() =
@@ -70,5 +65,37 @@ class TransactionViewModelSplitTest : TransactionViewModelBaseSetup() {
                 cancelAndIgnoreRemainingEvents()
             }
             verify(splitTransactionRepository).getSplitsForParent(transactionId)
+        }
+
+    @Test
+    fun `saveTransactionSplits passes false and does not throw on error`() =
+        runTest {
+            whenever(transactionRepository.getTransactionById(1)).thenReturn(flowOf(null))
+            val splitItems = listOf(SplitItem(id = 1, amount = "50.0", category = null, notes = "Notes"))
+            var result: Boolean? = null
+
+            viewModel.saveTransactionSplits(1, splitItems) { success ->
+                result = success
+            }
+            advanceUntilIdle()
+
+            assertEquals(false, result)
+        }
+
+    @Test
+    fun `unsplitTransaction error emits message to uiEvent`() =
+        runTest {
+            val transaction =
+                Transaction(id = 1, description = "Split", isSplit = true, originalDescription = "Original Desc", amount = 100.0, date = 0L, accountId = 1, categoryId = null, notes = null)
+            org.mockito.Mockito.doThrow(RuntimeException("DB failure"))
+                .`when`(splitTransactionRepository).unmarkSplit(1, "Original Desc")
+
+            viewModel.uiEvent.test {
+                viewModel.unsplitTransaction(transaction)
+                advanceUntilIdle()
+
+                assertEquals("Failed to un-split transaction.", awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

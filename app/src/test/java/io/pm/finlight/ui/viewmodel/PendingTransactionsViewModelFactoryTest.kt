@@ -3,6 +3,7 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -111,6 +112,21 @@ class PendingTransactionsViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(customDispatcher, dispatcherField)
+    }
+
+    @Test
+    fun create_withExtras_returnsPendingTransactionsViewModel() {
+        val viewModel = factory.create(PendingTransactionsViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(viewModel)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockViewModel: PendingTransactionsViewModel = mockk(relaxed = true)
+        ServiceLocator.setPendingTransactionsViewModel(mockViewModel)
+
+        val resolved = factory.create(PendingTransactionsViewModel::class.java)
+        assertSame(mockViewModel, resolved)
     }
 
     @Test

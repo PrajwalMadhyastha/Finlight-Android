@@ -16,6 +16,7 @@ import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.data.db.dao.TripWithStats
 import io.pm.finlight.data.repository.TripRepository
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -61,7 +62,7 @@ class TripDetailViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTransactionsByTagId(tagId)).thenReturn(flowOf(emptyList()))
 
             // Act
-            viewModel = TripDetailViewModel(tripRepository, transactionRepository, tripId, tagId)
+            viewModel = TripDetailViewModel(tripRepository, transactionRepository, tripId, tagId, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.tripDetails.test {
@@ -93,7 +94,7 @@ class TripDetailViewModelTest : BaseViewModelTest() {
             `when`(transactionRepository.getTransactionsByTagId(tagId)).thenReturn(flowOf(mockTransactions))
 
             // Act
-            viewModel = TripDetailViewModel(tripRepository, transactionRepository, tripId, tagId)
+            viewModel = TripDetailViewModel(tripRepository, transactionRepository, tripId, tagId, TestDispatcherProvider(testDispatcher))
 
             // Assert
             viewModel.transactions.test {

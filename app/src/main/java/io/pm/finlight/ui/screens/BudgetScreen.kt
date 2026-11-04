@@ -62,13 +62,13 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.Budget
-import io.pm.finlight.BudgetViewModel
 import io.pm.finlight.BudgetWithSpending
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.EmptyStateMessage
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.ui.viewmodel.BudgetViewModel
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
 import java.util.*

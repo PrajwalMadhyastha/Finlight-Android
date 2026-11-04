@@ -18,6 +18,7 @@ import app.cash.turbine.test
 import io.pm.finlight.*
 import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
 import io.pm.finlight.data.model.SpendingAnalysisItem
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -112,7 +113,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
             transactionAnalyticsDao.getSpendingAnalysisByMerchant(anyLong(), anyLong(), any(), any(), any(), any(), anyBoolean(), any()),
         ).thenReturn(flowOf(emptyList()))
 
-        viewModel = AnalysisViewModel(transactionAnalyticsDao, categoryDao, tagDao)
+        viewModel = AnalysisViewModel(transactionAnalyticsDao, categoryDao, tagDao, TestDispatcherProvider(standardTestDispatcher))
     }
 
     @After
@@ -122,7 +123,7 @@ class AnalysisViewModelTest : BaseViewModelTest() {
     }
 
     private fun initializeViewModel() {
-        viewModel = AnalysisViewModel(transactionAnalyticsDao, categoryDao, tagDao)
+        viewModel = AnalysisViewModel(transactionAnalyticsDao, categoryDao, tagDao, TestDispatcherProvider(standardTestDispatcher))
     }
 
     @Test

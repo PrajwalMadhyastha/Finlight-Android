@@ -10,7 +10,6 @@ import androidx.room.withTransaction
  */
 interface TransactionRunner {
     suspend fun <R> run(
-        db: RoomDatabase,
         block: suspend () -> R,
     ): R
 }
@@ -18,9 +17,10 @@ interface TransactionRunner {
 /**
  * Default implementation that delegates to Room's withTransaction extension function.
  */
-class RoomTransactionRunner : TransactionRunner {
+class RoomTransactionRunner(
+    private val db: RoomDatabase,
+) : TransactionRunner {
     override suspend fun <R> run(
-        db: RoomDatabase,
         block: suspend () -> R,
     ): R {
         return db.withTransaction(block)

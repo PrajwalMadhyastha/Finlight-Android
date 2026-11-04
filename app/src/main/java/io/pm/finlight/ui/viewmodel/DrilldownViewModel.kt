@@ -16,7 +16,7 @@ import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TransactionDetails
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
@@ -28,30 +28,31 @@ enum class DrilldownType {
     MERCHANT,
 }
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createDrilldownFactory(application, drilldownType, entityName, month, year)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class DrilldownViewModelFactory(
-    private val application: Application,
-    private val drilldownType: DrilldownType,
-    private val entityName: String,
-    private val month: Int,
-    private val year: Int,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(DrilldownViewModel::class.java)) {
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(application)
-            @Suppress("UNCHECKED_CAST")
-            return DrilldownViewModel(
-                transactionRepository = transactionRepository,
-                drilldownType = drilldownType,
-                entityName = entityName,
-                month = month,
-                year = year,
-                dispatcherProvider = dispatcherProvider,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    application: Application,
+    drilldownType: DrilldownType,
+    entityName: String,
+    month: Int,
+    year: Int,
+    transactionRepository: ITransactionRepository? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createDrilldownFactory(
+        context = application,
+        drilldownType = drilldownType,
+        entityName = entityName,
+        month = month,
+        year = year,
+        transactionRepository = transactionRepository,
+        dispatcherProvider = dispatcherProvider,
+    )
 
 class DrilldownViewModel(
     private val transactionRepository: ITransactionRepository,

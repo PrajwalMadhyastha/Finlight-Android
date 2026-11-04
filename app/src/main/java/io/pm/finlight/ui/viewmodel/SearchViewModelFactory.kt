@@ -1,57 +1,40 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/viewmodel/SearchViewModelFactory.kt
-// REASON: REFACTOR (Domain 5 / Issue #339) - Decouple SearchViewModelFactory from AppDatabase:
-// Standardized package to io.pm.finlight.ui.viewmodel and inject repositories
-// through ServiceLocator with optional test overrides.
-// =================================================================================
 package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ITagRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createSearchFactory(application, initialCategoryId, initialDateMillis, initialQuery)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class SearchViewModelFactory(
-    private val application: Application,
-    private val initialCategoryId: Int? = null,
-    private val initialDateMillis: Long? = null,
-    private val initialQuery: String? = null,
-    private val transactionRepository: ITransactionRepository? = null,
-    private val accountRepository: IAccountRepository? = null,
-    private val categoryRepository: ICategoryRepository? = null,
-    private val tagRepository: ITagRepository? = null,
-    private val dispatcherProvider: DispatcherProvider? = null,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(SearchViewModel::class.java)) {
-            val resolvedTransactionRepo =
-                transactionRepository ?: ServiceLocator.provideTransactionRepository(application)
-            val resolvedAccountRepo =
-                accountRepository ?: ServiceLocator.provideAccountRepository(application)
-            val resolvedCategoryRepo =
-                categoryRepository ?: ServiceLocator.provideCategoryRepository(application)
-            val resolvedTagRepo =
-                tagRepository ?: ServiceLocator.provideTagRepository(application)
-            val resolvedDispatcher =
-                dispatcherProvider ?: ServiceLocator.provideDispatcherProvider(application)
-
-            @Suppress("UNCHECKED_CAST")
-            return SearchViewModel(
-                transactionRepository = resolvedTransactionRepo,
-                accountRepository = resolvedAccountRepo,
-                categoryRepository = resolvedCategoryRepo,
-                tagRepository = resolvedTagRepo,
-                dispatcherProvider = resolvedDispatcher,
-                initialCategoryId = initialCategoryId,
-                initialDateMillis = initialDateMillis,
-                initialQuery = initialQuery,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
-    }
-}
+    application: Application,
+    initialCategoryId: Int? = null,
+    initialDateMillis: Long? = null,
+    initialQuery: String? = null,
+    transactionRepository: ITransactionRepository? = null,
+    accountRepository: IAccountRepository? = null,
+    categoryRepository: ICategoryRepository? = null,
+    tagRepository: ITagRepository? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createSearchFactory(
+        context = application,
+        initialCategoryId = initialCategoryId,
+        initialDateMillis = initialDateMillis,
+        initialQuery = initialQuery,
+        transactionRepository = transactionRepository,
+        accountRepository = accountRepository,
+        categoryRepository = categoryRepository,
+        tagRepository = tagRepository,
+        dispatcherProvider = dispatcherProvider,
+    )

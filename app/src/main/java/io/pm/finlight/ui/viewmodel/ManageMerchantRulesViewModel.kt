@@ -1,9 +1,20 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.pm.finlight.Category
+import io.pm.finlight.ICategoryRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.MerchantCategoryMapping
+import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.MerchantRuleCollisionDetector
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -13,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -28,7 +40,11 @@ class ManageMerchantRulesViewModel(
     private val transactionRepository: ITransactionRepository? = null,
     private val categoryMappingRepository: IMerchantCategoryMappingRepository? = null,
     private val categoryRepository: ICategoryRepository? = null,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    private val _uiEvent = Channel<String>(Channel.UNLIMITED)
+    val uiEvent = _uiEvent.receiveAsFlow()
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -185,8 +201,12 @@ class ManageMerchantRulesViewModel(
      * Deletes a merchant rename rule by its original merchant name.
      */
     fun deleteRule(rule: MerchantRenameRule) {
-        viewModelScope.launch {
-            merchantRenameRuleRepository.deleteByOriginalName(rule.originalName)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                merchantRenameRuleRepository.deleteByOriginalName(rule.originalName)
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting rule: ${e.message}")
+            }
         }
     }
 
@@ -195,13 +215,17 @@ class ManageMerchantRulesViewModel(
      * transactions' description back to the original SMS description.
      */
     fun deleteRuleAndSync(rule: MerchantRenameRule) {
-        viewModelScope.launch {
-            merchantRenameRuleRepository.deleteByOriginalName(rule.originalName)
-            transactionRepository?.updateDescriptionByOriginalDescription(
-                originalDesc = rule.originalName,
-                newDescription = rule.originalName,
-                oldDescription = rule.newName,
-            )
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                merchantRenameRuleRepository.deleteByOriginalName(rule.originalName)
+                transactionRepository?.updateDescriptionByOriginalDescription(
+                    originalDesc = rule.originalName,
+                    newDescription = rule.originalName,
+                    oldDescription = rule.newName,
+                )
+            } catch (e: Exception) {
+                _uiEvent.send("Error deleting rule: ${e.message}")
+            }
         }
     }
 
@@ -217,13 +241,17 @@ class ManageMerchantRulesViewModel(
         if (trimmedOriginal.isBlank() || trimmedNew.isBlank()) {
             return
         }
-        viewModelScope.launch {
-            merchantRenameRuleRepository.insert(
-                MerchantRenameRule(
-                    originalName = trimmedOriginal,
-                    newName = trimmedNew,
-                ),
-            )
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                merchantRenameRuleRepository.insert(
+                    MerchantRenameRule(
+                        originalName = trimmedOriginal,
+                        newName = trimmedNew,
+                    ),
+                )
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating rule: ${e.message}")
+            }
         }
     }
 
@@ -241,19 +269,23 @@ class ManageMerchantRulesViewModel(
         if (trimmedOriginal.isBlank() || trimmedNew.isBlank()) {
             return
         }
-        viewModelScope.launch {
-            val existingOld = oldDescription ?: merchantRenameRuleRepository.getRuleByOriginalName(trimmedOriginal)?.newName
-            merchantRenameRuleRepository.insert(
-                MerchantRenameRule(
-                    originalName = trimmedOriginal,
-                    newName = trimmedNew,
-                ),
-            )
-            transactionRepository?.updateDescriptionByOriginalDescription(
-                originalDesc = trimmedOriginal,
-                newDescription = trimmedNew,
-                oldDescription = existingOld,
-            )
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val existingOld = oldDescription ?: merchantRenameRuleRepository.getRuleByOriginalName(trimmedOriginal)?.newName
+                merchantRenameRuleRepository.insert(
+                    MerchantRenameRule(
+                        originalName = trimmedOriginal,
+                        newName = trimmedNew,
+                    ),
+                )
+                transactionRepository?.updateDescriptionByOriginalDescription(
+                    originalDesc = trimmedOriginal,
+                    newDescription = trimmedNew,
+                    oldDescription = existingOld,
+                )
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating rule: ${e.message}")
+            }
         }
     }
 
@@ -270,17 +302,21 @@ class ManageMerchantRulesViewModel(
         if (trimmedOriginal.isBlank() || trimmedNew.isBlank() || trimmedOriginal.equals(trimmedNew, ignoreCase = true)) {
             return
         }
-        viewModelScope.launch {
-            merchantRenameRuleRepository.insert(
-                MerchantRenameRule(
-                    originalName = trimmedOriginal,
-                    newName = trimmedNew,
-                ),
-            )
-            transactionRepository?.updateDescriptionByOriginalDescription(
-                originalDesc = trimmedOriginal,
-                newDescription = trimmedNew,
-            )
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                merchantRenameRuleRepository.insert(
+                    MerchantRenameRule(
+                        originalName = trimmedOriginal,
+                        newName = trimmedNew,
+                    ),
+                )
+                transactionRepository?.updateDescriptionByOriginalDescription(
+                    originalDesc = trimmedOriginal,
+                    newDescription = trimmedNew,
+                )
+            } catch (e: Exception) {
+                _uiEvent.send("Error adding rule: ${e.message}")
+            }
         }
     }
 }

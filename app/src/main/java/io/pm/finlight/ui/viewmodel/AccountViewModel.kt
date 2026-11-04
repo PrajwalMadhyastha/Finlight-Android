@@ -11,33 +11,63 @@
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
+import io.pm.finlight.CreditCardMetrics
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
+import io.pm.finlight.isCreditCard
+import io.pm.finlight.utils.DateUtils
+import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AccountViewModel(
     private val repository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
     private val settingsRepository: ISettingsRepository,
     private val mergeAccountsUseCase: MergeAccountsUseCase,
-    private val computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) : ViewModel() {
+    constructor(
+        repository: IAccountRepository,
+        transactionRepository: ITransactionRepository,
+        settingsRepository: ISettingsRepository,
+        mergeAccountsUseCase: MergeAccountsUseCase,
+        computationDispatcher: CoroutineDispatcher,
+    ) : this(
+        repository = repository,
+        transactionRepository = transactionRepository,
+        settingsRepository = settingsRepository,
+        mergeAccountsUseCase = mergeAccountsUseCase,
+        dispatcherProvider =
+            object : DispatcherProvider {
+                override val main: CoroutineDispatcher get() = computationDispatcher
+                override val io: CoroutineDispatcher get() = computationDispatcher
+                override val default: CoroutineDispatcher get() = computationDispatcher
+                override val unconfined: CoroutineDispatcher get() = computationDispatcher
+            },
+    )
+
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
 
@@ -52,8 +82,30 @@ class AccountViewModel(
     private val _suggestedMerges = MutableStateFlow<List<Pair<Account, Account>>>(emptyList())
     val suggestedMerges = _suggestedMerges.asStateFlow()
 
+    val creditCardMetrics: StateFlow<Map<Int, CreditCardMetrics>> =
+        repository.accountsWithBalance.flatMapLatest { accounts ->
+            val creditCardAccounts =
+                accounts
+                    .map { it.account }
+                    .filter { it.isCreditCard && (it.creditLimit ?: 0.0) > 0.0 }
+
+            if (creditCardAccounts.isEmpty()) {
+                flowOf(emptyMap())
+            } else {
+                val accountMetricFlows =
+                    creditCardAccounts.map { acc ->
+                        transactionRepository.getTransactionsForAccount(acc.id).map { txns ->
+                            acc.id to calculateCreditCardMetrics(acc, txns)
+                        }
+                    }
+                combine(accountMetricFlows) { pairs ->
+                    pairs.filter { it.second != null }.associate { it.first to it.second!! }
+                }
+            }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     init {
-        viewModelScope.launch(computationDispatcher) {
+        viewModelScope.launch(dispatcherProvider.default) {
             combine(
                 repository.accountsWithBalance,
                 settingsRepository.getDismissedMergeSuggestions(),
@@ -115,8 +167,13 @@ class AccountViewModel(
 
     fun dismissMergeSuggestion(suggestion: Pair<Account, Account>) {
         val key = "${min(suggestion.first.id, suggestion.second.id)}|${max(suggestion.first.id, suggestion.second.id)}"
-        viewModelScope.launch {
-            settingsRepository.addDismissedMergeSuggestion(key)
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                settingsRepository.addDismissedMergeSuggestion(key)
+            } catch (e: Exception) {
+                Log.e("AccountViewModel", "Error dismissing merge suggestion", e)
+                _uiEvent.send("Error dismissing merge suggestion: ${e.message}")
+            }
         }
     }
 
@@ -193,7 +250,7 @@ class AccountViewModel(
     }
 
     fun mergeSelectedAccounts(destinationAccountId: Int) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             val sourceAccountIds = _selectedAccountIds.value.filter { it != destinationAccountId }
 
             // 1. Perform validation first.
@@ -216,6 +273,73 @@ class AccountViewModel(
     }
 
     fun getAccountById(accountId: Int): Flow<Account?> = repository.getAccountById(accountId)
+
+    fun getCreditCardMetrics(accountId: Int): Flow<CreditCardMetrics?> {
+        return repository.getAccountById(accountId).flatMapLatest { account ->
+            if (account == null || !account.isCreditCard || account.creditLimit == null || account.creditLimit <= 0.0) {
+                flowOf(null)
+            } else {
+                transactionRepository.getTransactionsForAccount(accountId).map { txns ->
+                    calculateCreditCardMetrics(account, txns)
+                }
+            }
+        }
+    }
+
+    /**
+     * Calculates the credit card utilization metrics for a given billing cycle.
+     *
+     * Note: Current cycle spend is calculated as `(expenseSum - incomeSum).coerceAtLeast(0.0)`.
+     * `incomeSum` accounts for merchant refunds during the active billing cycle; note that any
+     * bill payments recorded as income directly on the credit card account during the active
+     * billing cycle will also offset current-cycle spend.
+     */
+    fun calculateCreditCardMetrics(
+        account: Account,
+        transactions: List<Transaction>,
+        currentTimeMillis: Long = System.currentTimeMillis(),
+    ): CreditCardMetrics? {
+        val limit = account.creditLimit ?: return null
+        if (limit <= 0.0 || !account.isCreditCard) return null
+
+        val billingDay = account.billingCycleDay ?: 1
+        val (cycleStart, cycleEnd) = DateUtils.getCreditCardBillingCycleRange(billingDay, currentTimeMillis)
+
+        val cycleTransactions =
+            transactions.filter {
+                it.date in cycleStart..cycleEnd && !it.isExcluded
+            }
+
+        val expenseSum =
+            cycleTransactions
+                .filter { it.transactionType == TransactionType.EXPENSE }
+                .sumOf { it.amount }
+        val incomeSum =
+            cycleTransactions
+                .filter { it.transactionType == TransactionType.INCOME }
+                .sumOf { it.amount }
+
+        val currentCycleSpend = (expenseSum - incomeSum).coerceAtLeast(0.0)
+        val availableLimit = (limit - currentCycleSpend).coerceAtLeast(0.0)
+        val utilization = ((currentCycleSpend / limit) * 100.0).toFloat().coerceIn(0f, 1000f)
+
+        val daysRemaining =
+            max(
+                0,
+                ceil((cycleEnd - currentTimeMillis).toDouble() / (1000 * 60 * 60 * 24)).toInt(),
+            )
+
+        return CreditCardMetrics(
+            creditLimit = limit,
+            billingCycleDay = billingDay,
+            currentCycleSpend = currentCycleSpend,
+            availableLimit = availableLimit,
+            utilizationPercentage = utilization,
+            cycleStartDate = cycleStart,
+            cycleEndDate = cycleEnd,
+            daysRemainingInCycle = daysRemaining,
+        )
+    }
 
     fun getAccountBalance(accountId: Int): Flow<Long> {
         return transactionRepository.getTransactionsForAccount(accountId).map { transactions ->
@@ -255,14 +379,14 @@ class AccountViewModel(
         sourceAccountIds: List<Int>,
         onComplete: (Boolean) -> Unit = {},
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 mergeAccountsUseCase(destinationAccountId, sourceAccountIds)
                 _uiEvent.send("Accounts merged successfully.")
-                onComplete(true)
+                withContext(dispatcherProvider.main) { onComplete(true) }
             } catch (e: Exception) {
                 _uiEvent.send("Error merging accounts: ${e.message}")
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             }
         }
     }
@@ -271,43 +395,58 @@ class AccountViewModel(
         name: String,
         type: String,
         onComplete: (Boolean) -> Unit = {},
-    ) = viewModelScope.launch {
+    ) = addAccount(name, type, null, null, onComplete)
+
+    fun addAccount(
+        name: String,
+        type: String,
+        creditLimit: Double?,
+        billingCycleDay: Int?,
+        onComplete: (Boolean) -> Unit = {},
+    ) = viewModelScope.launch(dispatcherProvider.io) {
         try {
             if (name.isNotBlank() && type.isNotBlank()) {
                 val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(name, ignoreCase = true) }
                 if (existingAccount != null) {
                     _uiEvent.send("An account named '$name' already exists.")
-                    onComplete(false)
+                    withContext(dispatcherProvider.main) { onComplete(false) }
                 } else {
-                    repository.insert(Account(name = name, type = type))
+                    repository.insert(
+                        Account(
+                            name = name,
+                            type = type,
+                            creditLimit = creditLimit,
+                            billingCycleDay = billingCycleDay,
+                        ),
+                    )
                     _uiEvent.send("Account '$name' created.")
-                    onComplete(true)
+                    withContext(dispatcherProvider.main) { onComplete(true) }
                 }
             } else {
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             }
         } catch (e: Exception) {
             _uiEvent.send("Error creating account: ${e.message}")
-            onComplete(false)
+            withContext(dispatcherProvider.main) { onComplete(false) }
         }
     }
 
     fun updateAccount(
         account: Account,
         onComplete: (Boolean) -> Unit = {},
-    ) = viewModelScope.launch {
+    ) = viewModelScope.launch(dispatcherProvider.io) {
         try {
             val existingAccount = repository.getAllAccountsSnapshot().find { it.name.equals(account.name, ignoreCase = true) && it.id != account.id }
             if (existingAccount != null) {
                 _uiEvent.send("An account named '${account.name}' already exists.")
-                onComplete(false)
+                withContext(dispatcherProvider.main) { onComplete(false) }
             } else {
                 repository.update(account)
-                onComplete(true)
+                withContext(dispatcherProvider.main) { onComplete(true) }
             }
         } catch (e: Exception) {
             _uiEvent.send("Error updating account: ${e.message}")
-            onComplete(false)
+            withContext(dispatcherProvider.main) { onComplete(false) }
         }
     }
 
@@ -316,16 +455,20 @@ class AccountViewModel(
         newName: String,
     ) {
         if (newName.isBlank()) return
-        viewModelScope.launch {
-            val accountToUpdate = repository.getAccountByIdSync(accountId)
-            accountToUpdate?.let {
-                updateAccount(it.copy(name = newName))
+        viewModelScope.launch(dispatcherProvider.io) {
+            try {
+                val accountToUpdate = repository.getAccountByIdSync(accountId)
+                accountToUpdate?.let {
+                    updateAccount(it.copy(name = newName))
+                }
+            } catch (e: Exception) {
+                _uiEvent.send("Error updating account: ${e.message}")
             }
         }
     }
 
     fun deleteAccount(account: Account) =
-        viewModelScope.launch {
+        viewModelScope.launch(dispatcherProvider.io) {
             try {
                 repository.delete(account)
                 _uiEvent.send("Account '${account.name}' deleted.")

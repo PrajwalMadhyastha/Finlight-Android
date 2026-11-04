@@ -1,28 +1,28 @@
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.ui.viewmodel.LinkTransactionViewModel
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.di.FinlightViewModelFactory
+import io.pm.finlight.utils.DispatcherProvider
 
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.createLinkTransactionFactory(application, potentialTransaction)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class LinkTransactionViewModelFactory(
-    private val application: Application,
-    private val potentialTransaction: PotentialTransaction,
-) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(LinkTransactionViewModel::class.java)) {
-            val db = AppDatabase.getInstance(application)
-            val transactionRepository = ServiceLocator.provideTransactionRepository(application)
-            val recurringTransactionDao = db.recurringTransactionDao()
-            @Suppress("UNCHECKED_CAST")
-            return LinkTransactionViewModel(
-                transactionRepository,
-                recurringTransactionDao,
-                potentialTransaction,
-            ) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
+    application: Application,
+    potentialTransaction: PotentialTransaction,
+    transactionRepository: ITransactionRepository? = null,
+    dispatcherProvider: DispatcherProvider? = null,
+) : ViewModelProvider.Factory by FinlightViewModelFactory.createLinkTransactionFactory(
+        context = application,
+        potentialTransaction = potentialTransaction,
+        transactionRepository = transactionRepository,
+        dispatcherProvider = dispatcherProvider,
+    )

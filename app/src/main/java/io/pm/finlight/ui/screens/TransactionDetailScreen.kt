@@ -60,7 +60,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -84,10 +83,9 @@ import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.ui.viewmodel.SettingsViewModelFactory
-import io.pm.finlight.utils.BankLogoHelper
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.FormatUtils
@@ -136,7 +134,7 @@ fun TransactionDetailScreen(
     val context = LocalContext.current
     val settingsViewModel: SettingsViewModel =
         viewModel(
-            factory = SettingsViewModelFactory(context.applicationContext as android.app.Application),
+            factory = FinlightViewModelFactory.create(context.applicationContext as android.app.Application),
         )
 
     val detailsState by viewModel.findTransactionDetailsById(transactionId).collectAsState(initial = null)
@@ -195,6 +193,12 @@ fun TransactionDetailScreen(
     // Observe ViewModel-driven navigation events (e.g. after canonical nudge resolves).
     LaunchedEffect(Unit) {
         viewModel.navigateBackEvent.collect { navigateBack() }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.uiEvent.collect { message ->
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        }
     }
 
     LaunchedEffect(validationError) {
@@ -620,8 +624,8 @@ fun TransactionDetailScreen(
                 if (showCreateAccountDialog) {
                     CreateAccountDialog(
                         onDismiss = { showCreateAccountDialog = false },
-                        onConfirm = { name, type ->
-                            viewModel.createAccount(name, type) { newAccount ->
+                        onConfirm = { name, type, creditLimit, billingCycleDay ->
+                            viewModel.createAccount(name, type, creditLimit, billingCycleDay) { newAccount ->
                                 viewModel.updateTransactionAccount(transactionId, newAccount.id)
                             }
                             showCreateAccountDialog = false
@@ -1061,10 +1065,15 @@ private fun TransactionSpotlightHeader(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            val isPredefined = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey) != R.drawable.bg_cat_general
+            val categoryBgRes = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey)
+            val isPredefined = categoryBgRes != R.drawable.bg_cat_general
             if (isPredefined && !isSplit) {
                 Image(
-                    painter = painterResource(id = CategoryIconHelper.getCategoryBackground(displayCategory.iconKey)),
+                    painter =
+                        rememberSafeDrawablePainter(
+                            resId = categoryBgRes,
+                            fallbackResId = R.drawable.bg_cat_general,
+                        ),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.matchParentSize(),
@@ -1258,7 +1267,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(entry.accountName)),
+                        painter = rememberSafeBankLogoPainter(entry.accountName),
                         contentDescription = "${entry.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1312,7 +1321,7 @@ private fun MultiAccountBreakdownCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     Image(
-                        painter = painterResource(id = BankLogoHelper.getLogoForAccount(detail.accountName ?: "")),
+                        painter = rememberSafeBankLogoPainter(detail.accountName ?: ""),
                         contentDescription = "${detail.accountName} logo",
                         modifier = Modifier.size(36.dp),
                     )
@@ -1373,7 +1382,7 @@ private fun AccountCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(id = BankLogoHelper.getLogoForAccount(details.accountName ?: "")),
+                painter = rememberSafeBankLogoPainter(details.accountName ?: ""),
                 contentDescription = "${details.accountName} Logo",
                 modifier = Modifier.size(40.dp),
             )
@@ -1912,7 +1921,26 @@ private fun AccountPickerItem(
             headlineContent = {
                 Text(account.name, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
             },
-            supportingContent = { if (isCurrent) Text("Currently Selected") },
+            supportingContent =
+                if (isCurrent || (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0)) {
+                    {
+                        val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
+                        val hasLimit = account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0
+                        when {
+                            isCurrent && hasLimit -> {
+                                Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
+                            }
+                            isCurrent -> {
+                                Text("Currently Selected")
+                            }
+                            hasLimit -> {
+                                Text("Limit: ${currencyFormat.format(account.creditLimit)}")
+                            }
+                        }
+                    }
+                } else {
+                    null
+                },
             modifier = Modifier.clickable(onClick = onSelectClick),
             trailingContent = {
                 IconButton(onClick = onEditClick) {

@@ -1,29 +1,32 @@
-// FILE: app/src/main/java/io/pm/finlight/OnboardingViewModelFactory.kt
-// =================================================================================
-// REASON: FIX - The factory now passes the application context to the
-// OnboardingViewModel, which is required for the new, more reliable currency
-// detection logic that uses the TelephonyManager.
-// =================================================================================
-package io.pm.finlight
+package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import io.pm.finlight.di.ServiceLocator
 
-/**
- * Factory for creating an OnboardingViewModel.
- */
+@Deprecated(
+    message = "Migrate to FinlightViewModelFactory or ServiceLocator. Individual factories will be removed in a future release.",
+    replaceWith =
+        ReplaceWith(
+            "FinlightViewModelFactory.create(application)",
+            "io.pm.finlight.di.FinlightViewModelFactory",
+        ),
+)
 class OnboardingViewModelFactory(private val application: Application) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(OnboardingViewModel::class.java)) {
-            val categoryRepository = ServiceLocator.provideCategoryRepository(application)
-            val settingsRepository = ServiceLocator.provideSettingsRepository(application)
-
             @Suppress("UNCHECKED_CAST")
-            // --- UPDATED: Pass the application context to the ViewModel ---
-            return OnboardingViewModel(application, categoryRepository, settingsRepository) as T
+            return ServiceLocator.provideOnboardingViewModel(application) as T
         }
-        throw IllegalArgumentException("Unknown ViewModel class")
+        throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
+    }
+
+    override fun <T : ViewModel> create(
+        modelClass: Class<T>,
+        extras: CreationExtras,
+    ): T {
+        return create(modelClass)
     }
 }

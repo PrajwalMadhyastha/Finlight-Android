@@ -27,6 +27,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -99,7 +100,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
         `when`(transactionRepository.getFirstTransactionDate()).thenReturn(flowOf(System.currentTimeMillis()))
         `when`(transactionRepository.getMonthlyTrends(anyLong())).thenReturn(flowOf(emptyList()))
 
-        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+        viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
     }
 
     @Test
@@ -122,7 +123,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
             `when`(budgetRepository.getBudgetsForMonthWithSpending(anyString(), anyInt(), anyInt())).thenReturn(flowOf(budgetsWithSpending))
 
             // ACT: Re-initialize ViewModel to pick up new mock setup.
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ASSERT
             viewModel.availableCategoriesForNewBudget.test {
@@ -155,7 +156,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth)).thenReturn(flowOf(prevMonthBudget))
 
             // --- Re-initialize ViewModel *after* test-specific mocks are set ---
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ACT & ASSERT
             viewModel.overallBudgetForSelectedMonth.test {
@@ -183,7 +184,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getOverallBudgetForMonth(anyInt(), anyInt())).thenReturn(flowOf(null))
 
             // ACT
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             // ASSERT
             viewModel.overallBudgetForSelectedMonth.test {
@@ -284,7 +285,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
             `when`(settingsRepository.getOverallBudgetForMonth(twoMonthsAgoYear, twoMonthsAgoMonth)).thenReturn(flowOf(null))
 
             // Act
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle() // Let the flow combine and emit
 
             // Assert
@@ -327,7 +328,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(FinancialSummary(totalIncome = 0.0, totalExpenses = totalMonthlyExpenses)))
 
             // ACT
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle()
 
             // ASSERT
@@ -360,7 +361,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
                 .thenReturn(flowOf(FinancialSummary(totalIncome = 0.0, totalExpenses = totalMonthlyExpenses)))
 
             // ACT
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
             advanceUntilIdle()
 
             // ASSERT
@@ -633,7 +634,7 @@ class BudgetViewModelTest : BaseViewModelTest() {
             `when`(budgetRepository.getBudgetsForCategoryAndYear("Food", year)).thenReturn(existingCatBudgets)
 
             // Reset view model with the new mock behaviors
-            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository)
+            viewModel = BudgetViewModel(budgetRepository, settingsRepository, categoryRepository, transactionRepository, TestDispatcherProvider(testDispatcher))
 
             viewModel.setSelectedPlanningYear(year)
             advanceUntilIdle()

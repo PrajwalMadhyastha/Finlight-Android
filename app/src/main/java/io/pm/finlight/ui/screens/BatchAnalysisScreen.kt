@@ -16,15 +16,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModel
-import io.pm.finlight.ui.viewmodel.BatchAnalysisViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BatchAnalysisScreen(navController: androidx.navigation.NavController) {
     val context = LocalContext.current
     val viewModel: BatchAnalysisViewModel =
-        viewModel(factory = BatchAnalysisViewModelFactory(context.applicationContext))
+        viewModel(factory = FinlightViewModelFactory.createBatchAnalysisFactory(context.applicationContext))
     val status = viewModel.status
 
     LaunchedEffect(viewModel.uiEvent) {

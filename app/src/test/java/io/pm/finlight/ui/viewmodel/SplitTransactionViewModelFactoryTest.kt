@@ -2,7 +2,8 @@ package io.pm.finlight.ui.viewmodel
 
 import android.app.Application
 import android.os.Build
-import androidx.lifecycle.ViewModel
+import io.pm.finlight.di.assertThrowsUnknownViewModel
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
@@ -10,15 +11,12 @@ import io.mockk.mockk
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISplitTransactionRepository
 import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.SplitTransactionViewModel
-import io.pm.finlight.SplitTransactionViewModelFactory
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,10 +80,38 @@ class SplitTransactionViewModelFactoryTest {
 
     @Test
     fun create_withUnknownViewModelClass_throwsIllegalArgumentException() {
-        class UnknownViewModel : ViewModel()
+        assertThrowsUnknownViewModel(factory)
+    }
 
-        assertThrows(IllegalArgumentException::class.java) {
-            factory.create(UnknownViewModel::class.java)
-        }
+    @Test
+    fun create_withExtras_returnsSplitTransactionViewModel() {
+        val vm = factory.create(SplitTransactionViewModel::class.java, CreationExtras.Empty)
+        assertNotNull(vm)
+    }
+
+    @Test
+    fun create_withOverriddenViewModel_returnsMockedInstance() {
+        val mockVM: SplitTransactionViewModel = mockk(relaxed = true)
+        ServiceLocator.setSplitTransactionViewModel(mockVM)
+
+        val resolved = factory.create(SplitTransactionViewModel::class.java)
+        assertSame(mockVM, resolved)
+    }
+
+    @Test
+    fun create_withExplicitOverrides_usesPassedDependencies() {
+        val customTxnRepo: ITransactionRepository = mockk(relaxed = true)
+        val customCatRepo: ICategoryRepository = mockk(relaxed = true)
+        val customFactory =
+            SplitTransactionViewModelFactory(
+                application = application,
+                transactionId = 99,
+                transactionRepository = customTxnRepo,
+                categoryRepository = customCatRepo,
+            )
+
+        val vm = customFactory.create(SplitTransactionViewModel::class.java)
+        assertNotNull(vm)
+        assertSame(customCatRepo, vm.categoryRepository)
     }
 }
