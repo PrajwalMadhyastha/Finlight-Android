@@ -647,8 +647,8 @@ fun AddTransactionScreen(
     if (showCreateAccountDialog) {
         CreateAccountDialog(
             onDismiss = { showCreateAccountDialog = false },
-            onConfirm = { name, type ->
-                viewModel.createAccount(name, type) { newAccount ->
+            onConfirm = { name, type, creditLimit, billingCycleDay ->
+                viewModel.createAccount(name, type, creditLimit, billingCycleDay) { newAccount ->
                     viewModel.onAddTransactionAccountChanged(newAccount)
                 }
                 showCreateAccountDialog = false

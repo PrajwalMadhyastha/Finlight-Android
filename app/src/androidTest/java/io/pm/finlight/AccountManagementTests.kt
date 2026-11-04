@@ -261,7 +261,7 @@ class AccountManagementTests {
 
         // Wallet transactions: -150 (coffee), -50 (bus), -250 (taxi) = -450 total balance.
         val expectedBalance =
-            java.text.NumberFormat.getCurrencyInstance(java.util.Locale("en", "IN"))
+            java.text.NumberFormat.getCurrencyInstance(java.util.Locale.forLanguageTag("en-IN"))
                 .apply { maximumFractionDigits = 0 }
                 .format(-450.0)
         composeTestRule.onNodeWithText(expectedBalance).assertExists()

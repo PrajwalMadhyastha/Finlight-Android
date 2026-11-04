@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
 import io.pm.finlight.*
+import io.pm.finlight.utils.DateUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -991,4 +992,75 @@ class AccountViewModelTest : BaseViewModelTest() {
             assertTrue(callbackTriggered)
             assertTrue(successResult)
         }
+
+    @Test
+    fun `creditCardMetrics emits empty map when accountsWithBalance is empty`() =
+        runTest {
+            `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(emptyList()))
+
+            viewModel =
+                AccountViewModel(
+                    accountRepository,
+                    transactionRepository,
+                    settingsRepository,
+                    mergeAccountsUseCase,
+                    testDispatcher,
+                )
+
+            viewModel.creditCardMetrics.test {
+                val emission = awaitItem()
+                assertEquals(emptyMap<Int, CreditCardMetrics>(), emission)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `calculateCreditCardMetrics ignores excluded transactions and transactions outside cycle`() {
+        val currentTime = System.currentTimeMillis()
+        val card = Account(id = 10, name = "Card", type = "Credit Card", creditLimit = 50000.0, billingCycleDay = 15)
+        val (cycleStart, _) = DateUtils.getCreditCardBillingCycleRange(15, currentTime)
+
+        val txns =
+            listOf(
+                Transaction(
+                    id = 1,
+                    description = "Valid",
+                    amount = 2000.0,
+                    date = currentTime,
+                    accountId = 10,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                    isExcluded = false,
+                ),
+                Transaction(
+                    id = 2,
+                    description = "Excluded",
+                    amount = 1500.0,
+                    date = currentTime,
+                    accountId = 10,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                    isExcluded = true,
+                ),
+                Transaction(
+                    id = 3,
+                    description = "Past",
+                    amount = 3000.0,
+                    date = cycleStart - 86400000L,
+                    accountId = 10,
+                    categoryId = 1,
+                    notes = null,
+                    transactionType = TransactionType.EXPENSE,
+                    isExcluded = false,
+                ),
+            )
+
+        val metrics = viewModel.calculateCreditCardMetrics(card, txns, currentTime)
+        org.junit.Assert.assertNotNull(metrics)
+        assertEquals(2000.0, metrics?.currentCycleSpend ?: 0.0, 0.01)
+        assertEquals(48000.0, metrics?.availableLimit ?: 0.0, 0.01)
+        assertEquals(4.0f, metrics?.utilizationPercentage ?: 0.0f, 0.01f)
+    }
 }

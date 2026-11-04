@@ -624,8 +624,8 @@ fun TransactionDetailScreen(
                 if (showCreateAccountDialog) {
                     CreateAccountDialog(
                         onDismiss = { showCreateAccountDialog = false },
-                        onConfirm = { name, type ->
-                            viewModel.createAccount(name, type) { newAccount ->
+                        onConfirm = { name, type, creditLimit, billingCycleDay ->
+                            viewModel.createAccount(name, type, creditLimit, billingCycleDay) { newAccount ->
                                 viewModel.updateTransactionAccount(transactionId, newAccount.id)
                             }
                             showCreateAccountDialog = false
@@ -1921,21 +1921,26 @@ private fun AccountPickerItem(
             headlineContent = {
                 Text(account.name, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
             },
-            supportingContent = {
-                val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
-                val hasLimit = account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0
-                when {
-                    isCurrent && hasLimit -> {
-                        Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
+            supportingContent =
+                if (isCurrent || (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0)) {
+                    {
+                        val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
+                        val hasLimit = account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0
+                        when {
+                            isCurrent && hasLimit -> {
+                                Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
+                            }
+                            isCurrent -> {
+                                Text("Currently Selected")
+                            }
+                            hasLimit -> {
+                                Text("Limit: ${currencyFormat.format(account.creditLimit)}")
+                            }
+                        }
                     }
-                    isCurrent -> {
-                        Text("Currently Selected")
-                    }
-                    hasLimit -> {
-                        Text("Limit: ${currencyFormat.format(account.creditLimit)}")
-                    }
-                }
-            },
+                } else {
+                    null
+                },
             modifier = Modifier.clickable(onClick = onSelectClick),
             trailingContent = {
                 IconButton(onClick = onEditClick) {
