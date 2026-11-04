@@ -1266,6 +1266,19 @@ private fun AccountPickerSheet(
                                 color = MaterialTheme.colorScheme.onSurface,
                             )
                         },
+                        supportingContent =
+                            if (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0) {
+                                {
+                                    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+                                    Text(
+                                        "Limit: ${currencyFormat.format(account.creditLimit)}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                         leadingContent = {
                             Image(
                                 painter = rememberSafeBankLogoPainter(account.name),

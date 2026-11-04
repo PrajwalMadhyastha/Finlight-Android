@@ -50,6 +50,7 @@ class AccountListScreenTest {
                 every { isSelectionModeActive } returns MutableStateFlow(false)
                 every { selectedAccountIds } returns MutableStateFlow(emptySet())
                 every { suggestedMerges } returns MutableStateFlow(emptyList())
+                every { creditCardMetrics } returns MutableStateFlow(emptyMap())
                 every { uiEvent } returns MutableSharedFlow()
             }
 

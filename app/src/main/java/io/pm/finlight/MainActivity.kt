@@ -963,6 +963,7 @@ fun AppNavHost(
                 navController = navController,
                 dashboardViewModel = dashboardViewModel,
                 transactionViewModel = transactionViewModel,
+                accountViewModel = accountViewModel,
             )
         }
         composable(

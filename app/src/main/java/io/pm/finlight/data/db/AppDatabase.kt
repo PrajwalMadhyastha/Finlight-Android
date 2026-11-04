@@ -55,7 +55,7 @@ import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
         GoalContribution::class,
         MergeRecord::class,
     ],
-    version = 58,
+    version = 59,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -1089,6 +1089,16 @@ abstract class AppDatabase : RoomDatabase() {
                 }
             }
 
+        // --- Migration 58→59: Add creditLimit and billingCycleDay to accounts table ---
+        val MIGRATION_58_59 =
+            object : Migration(58, 59) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE accounts ADD COLUMN creditLimit REAL DEFAULT NULL")
+                    db.execSQL("ALTER TABLE accounts ADD COLUMN billingCycleDay INTEGER DEFAULT NULL")
+                    Log.i("Migration_58_59", "Added creditLimit and billingCycleDay columns to accounts table.")
+                }
+            }
+
         @androidx.annotation.VisibleForTesting
         fun setTestInstance(database: AppDatabase) {
             INSTANCE = database
@@ -1134,6 +1144,7 @@ abstract class AppDatabase : RoomDatabase() {
                             MIGRATION_55_56,
                             MIGRATION_56_57,
                             MIGRATION_57_58,
+                            MIGRATION_58_59,
                         )
                         .fallbackToDestructiveMigration()
                         .addCallback(DatabaseCallback(context))

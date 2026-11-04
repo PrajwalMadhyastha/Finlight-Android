@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Account
 import io.pm.finlight.AccountWithBalance
+import io.pm.finlight.CreditCardMetrics
+import io.pm.finlight.isCreditCard
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.rememberSafeBankLogoPainter
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -59,6 +61,7 @@ fun AccountListScreen(
     val isSelectionMode by viewModel.isSelectionModeActive.collectAsState()
     val selectedIds by viewModel.selectedAccountIds.collectAsState()
     val suggestedMerges by viewModel.suggestedMerges.collectAsState()
+    val ccMetricsMap by viewModel.creditCardMetrics.collectAsState()
     var showMergeDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(key1 = viewModel.uiEvent) {
@@ -129,6 +132,7 @@ fun AccountListScreen(
                 AccountListItem(
                     modifier = Modifier.animateItemPlacement(),
                     accountWithBalance = accountWithBalance,
+                    creditCardMetrics = ccMetricsMap[accountWithBalance.account.id],
                     isSelectionMode = isSelectionMode,
                     isSelected = accountWithBalance.account.id in selectedIds,
                     onToggleSelection = { viewModel.toggleAccountSelection(accountWithBalance.account.id) },
@@ -208,6 +212,7 @@ private fun MergeSuggestionCard(
 private fun AccountListItem(
     modifier: Modifier = Modifier,
     accountWithBalance: AccountWithBalance,
+    creditCardMetrics: CreditCardMetrics? = null,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onToggleSelection: () -> Unit,
@@ -247,11 +252,46 @@ private fun AccountListItem(
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Text(
-                    text = "Balance: ${currencyFormat.format(accountWithBalance.balance)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                if (creditCardMetrics != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = "Spent: ${currencyFormat.format(creditCardMetrics.currentCycleSpend)} / ${currencyFormat.format(creditCardMetrics.creditLimit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
+                    val progressColor =
+                        when {
+                            creditCardMetrics.utilizationPercentage <= 30f -> MaterialTheme.colorScheme.primary
+                            creditCardMetrics.utilizationPercentage <= 50f -> MaterialTheme.colorScheme.tertiary
+                            else -> MaterialTheme.colorScheme.error
+                        }
+                    LinearProgressIndicator(
+                        progress = { progress },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                        color = progressColor,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "${String.format(Locale.getDefault(), "%.1f", creditCardMetrics.utilizationPercentage)}% used • ${creditCardMetrics.daysRemainingInCycle}d left",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = progressColor,
+                    )
+                } else if (accountWithBalance.account.isCreditCard && (accountWithBalance.account.creditLimit ?: 0.0) > 0.0) {
+                    Text(
+                        text = "Limit: ${currencyFormat.format(accountWithBalance.account.creditLimit)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    Text(
+                        text = "Balance: ${currencyFormat.format(accountWithBalance.balance)}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
 
             if (isSelectionMode) {

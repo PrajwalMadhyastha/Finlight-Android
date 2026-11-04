@@ -10,15 +10,21 @@
 // =================================================================================
 package io.pm.finlight.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import io.pm.finlight.AccountType
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -41,6 +47,10 @@ fun AddEditAccountScreen(
 
     var accountName by remember { mutableStateOf(TextFieldValue("")) }
     var accountType by remember { mutableStateOf(TextFieldValue("")) }
+    var creditLimitText by remember { mutableStateOf(TextFieldValue("")) }
+    var billingDayText by remember { mutableStateOf(TextFieldValue("")) }
+    val isCreditCard = AccountType.fromString(accountType.text) == AccountType.CREDIT_CARD
+
     var showDeleteDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var matchDialogState by remember { mutableStateOf<AccountMatch?>(null) }
@@ -55,6 +65,13 @@ fun AddEditAccountScreen(
         accountToEdit?.let {
             accountName = TextFieldValue(it.name, TextRange(it.name.length))
             accountType = TextFieldValue(it.type, TextRange(it.type.length))
+            val limitStr =
+                it.creditLimit?.let { limit ->
+                    if (limit % 1.0 == 0.0) limit.toLong().toString() else limit.toString()
+                } ?: ""
+            creditLimitText = TextFieldValue(limitStr, TextRange(limitStr.length))
+            val dayStr = it.billingCycleDay?.toString() ?: ""
+            billingDayText = TextFieldValue(dayStr, TextRange(dayStr.length))
         }
     }
 
@@ -62,72 +79,136 @@ fun AddEditAccountScreen(
         modifier =
             Modifier
                 .fillMaxSize()
+                .imePadding()
                 .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = titleText,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Text(
+                text = titleText,
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
 
-        GlassPanel {
-            Column(
-                modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                OutlinedTextField(
-                    value = accountName,
-                    onValueChange = { accountName = it },
-                    label = { Text("Account Name (e.g., Savings, Credit Card)") },
+            GlassPanel {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    OutlinedTextField(
+                        value = accountName,
+                        onValueChange = { accountName = it },
+                        label = { Text("Account Name (e.g., Savings, Credit Card)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                            ),
+                    )
+                    OutlinedTextField(
+                        value = accountType,
+                        onValueChange = { accountType = it },
+                        label = { Text("Account Type (e.g., Bank, Wallet)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors =
+                            OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                            ),
+                    )
+
+                    AnimatedVisibility(visible = isCreditCard) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            OutlinedTextField(
+                                value = creditLimitText,
+                                onValueChange = { newValue ->
+                                    if (newValue.text.all { it.isDigit() || it == '.' }) {
+                                        creditLimitText = newValue
+                                    }
+                                },
+                                label = { Text("Credit Limit (e.g., 100000)") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors =
+                                    OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        cursorColor = MaterialTheme.colorScheme.primary,
+                                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                    ),
+                            )
+                            OutlinedTextField(
+                                value = billingDayText,
+                                onValueChange = { newValue ->
+                                    if (newValue.text.all { it.isDigit() } && newValue.text.length <= 2) {
+                                        billingDayText = newValue
+                                    }
+                                },
+                                label = { Text("Billing Day of Month (1 - 31)") },
+                                supportingText = { Text("Day each month when your statement is generated") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors =
+                                    OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+                                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        cursorColor = MaterialTheme.colorScheme.primary,
+                                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                        focusedContainerColor = Color.Transparent,
+                                        unfocusedContainerColor = Color.Transparent,
+                                    ),
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (isEditMode) {
+                Button(
+                    onClick = { showDeleteDialog = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                        ),
-                )
-                OutlinedTextField(
-                    value = accountType,
-                    onValueChange = { accountType = it },
-                    label = { Text("Account Type (e.g., Bank, Wallet)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                            focusedLabelColor = MaterialTheme.colorScheme.primary,
-                            unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            cursorColor = MaterialTheme.colorScheme.primary,
-                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                        ),
-                )
+                ) {
+                    Text("Delete Account")
+                }
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
 
-        if (isEditMode) {
-            Button(
-                onClick = { showDeleteDialog = true },
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Delete Account")
-            }
-        }
+        Spacer(modifier = Modifier.height(16.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedButton(onClick = { navController.popBackStack() }, modifier = Modifier.weight(1f)) {
@@ -143,12 +224,28 @@ fun AddEditAccountScreen(
                             val onComplete = { success: Boolean ->
                                 if (success) navController.popBackStack()
                             }
+                            val parsedLimit = if (isCreditCard) creditLimitText.text.toDoubleOrNull() else null
+                            val parsedBillingDay = if (isCreditCard) billingDayText.text.toIntOrNull()?.coerceIn(1, 31) else null
                             if (isEditMode) {
                                 accountToEdit?.let {
-                                    viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text), onComplete)
+                                    viewModel.updateAccount(
+                                        it.copy(
+                                            name = accountName.text,
+                                            type = accountType.text,
+                                            creditLimit = parsedLimit,
+                                            billingCycleDay = parsedBillingDay,
+                                        ),
+                                        onComplete,
+                                    )
                                 }
                             } else {
-                                viewModel.addAccount(accountName.text, accountType.text, onComplete)
+                                viewModel.addAccount(
+                                    name = accountName.text,
+                                    type = accountType.text,
+                                    creditLimit = parsedLimit,
+                                    billingCycleDay = parsedBillingDay,
+                                    onComplete = onComplete,
+                                )
                             }
                         }
                     }
@@ -201,12 +298,28 @@ fun AddEditAccountScreen(
                             val onComplete = { success: Boolean ->
                                 if (success) navController.popBackStack()
                             }
+                            val parsedLimit = if (isCreditCard) creditLimitText.text.toDoubleOrNull() else null
+                            val parsedBillingDay = if (isCreditCard) billingDayText.text.toIntOrNull()?.coerceIn(1, 31) else null
                             if (isEditMode) {
                                 accountToEdit?.let {
-                                    viewModel.updateAccount(it.copy(name = accountName.text, type = accountType.text), onComplete)
+                                    viewModel.updateAccount(
+                                        it.copy(
+                                            name = accountName.text,
+                                            type = accountType.text,
+                                            creditLimit = parsedLimit,
+                                            billingCycleDay = parsedBillingDay,
+                                        ),
+                                        onComplete,
+                                    )
                                 }
                             } else {
-                                viewModel.addAccount(accountName.text, accountType.text, onComplete)
+                                viewModel.addAccount(
+                                    name = accountName.text,
+                                    type = accountType.text,
+                                    creditLimit = parsedLimit,
+                                    billingCycleDay = parsedBillingDay,
+                                    onComplete = onComplete,
+                                )
                             }
                             matchDialogState = null
                         }) {

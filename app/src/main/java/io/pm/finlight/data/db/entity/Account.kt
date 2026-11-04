@@ -25,6 +25,12 @@ data class Account(
     @ColumnInfo(name = "name", collate = ColumnInfo.NOCASE)
     val name: String,
     val type: String,
+    // Optional credit card specific fields
+    val creditLimit: Double? = null,
+    val billingCycleDay: Int? = null,
     // The balance field is intentionally removed from the database entity.
     // It will be calculated on-the-fly.
 )
+
+val Account.isCreditCard: Boolean
+    get() = AccountType.fromString(type) == AccountType.CREDIT_CARD

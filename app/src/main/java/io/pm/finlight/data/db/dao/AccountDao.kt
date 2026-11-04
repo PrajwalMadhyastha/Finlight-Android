@@ -25,6 +25,8 @@ interface AccountDao {
             A.id,
             IFNULL(A.name, 'Unnamed Account') AS name,
             IFNULL(A.type, 'General') AS type,
+            A.creditLimit,
+            A.billingCycleDay,
             IFNULL(TxSums.balance, 0.0) AS balance
         FROM
             accounts AS A
@@ -42,19 +44,19 @@ interface AccountDao {
     )
     fun getAccountsWithBalance(): Flow<List<AccountWithBalance>>
 
-    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type FROM accounts ORDER BY name ASC")
+    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type, creditLimit, billingCycleDay FROM accounts ORDER BY name ASC")
     fun getAllAccounts(): Flow<List<Account>>
 
-    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type FROM accounts ORDER BY name ASC")
+    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type, creditLimit, billingCycleDay FROM accounts ORDER BY name ASC")
     suspend fun getAllAccountsSnapshot(): List<Account>
 
-    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type FROM accounts WHERE name = :name COLLATE NOCASE LIMIT 1")
+    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type, creditLimit, billingCycleDay FROM accounts WHERE name = :name COLLATE NOCASE LIMIT 1")
     suspend fun findByName(name: String): Account?
 
-    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type FROM accounts WHERE id = :accountId")
+    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type, creditLimit, billingCycleDay FROM accounts WHERE id = :accountId")
     fun getAccountById(accountId: Int): Flow<Account?>
 
-    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type FROM accounts WHERE id = :accountId")
+    @Query("SELECT id, IFNULL(name, 'Unnamed Account') AS name, IFNULL(type, 'General') AS type, creditLimit, billingCycleDay FROM accounts WHERE id = :accountId")
     suspend fun getAccountByIdSync(accountId: Int): Account?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

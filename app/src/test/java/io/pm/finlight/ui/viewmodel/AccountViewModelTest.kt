@@ -20,6 +20,7 @@ import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito.*
 import org.robolectric.annotation.Config
+import java.util.Calendar
 import kotlin.math.max
 import kotlin.math.min
 
@@ -756,5 +757,107 @@ class AccountViewModelTest : BaseViewModelTest() {
             advanceUntilIdle()
 
             assertTrue(vm.suggestedMerges.value.isNotEmpty())
+        }
+
+    @Test
+    fun `calculateCreditCardMetrics returns null for non-credit card or invalid limit`() {
+        val bankAccount = Account(id = 1, name = "Savings", type = "Bank", creditLimit = 50000.0, billingCycleDay = 15)
+        val ccNoLimit = Account(id = 2, name = "Card", type = "Credit Card", creditLimit = null, billingCycleDay = 15)
+        val ccZeroLimit = Account(id = 3, name = "Card", type = "Credit Card", creditLimit = 0.0, billingCycleDay = 15)
+
+        assertEquals(null, viewModel.calculateCreditCardMetrics(bankAccount, emptyList()))
+        assertEquals(null, viewModel.calculateCreditCardMetrics(ccNoLimit, emptyList()))
+        assertEquals(null, viewModel.calculateCreditCardMetrics(ccZeroLimit, emptyList()))
+    }
+
+    @Test
+    fun `calculateCreditCardMetrics calculates correct spend, available limit, and utilization`() {
+        val testTime =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 10, 12, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+        val card = Account(id = 10, name = "HDFC Regalia", type = "Credit Card", creditLimit = 100000.0, billingCycleDay = 24)
+
+        // Active cycle for testTime is Oct 25, 2025 -> Nov 24, 2025
+        val insideCycleExpense =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 5, 10, 0, 0)
+            }.timeInMillis
+        val insideCycleIncomeRefund =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 6, 10, 0, 0)
+            }.timeInMillis
+        val outsideCycleExpense =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.OCTOBER, 20, 10, 0, 0)
+            }.timeInMillis
+
+        val txns =
+            listOf(
+                Transaction(id = 1, description = "Groceries", amount = 25000.0, date = insideCycleExpense, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE),
+                Transaction(id = 2, description = "Refund", amount = 5000.0, date = insideCycleIncomeRefund, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.INCOME),
+                Transaction(id = 3, description = "Old Spend", amount = 10000.0, date = outsideCycleExpense, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE),
+                Transaction(id = 4, description = "Excluded", amount = 5000.0, date = insideCycleExpense, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE, isExcluded = true),
+            )
+
+        val metrics = viewModel.calculateCreditCardMetrics(card, txns, testTime)
+        org.junit.Assert.assertNotNull(metrics)
+        metrics!!
+
+        // Net spend: 25000 - 5000 = 20000
+        assertEquals(20000.0, metrics.currentCycleSpend, 0.01)
+        assertEquals(80000.0, metrics.availableLimit, 0.01)
+        assertEquals(20.0f, metrics.utilizationPercentage, 0.01f)
+        assertEquals(24, metrics.billingCycleDay)
+        assertEquals(100000.0, metrics.creditLimit, 0.01)
+        assertTrue(metrics.daysRemainingInCycle > 0)
+    }
+
+    @Test
+    fun `addAccount with creditLimit and billingCycleDay saves full details`() =
+        runTest {
+            var callbackTriggered = false
+            var successResult = false
+
+            viewModel.addAccount(
+                name = "Axis Magnus",
+                type = "Credit Card",
+                creditLimit = 300000.0,
+                billingCycleDay = 18,
+            ) { success ->
+                callbackTriggered = true
+                successResult = success
+            }
+            advanceUntilIdle()
+
+            verify(accountRepository).insert(
+                Account(
+                    name = "Axis Magnus",
+                    type = "Credit Card",
+                    creditLimit = 300000.0,
+                    billingCycleDay = 18,
+                ),
+            )
+            assertTrue(callbackTriggered)
+            assertTrue(successResult)
+        }
+
+    @Test
+    fun `getCreditCardMetrics emits metrics for credit card and null for others`() =
+        runTest {
+            val card = Account(id = 20, name = "ICICI Sapphiro", type = "Credit Card", creditLimit = 200000.0, billingCycleDay = 15)
+            `when`(accountRepository.getAccountById(20)).thenReturn(flowOf(card))
+            `when`(transactionRepository.getTransactionsForAccount(20)).thenReturn(flowOf(emptyList()))
+
+            val metrics = viewModel.getCreditCardMetrics(20).first()
+            org.junit.Assert.assertNotNull(metrics)
+            assertEquals(200000.0, metrics?.creditLimit ?: 0.0, 0.01)
+
+            val bank = Account(id = 21, name = "HDFC Salary", type = "Bank")
+            `when`(accountRepository.getAccountById(21)).thenReturn(flowOf(bank))
+            val bankMetrics = viewModel.getCreditCardMetrics(21).first()
+            assertEquals(null, bankMetrics)
         }
 }

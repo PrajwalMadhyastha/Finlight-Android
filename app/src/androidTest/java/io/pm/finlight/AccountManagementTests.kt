@@ -314,4 +314,106 @@ class AccountManagementTests {
         composeTestRule.onNodeWithText("Account Already Exists", useUnmergedTree = true).assertDoesNotExist()
         composeTestRule.onAllNodesWithText("Add New Account").onFirst().assertIsDisplayed()
     }
+
+    /**
+     * Test adding, editing, and displaying a credit card account with limit and billing day,
+     * verifying utilization info on list and detail screens, action buttons accessible on edit,
+     * and limit displayed on the dashboard accounts carousel.
+     */
+    @Test
+    fun test_addCreditCard_displaysLimitAndUtilization() {
+        navigateToAccountList()
+
+        val cardName = "HDFC Diners ${UUID.randomUUID().toString().take(4)}"
+
+        // Click Add FAB
+        composeTestRule.onNodeWithContentDescription("Add").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Add New Account").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Fill Name
+        composeTestRule.onNodeWithText("Account Name (e.g., Savings, Credit Card)").performTextInput(cardName)
+
+        // Fill Type with "Credit Card"
+        composeTestRule.onNodeWithText("Account Type (e.g., Bank, Wallet)").performTextInput("Credit Card")
+
+        // Wait for credit card specific fields to appear
+        composeTestRule.waitUntil(timeoutMillis = 5000) {
+            composeTestRule.onAllNodesWithText("Credit Limit (e.g., 100000)").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText("Credit Limit (e.g., 100000)").performTextInput("150000")
+        composeTestRule.onNodeWithText("Billing Day of Month (1 - 31)").performTextInput("24")
+
+        // Click Save
+        composeTestRule.onNodeWithText("Save").performClick()
+
+        // Wait for return to AccountListScreen
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify credit card account is in the list with utilization info
+        composeTestRule.onNodeWithText(cardName).assertExists()
+        composeTestRule.onNodeWithText("0.0% used", substring = true).assertExists()
+
+        // Navigate to detail
+        composeTestRule.onNodeWithText(cardName).performClick()
+
+        // Verify AccountDetailScreen displays Credit Card metrics
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Current Cycle Spend").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithText("Credit Utilization").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Limit:", substring = true).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Available:", substring = true).assertIsDisplayed()
+
+        // Go back to AccountListScreen
+        composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Click Edit Account for this credit card to verify update flow and buttons
+        composeTestRule.onNode(
+            hasContentDescription("Edit Account") and hasAnyAncestor(hasText(cardName)),
+        ).performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Edit Account").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify Update and Cancel buttons are displayed and not squeezed
+        composeTestRule.onNodeWithText("Cancel").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Update").assertIsDisplayed()
+
+        // Update credit limit to 200000
+        val limitField = composeTestRule.onNodeWithText("Credit Limit (e.g., 100000)")
+        limitField.performTextClearance()
+        limitField.performTextInput("200000")
+
+        // Click Update
+        composeTestRule.onNodeWithText("Update").performClick()
+
+        // Wait for return to AccountListScreen
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithContentDescription("Add").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Go back to Dashboard
+        composeTestRule.activityRule.scenario.onActivity { it.onBackPressedDispatcher.onBackPressed() }
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithTag("dashboard_lazy_column").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        // Verify dashboard Accounts Carousel displays the card, limit, and utilization metrics
+        composeTestRule.onNodeWithTag("dashboard_lazy_column")
+            .performScrollToNode(hasText("Accounts"))
+        composeTestRule.onNodeWithText(cardName).assertExists()
+        composeTestRule.onNodeWithText("Limit: ₹2,00,000").assertExists()
+        composeTestRule.onNodeWithText("0%").assertExists()
+        composeTestRule.onNodeWithText("spent", substring = true).assertExists()
+    }
 }
