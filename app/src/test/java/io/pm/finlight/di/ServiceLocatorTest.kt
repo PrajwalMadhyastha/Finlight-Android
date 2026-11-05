@@ -83,6 +83,8 @@ import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
+import io.pm.finlight.utils.DefaultWorkScheduler
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -637,6 +639,32 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideWorkScheduler_returnsSingletonInstance() {
+        val scheduler1 = ServiceLocator.provideWorkScheduler(application)
+        val scheduler2 = ServiceLocator.provideWorkScheduler(application)
+
+        assertNotNull(scheduler1)
+        assertSame(scheduler1, scheduler2)
+        assertTrue(scheduler1 is DefaultWorkScheduler)
+    }
+
+    @Test
+    fun setWorkScheduler_overridesInstance() {
+        val mockScheduler: IWorkScheduler = mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(mockScheduler)
+        assertSame(mockScheduler, ServiceLocator.provideWorkScheduler(application))
+
+        val mockScheduler2: IWorkScheduler = mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(mockScheduler2)
+        assertSame(mockScheduler2, ServiceLocator.provideWorkScheduler(application))
+
+        ServiceLocator.setWorkScheduler(null)
+        val defaultScheduler = ServiceLocator.provideWorkScheduler(application)
+        assertNotNull(defaultScheduler)
+        assertNotSame(mockScheduler2, defaultScheduler)
+    }
+
+    @Test
     fun setMerchantMappingRepository_overridesInstance() {
         val mockRepo: IMerchantMappingRepository = mockk(relaxed = true)
         ServiceLocator.setMerchantMappingRepository(mockRepo)
@@ -787,6 +815,7 @@ class ServiceLocatorTest {
         val mockCategoryMapping: IMerchantCategoryMappingRepository = mockk(relaxed = true)
         val mockCustomSmsRule: ICustomSmsRuleRepository = mockk(relaxed = true)
         val mockIgnoreRule: IIgnoreRuleRepository = mockk(relaxed = true)
+        val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxn)
         ServiceLocator.setAccountRepository(mockAccount)
@@ -807,6 +836,7 @@ class ServiceLocatorTest {
         ServiceLocator.setMerchantCategoryMappingRepository(mockCategoryMapping)
         ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRule)
         ServiceLocator.setIgnoreRuleRepository(mockIgnoreRule)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         assertSame(mockTxn, ServiceLocator.provideTransactionRepository(application))
         assertSame(mockAccount, ServiceLocator.provideAccountRepository(application))
@@ -827,6 +857,7 @@ class ServiceLocatorTest {
         assertSame(mockCategoryMapping, ServiceLocator.provideMerchantCategoryMappingRepository(application))
         assertSame(mockCustomSmsRule, ServiceLocator.provideCustomSmsRuleRepository(application))
         assertSame(mockIgnoreRule, ServiceLocator.provideIgnoreRuleRepository(application))
+        assertSame(mockWorkScheduler, ServiceLocator.provideWorkScheduler(application))
 
         ServiceLocator.reset()
 
@@ -849,6 +880,7 @@ class ServiceLocatorTest {
         val newCategoryMapping = ServiceLocator.provideMerchantCategoryMappingRepository(application)
         val newCustomSmsRule = ServiceLocator.provideCustomSmsRuleRepository(application)
         val newIgnoreRule = ServiceLocator.provideIgnoreRuleRepository(application)
+        val newWorkScheduler = ServiceLocator.provideWorkScheduler(application)
 
         assertNotNull(newTxn)
         assertNotSame(mockTxn, newTxn)
@@ -886,6 +918,8 @@ class ServiceLocatorTest {
         assertNotSame(mockCustomSmsRule, newCustomSmsRule)
         assertNotNull(newIgnoreRule)
         assertNotSame(mockIgnoreRule, newIgnoreRule)
+        assertNotNull(newWorkScheduler)
+        assertNotSame(mockWorkScheduler, newWorkScheduler)
     }
 
     // --- Concurrency / Thread-Safety Tests ---
