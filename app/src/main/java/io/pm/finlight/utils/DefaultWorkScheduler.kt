@@ -27,7 +27,7 @@ class DefaultWorkScheduler(
     private val context: Context,
     private val settingsRepository: ISettingsRepository,
     private val workManagerProvider: () -> WorkManager = { WorkManager.getInstance(context) },
-    private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val timeProvider: TimeProvider = SystemTimeProvider(),
 ) : IWorkScheduler {
     companion object {
         private const val TAG = "DefaultWorkScheduler"
@@ -39,13 +39,46 @@ class DefaultWorkScheduler(
         const val AUTO_BACKUP_WORK_TAG = "auto_backup_work"
         const val SMS_CATCHUP_WORK_TAG = "sms_catchup_work"
         const val GOAL_SURPLUS_WORK_TAG = "goal_surplus_work"
+
+        internal fun calculateNextGoalSurplusRun(
+            now: Calendar,
+            forceNextMonth: Boolean,
+        ): Calendar =
+            (now.clone() as Calendar).apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 9)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                if (forceNextMonth || before(now)) {
+                    add(Calendar.MONTH, 1)
+                }
+            }
+
+        internal fun calculateNextRecurringTransactionRun(now: Calendar): Calendar =
+            (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, 2)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
+            }
+
+        internal fun calculateNextRecurringPatternRun(now: Calendar): Calendar =
+            (now.clone() as Calendar).apply {
+                set(Calendar.HOUR_OF_DAY, 3)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+                if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
+            }
     }
 
     private val workManager: WorkManager by lazy { workManagerProvider() }
 
     override suspend fun scheduleDailyReport(policy: ExistingWorkPolicy) {
         val (hour, minute) = settingsRepository.getDailyReportTime().first()
-        val now = Calendar.getInstance()
+        val now = timeProvider.now()
         val nextRun =
             (now.clone() as Calendar).apply {
                 set(Calendar.HOUR_OF_DAY, hour)
@@ -64,7 +97,7 @@ class DefaultWorkScheduler(
 
     override suspend fun scheduleWeeklySummary(policy: ExistingWorkPolicy) {
         val (dayOfWeek, hour, minute) = settingsRepository.getWeeklyReportTime().first()
-        val now = Calendar.getInstance()
+        val now = timeProvider.now()
         val nextRun =
             (now.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_WEEK, dayOfWeek)
@@ -84,7 +117,7 @@ class DefaultWorkScheduler(
 
     override suspend fun scheduleMonthlySummary(policy: ExistingWorkPolicy) {
         val (dayOfMonth, hour, minute) = settingsRepository.getMonthlyReportTime().first()
-        val now = Calendar.getInstance()
+        val now = timeProvider.now()
         val nextRun =
             (now.clone() as Calendar).apply {
                 set(Calendar.DAY_OF_MONTH, minOf(dayOfMonth, getActualMaximum(Calendar.DAY_OF_MONTH)))
@@ -132,33 +165,8 @@ class DefaultWorkScheduler(
         forceNextMonth: Boolean,
         policy: ExistingWorkPolicy,
     ) {
-        val now = Calendar.getInstance()
-        val targetYear =
-            if (forceNextMonth) {
-                if (now.get(Calendar.MONTH) == Calendar.DECEMBER) now.get(Calendar.YEAR) + 1 else now.get(Calendar.YEAR)
-            } else {
-                now.get(Calendar.YEAR)
-            }
-        val targetMonth =
-            if (forceNextMonth) {
-                (now.get(Calendar.MONTH) + 1) % 12
-            } else {
-                now.get(Calendar.MONTH)
-            }
-        val nextRun =
-            (now.clone() as Calendar).apply {
-                set(Calendar.YEAR, targetYear)
-                set(Calendar.MONTH, targetMonth)
-                set(Calendar.DAY_OF_MONTH, 1)
-                set(Calendar.HOUR_OF_DAY, 9)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                if (before(now)) {
-                    add(Calendar.MONTH, 1)
-                    set(Calendar.DAY_OF_MONTH, 1)
-                }
-            }
+        val now = timeProvider.now()
+        val nextRun = calculateNextGoalSurplusRun(now, forceNextMonth)
         val delay = maxOf(0L, nextRun.timeInMillis - now.timeInMillis)
         val request =
             OneTimeWorkRequestBuilder<GoalSurplusWorker>()
@@ -168,15 +176,8 @@ class DefaultWorkScheduler(
     }
 
     override fun scheduleRecurringTransactionWorker(policy: ExistingWorkPolicy) {
-        val now = Calendar.getInstance()
-        val nextRun =
-            (now.clone() as Calendar).apply {
-                set(Calendar.HOUR_OF_DAY, 2)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
-            }
+        val now = timeProvider.now()
+        val nextRun = calculateNextRecurringTransactionRun(now)
         val delay = nextRun.timeInMillis - now.timeInMillis
         val request =
             OneTimeWorkRequestBuilder<RecurringTransactionWorker>()
@@ -186,15 +187,8 @@ class DefaultWorkScheduler(
     }
 
     override fun scheduleRecurringPatternWorker(policy: ExistingWorkPolicy) {
-        val now = Calendar.getInstance()
-        val nextRun =
-            (now.clone() as Calendar).apply {
-                set(Calendar.HOUR_OF_DAY, 3)
-                set(Calendar.MINUTE, 0)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-                if (before(now)) add(Calendar.DAY_OF_YEAR, 1)
-            }
+        val now = timeProvider.now()
+        val nextRun = calculateNextRecurringPatternRun(now)
         val delay = nextRun.timeInMillis - now.timeInMillis
         val request =
             OneTimeWorkRequestBuilder<RecurringPatternWorker>()

@@ -9,12 +9,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
-import androidx.work.ListenableWorker
-import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import io.pm.finlight.BackupWorker
+import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.DailyReportWorker
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.MonthlySummaryWorker
@@ -25,7 +24,6 @@ import io.pm.finlight.TransactionNotificationWorker
 import io.pm.finlight.WeeklySummaryWorker
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.workers.GoalSurplusWorker
 import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,6 +45,10 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
     private lateinit var workManager: WorkManager
     private lateinit var settingsRepository: ISettingsRepository
     private lateinit var scheduler: DefaultWorkScheduler
+
+    private class SettableTimeProvider(var current: Calendar) : TimeProvider {
+        override fun now(): Calendar = current.clone() as Calendar
+    }
 
     @Before
     override fun setup() {
@@ -81,25 +83,149 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
         ServiceLocator.reset()
     }
 
-    private fun checkUniqueWorkEnqueued(
-        uniqueTag: String,
-        targetWorker: Class<out ListenableWorker>,
-    ) {
-        val infos = workManager.getWorkInfosForUniqueWork(uniqueTag).get()
-        assertEquals("Expected single work for tag: $uniqueTag", 1, infos.size)
-        val info = infos.first()
-        val isActiveState = info.state == WorkInfo.State.ENQUEUED || info.state == WorkInfo.State.RUNNING
-        assertTrue("Expected active state for $uniqueTag but was ${info.state}", isActiveState)
-        assertTrue(
-            "Expected tag matching worker class ${targetWorker.simpleName}",
-            info.tags.any { it.contains(targetWorker.simpleName) },
-        )
+    @Test
+    fun `calculateNextGoalSurplusRun rolls over to January next year when scheduled in December`() {
+        val decDate =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.DECEMBER)
+                set(Calendar.DAY_OF_MONTH, 15)
+                set(Calendar.HOUR_OF_DAY, 10)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        val nextRun = DefaultWorkScheduler.calculateNextGoalSurplusRun(decDate, forceNextMonth = true)
+        assertEquals(2027, nextRun.get(Calendar.YEAR))
+        assertEquals(Calendar.JANUARY, nextRun.get(Calendar.MONTH))
+        assertEquals(1, nextRun.get(Calendar.DAY_OF_MONTH))
+        assertEquals(9, nextRun.get(Calendar.HOUR_OF_DAY))
+        assertEquals(0, nextRun.get(Calendar.MINUTE))
+        assertEquals(0, nextRun.get(Calendar.SECOND))
+        assertEquals(0, nextRun.get(Calendar.MILLISECOND))
     }
 
-    private fun checkUniqueWorkCancelledOrAbsent(uniqueTag: String) {
-        val infos = workManager.getWorkInfosForUniqueWork(uniqueTag).get()
-        val isInactive = infos.all { it.state == WorkInfo.State.CANCELLED || it.state == WorkInfo.State.SUCCEEDED }
-        assertTrue("Expected work for $uniqueTag to be cancelled or done", isInactive)
+    @Test
+    fun `calculateNextGoalSurplusRun runs today when on 1st before 9 AM and forceNextMonth is false`() {
+        val morningFirst =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.DECEMBER)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 8)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        val nextRun = DefaultWorkScheduler.calculateNextGoalSurplusRun(morningFirst, forceNextMonth = false)
+        assertEquals(2026, nextRun.get(Calendar.YEAR))
+        assertEquals(Calendar.DECEMBER, nextRun.get(Calendar.MONTH))
+        assertEquals(1, nextRun.get(Calendar.DAY_OF_MONTH))
+        assertEquals(9, nextRun.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun `calculateNextGoalSurplusRun advances month when on 1st before 9 AM and forceNextMonth is true`() {
+        val morningFirst =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.DECEMBER)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 8)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        val nextRun = DefaultWorkScheduler.calculateNextGoalSurplusRun(morningFirst, forceNextMonth = true)
+        assertEquals(2027, nextRun.get(Calendar.YEAR))
+        assertEquals(Calendar.JANUARY, nextRun.get(Calendar.MONTH))
+        assertEquals(1, nextRun.get(Calendar.DAY_OF_MONTH))
+        assertEquals(9, nextRun.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun `calculateNextGoalSurplusRun advances month when after 9 AM and forceNextMonth is false`() {
+        val midMonth =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.JUNE)
+                set(Calendar.DAY_OF_MONTH, 15)
+                set(Calendar.HOUR_OF_DAY, 12)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+
+        val nextRun = DefaultWorkScheduler.calculateNextGoalSurplusRun(midMonth, forceNextMonth = false)
+        assertEquals(2026, nextRun.get(Calendar.YEAR))
+        assertEquals(Calendar.JULY, nextRun.get(Calendar.MONTH))
+        assertEquals(1, nextRun.get(Calendar.DAY_OF_MONTH))
+        assertEquals(9, nextRun.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun `calculateNextRecurringTransactionRun schedules today when before 2 AM and tomorrow when after 2 AM`() {
+        val beforeTwoAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 1)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val runToday = DefaultWorkScheduler.calculateNextRecurringTransactionRun(beforeTwoAm)
+        assertEquals(beforeTwoAm.get(Calendar.DAY_OF_YEAR), runToday.get(Calendar.DAY_OF_YEAR))
+        assertEquals(2, runToday.get(Calendar.HOUR_OF_DAY))
+
+        val afterTwoAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 3)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val runTomorrow = DefaultWorkScheduler.calculateNextRecurringTransactionRun(afterTwoAm)
+        val expectedDay =
+            if (afterTwoAm.get(Calendar.DAY_OF_YEAR) == afterTwoAm.getActualMaximum(Calendar.DAY_OF_YEAR)) {
+                1
+            } else {
+                afterTwoAm.get(Calendar.DAY_OF_YEAR) + 1
+            }
+        assertEquals(expectedDay, runTomorrow.get(Calendar.DAY_OF_YEAR))
+        assertEquals(2, runTomorrow.get(Calendar.HOUR_OF_DAY))
+    }
+
+    @Test
+    fun `calculateNextRecurringPatternRun schedules today when before 3 AM and tomorrow when after 3 AM`() {
+        val beforeThreeAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 2)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val runToday = DefaultWorkScheduler.calculateNextRecurringPatternRun(beforeThreeAm)
+        assertEquals(beforeThreeAm.get(Calendar.DAY_OF_YEAR), runToday.get(Calendar.DAY_OF_YEAR))
+        assertEquals(3, runToday.get(Calendar.HOUR_OF_DAY))
+
+        val afterThreeAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 4)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val runTomorrow = DefaultWorkScheduler.calculateNextRecurringPatternRun(afterThreeAm)
+        val expectedDay =
+            if (afterThreeAm.get(Calendar.DAY_OF_YEAR) == afterThreeAm.getActualMaximum(Calendar.DAY_OF_YEAR)) {
+                1
+            } else {
+                afterThreeAm.get(Calendar.DAY_OF_YEAR) + 1
+            }
+        assertEquals(expectedDay, runTomorrow.get(Calendar.DAY_OF_YEAR))
+        assertEquals(3, runTomorrow.get(Calendar.HOUR_OF_DAY))
     }
 
     @Test
@@ -113,7 +239,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
 
             scheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE)
 
-            checkUniqueWorkEnqueued(
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
                 DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG,
                 DailyReportWorker::class.java,
             )
@@ -130,7 +257,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
 
             scheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE)
 
-            checkUniqueWorkEnqueued(
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
                 DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG,
                 DailyReportWorker::class.java,
             )
@@ -142,7 +270,7 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
             scheduler.scheduleDailyReport()
             scheduler.cancelDailyReport()
 
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG)
+            WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG)
         }
 
     @Test
@@ -157,7 +285,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
 
             scheduler.scheduleWeeklySummary()
 
-            checkUniqueWorkEnqueued(
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
                 DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG,
                 WeeklySummaryWorker::class.java,
             )
@@ -175,7 +304,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
 
             scheduler.scheduleWeeklySummary()
 
-            checkUniqueWorkEnqueued(
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
                 DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG,
                 WeeklySummaryWorker::class.java,
             )
@@ -187,18 +317,45 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
             scheduler.scheduleWeeklySummary()
             scheduler.cancelWeeklySummary()
 
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG)
+            WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG)
         }
 
     @Test
-    fun `scheduleMonthlySummary enqueues MonthlySummaryWorker with day clamp and next month roll`() =
+    fun `scheduleMonthlySummary enqueues MonthlySummaryWorker when scheduled earlier this month`() =
         runTest {
             // Day 31 will be clamped by minOf to actual max days in month, and rolled if earlier
             settingsRepository.saveMonthlyReportTime(31, 8, 0)
 
             scheduler.scheduleMonthlySummary()
 
-            checkUniqueWorkEnqueued(
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
+                DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG,
+                MonthlySummaryWorker::class.java,
+            )
+        }
+
+    @Test
+    fun `scheduleMonthlySummary enqueues MonthlySummaryWorker when scheduled later this month`() =
+        runTest {
+            val futureTime =
+                Calendar.getInstance().apply {
+                    set(Calendar.DAY_OF_MONTH, 1)
+                    set(Calendar.HOUR_OF_DAY, 8)
+                }
+            val customScheduler =
+                DefaultWorkScheduler(
+                    context = context,
+                    settingsRepository = settingsRepository,
+                    workManagerProvider = { workManager },
+                    timeProvider = SettableTimeProvider(futureTime),
+                )
+            settingsRepository.saveMonthlyReportTime(20, 10, 0)
+
+            customScheduler.scheduleMonthlySummary()
+
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
                 DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG,
                 MonthlySummaryWorker::class.java,
             )
@@ -210,14 +367,15 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
             scheduler.scheduleMonthlySummary()
             scheduler.cancelMonthlySummary()
 
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG)
+            WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG)
         }
 
     @Test
     fun `scheduleAutoBackup enqueues periodic BackupWorker`() {
         scheduler.scheduleAutoBackup(ExistingPeriodicWorkPolicy.UPDATE)
 
-        checkUniqueWorkEnqueued(
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG,
             BackupWorker::class.java,
         )
@@ -228,14 +386,15 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
         scheduler.scheduleAutoBackup()
         scheduler.cancelAutoBackup()
 
-        checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG)
+        WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG)
     }
 
     @Test
     fun `scheduleSmsRecoveryWorker enqueues SmsCatchupWorker with battery requirement`() {
         scheduler.scheduleSmsRecoveryWorker(ExistingPeriodicWorkPolicy.UPDATE)
 
-        checkUniqueWorkEnqueued(
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG,
             SmsCatchupWorker::class.java,
         )
@@ -248,39 +407,121 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
         scheduler.scheduleSmsRecoveryWorker()
         scheduler.cancelSmsRecoveryWorker()
 
-        checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG)
+        WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG)
     }
 
     @Test
-    fun `scheduleGoalSurplusWorker schedules with forceNextMonth true and false`() {
-        scheduler.scheduleGoalSurplusWorker(forceNextMonth = false)
-        checkUniqueWorkEnqueued(
+    fun `scheduleGoalSurplusWorker schedules with custom time provider before and after threshold`() {
+        val morningFirst =
+            Calendar.getInstance().apply {
+                set(Calendar.YEAR, 2026)
+                set(Calendar.MONTH, Calendar.DECEMBER)
+                set(Calendar.DAY_OF_MONTH, 1)
+                set(Calendar.HOUR_OF_DAY, 8)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
+        val customScheduler =
+            DefaultWorkScheduler(
+                context = context,
+                settingsRepository = settingsRepository,
+                workManagerProvider = { workManager },
+                timeProvider = SettableTimeProvider(morningFirst),
+            )
+
+        customScheduler.scheduleGoalSurplusWorker(forceNextMonth = false)
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG,
             GoalSurplusWorker::class.java,
         )
 
-        scheduler.scheduleGoalSurplusWorker(forceNextMonth = true)
-        checkUniqueWorkEnqueued(
+        customScheduler.scheduleGoalSurplusWorker(forceNextMonth = true)
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG,
             GoalSurplusWorker::class.java,
         )
     }
 
     @Test
-    fun `scheduleRecurringTransactionWorker schedules RecurringTransactionWorker`() {
-        scheduler.scheduleRecurringTransactionWorker()
+    fun `scheduleRecurringTransactionWorker schedules before 2 AM and after 2 AM`() {
+        val beforeTwoAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 1)
+                set(Calendar.MINUTE, 0)
+            }
+        val earlyScheduler =
+            DefaultWorkScheduler(
+                context = context,
+                settingsRepository = settingsRepository,
+                workManagerProvider = { workManager },
+                timeProvider = SettableTimeProvider(beforeTwoAm),
+            )
+        earlyScheduler.scheduleRecurringTransactionWorker()
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
+            DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG,
+            RecurringTransactionWorker::class.java,
+        )
 
-        checkUniqueWorkEnqueued(
+        val afterTwoAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 3)
+                set(Calendar.MINUTE, 0)
+            }
+        val lateScheduler =
+            DefaultWorkScheduler(
+                context = context,
+                settingsRepository = settingsRepository,
+                workManagerProvider = { workManager },
+                timeProvider = SettableTimeProvider(afterTwoAm),
+            )
+        lateScheduler.scheduleRecurringTransactionWorker()
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG,
             RecurringTransactionWorker::class.java,
         )
     }
 
     @Test
-    fun `scheduleRecurringPatternWorker schedules RecurringPatternWorker`() {
-        scheduler.scheduleRecurringPatternWorker()
+    fun `scheduleRecurringPatternWorker schedules before 3 AM and after 3 AM`() {
+        val beforeThreeAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 2)
+                set(Calendar.MINUTE, 0)
+            }
+        val earlyScheduler =
+            DefaultWorkScheduler(
+                context = context,
+                settingsRepository = settingsRepository,
+                workManagerProvider = { workManager },
+                timeProvider = SettableTimeProvider(beforeThreeAm),
+            )
+        earlyScheduler.scheduleRecurringPatternWorker()
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
+            DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG,
+            RecurringPatternWorker::class.java,
+        )
 
-        checkUniqueWorkEnqueued(
+        val afterThreeAm =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, 4)
+                set(Calendar.MINUTE, 0)
+            }
+        val lateScheduler =
+            DefaultWorkScheduler(
+                context = context,
+                settingsRepository = settingsRepository,
+                workManagerProvider = { workManager },
+                timeProvider = SettableTimeProvider(afterThreeAm),
+            )
+        lateScheduler.scheduleRecurringPatternWorker()
+        WorkSchedulerTestUtils.assertWorkEnqueued(
+            workManager,
             DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG,
             RecurringPatternWorker::class.java,
         )
@@ -293,8 +534,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
 
         scheduler.cancelRecurringTransactionWorkers()
 
-        checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG)
-        checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG)
+        WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG)
+        WorkSchedulerTestUtils.assertWorkCancelled(workManager, DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG)
     }
 
     @Test
@@ -303,7 +544,7 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
         scheduler.scheduleTransactionNotification(txId)
 
         val uniqueName = "tx_notif_$txId"
-        checkUniqueWorkEnqueued(uniqueName, TransactionNotificationWorker::class.java)
+        WorkSchedulerTestUtils.assertWorkEnqueued(workManager, uniqueName, TransactionNotificationWorker::class.java)
 
         val info = workManager.getWorkInfosForUniqueWork(uniqueName).get().first()
         assertTrue(info.tags.any { it.contains("TransactionNotificationWorker") })
@@ -326,106 +567,56 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
     @Test
     fun `reconcileWorkOnStartup reconciles all 8 workers when enabled`() =
         runTest {
-            settingsRepository.saveDailyReportEnabled(true)
-            settingsRepository.saveWeeklySummaryEnabled(true)
-            settingsRepository.saveMonthlySummaryEnabled(true)
-            settingsRepository.saveAutoBackupEnabled(true)
-            settingsRepository.saveRecurringTransactionsEnabled(true)
-
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = true)
             scheduler.reconcileWorkOnStartup()
-
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG, DailyReportWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG, WeeklySummaryWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG, MonthlySummaryWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG, BackupWorker::class.java)
-            checkUniqueWorkEnqueued(
-                DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG,
-                RecurringTransactionWorker::class.java,
-            )
-            checkUniqueWorkEnqueued(
-                DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG,
-                RecurringPatternWorker::class.java,
-            )
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG, GoalSurplusWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG, SmsCatchupWorker::class.java)
+            WorkSchedulerTestUtils.assertAllStandardWorkersEnqueued(workManager)
         }
 
     @Test
     fun `reconcileWorkOnStartup skips disabled workers but keeps essential workers`() =
         runTest {
-            settingsRepository.saveDailyReportEnabled(false)
-            settingsRepository.saveWeeklySummaryEnabled(false)
-            settingsRepository.saveMonthlySummaryEnabled(false)
-            settingsRepository.saveAutoBackupEnabled(false)
-            settingsRepository.saveRecurringTransactionsEnabled(false)
-
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = false)
             scheduler.reconcileWorkOnStartup()
-
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG)
-            // Goal surplus and SMS recovery are always reconciled under KEEP
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG, GoalSurplusWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG, SmsCatchupWorker::class.java)
+            WorkSchedulerTestUtils.assertConfigurableWorkersCancelled(workManager)
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
+                DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG,
+                GoalSurplusWorker::class.java,
+            )
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
+                DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG,
+                SmsCatchupWorker::class.java,
+            )
         }
 
     @Test
     fun `rescheduleAllWork schedules all enabled features`() =
         runTest {
-            settingsRepository.saveDailyReportEnabled(true)
-            settingsRepository.saveWeeklySummaryEnabled(true)
-            settingsRepository.saveMonthlySummaryEnabled(true)
-            settingsRepository.saveAutoBackupEnabled(true)
-            settingsRepository.saveRecurringTransactionsEnabled(true)
-
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = true)
             scheduler.rescheduleAllWork()
-
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG, DailyReportWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG, WeeklySummaryWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG, MonthlySummaryWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG, BackupWorker::class.java)
-            checkUniqueWorkEnqueued(
-                DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG,
-                RecurringTransactionWorker::class.java,
-            )
-            checkUniqueWorkEnqueued(
-                DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG,
-                RecurringPatternWorker::class.java,
-            )
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG, GoalSurplusWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG, SmsCatchupWorker::class.java)
+            WorkSchedulerTestUtils.assertAllStandardWorkersEnqueued(workManager)
         }
 
     @Test
     fun `rescheduleAllWork explicitly cancels all disabled features`() =
         runTest {
-            // First enqueue all
-            settingsRepository.saveDailyReportEnabled(true)
-            settingsRepository.saveWeeklySummaryEnabled(true)
-            settingsRepository.saveMonthlySummaryEnabled(true)
-            settingsRepository.saveAutoBackupEnabled(true)
-            settingsRepository.saveRecurringTransactionsEnabled(true)
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = true)
             scheduler.rescheduleAllWork()
 
-            // Now disable all and reschedule
-            settingsRepository.saveDailyReportEnabled(false)
-            settingsRepository.saveWeeklySummaryEnabled(false)
-            settingsRepository.saveMonthlySummaryEnabled(false)
-            settingsRepository.saveAutoBackupEnabled(false)
-            settingsRepository.saveRecurringTransactionsEnabled(false)
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = false)
             scheduler.rescheduleAllWork()
 
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.DAILY_EXPENSE_REPORT_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.WEEKLY_SUMMARY_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.MONTHLY_SUMMARY_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.AUTO_BACKUP_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_TRANSACTION_WORK_TAG)
-            checkUniqueWorkCancelledOrAbsent(DefaultWorkScheduler.RECURRING_PATTERN_WORK_TAG)
-            // Goal surplus and SMS recovery remain active
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG, GoalSurplusWorker::class.java)
-            checkUniqueWorkEnqueued(DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG, SmsCatchupWorker::class.java)
+            WorkSchedulerTestUtils.assertConfigurableWorkersCancelled(workManager)
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
+                DefaultWorkScheduler.GOAL_SURPLUS_WORK_TAG,
+                GoalSurplusWorker::class.java,
+            )
+            WorkSchedulerTestUtils.assertWorkEnqueued(
+                workManager,
+                DefaultWorkScheduler.SMS_CATCHUP_WORK_TAG,
+                SmsCatchupWorker::class.java,
+            )
         }
 }

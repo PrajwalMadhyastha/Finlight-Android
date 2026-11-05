@@ -67,28 +67,11 @@ class ReminderManagerTest : BaseViewModelTest() {
         uniqueWorkName: String,
         workerClass: Class<out ListenableWorker>,
     ) {
-        val workInfos = workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
-        assertEquals("Work request should be enqueued for $uniqueWorkName", 1, workInfos.size)
-        val workInfo = workInfos[0]
-        // Periodic work can be ENQUEUED or RUNNING immediately in tests
-        assertTrue(
-            "Work state should be ENQUEUED or RUNNING, but was ${workInfo.state}",
-            workInfo.state == WorkInfo.State.ENQUEUED || workInfo.state == WorkInfo.State.RUNNING,
-        )
-        assertTrue(
-            "Worker class name should contain ${workerClass.simpleName}",
-            workInfo.tags.any { it.contains(workerClass.simpleName) },
-        )
+        WorkSchedulerTestUtils.assertWorkEnqueued(workManager, uniqueWorkName, workerClass)
     }
 
     private fun assertWorkIsCancelled(uniqueWorkName: String) {
-        val workInfos = workManager.getWorkInfosForUniqueWork(uniqueWorkName).get()
-        assertTrue(
-            "Work request for $uniqueWorkName should be cancelled or finished",
-            workInfos.all {
-                it.state == WorkInfo.State.CANCELLED || it.state == WorkInfo.State.SUCCEEDED
-            },
-        )
+        WorkSchedulerTestUtils.assertWorkCancelled(workManager, uniqueWorkName)
     }
 
     @Test
@@ -168,12 +151,7 @@ class ReminderManagerTest : BaseViewModelTest() {
     @Test
     fun `rescheduleAllWork schedules enabled workers`() =
         runTest {
-            // Arrange: Enable everything
-            settingsRepository.saveDailyReportEnabled(true)
-            settingsRepository.saveWeeklySummaryEnabled(true)
-            settingsRepository.saveMonthlySummaryEnabled(true)
-            settingsRepository.saveAutoBackupEnabled(true)
-            settingsRepository.saveRecurringTransactionsEnabled(true)
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = true)
 
             // Act
             ReminderManager.rescheduleAllWork(context)
@@ -190,23 +168,13 @@ class ReminderManagerTest : BaseViewModelTest() {
     @Test
     fun `rescheduleAllWork does not schedule disabled workers`() =
         runTest {
-            // Arrange: Disable everything including recurring transactions
-            settingsRepository.saveDailyReportEnabled(false)
-            settingsRepository.saveWeeklySummaryEnabled(false)
-            settingsRepository.saveMonthlySummaryEnabled(false)
-            settingsRepository.saveAutoBackupEnabled(false)
-            settingsRepository.saveRecurringTransactionsEnabled(false)
+            WorkSchedulerTestUtils.configureAllStandardSettings(settingsRepository, enabled = false)
 
             // Act
             ReminderManager.rescheduleAllWork(context)
 
             // Assert: All workers are cancelled/not present when disabled
-            assertWorkIsCancelled("daily_expense_report_work")
-            assertWorkIsCancelled("weekly_summary_work")
-            assertWorkIsCancelled("monthly_summary_work")
-            assertWorkIsCancelled("auto_backup_work")
-            assertWorkIsCancelled("recurring_transaction_work")
-            assertWorkIsCancelled("recurring_pattern_work")
+            WorkSchedulerTestUtils.assertConfigurableWorkersCancelled(workManager)
         }
 
     @Test

@@ -688,7 +688,7 @@ object ServiceLocator {
                 context = context.applicationContext,
                 settingsRepository = provideSettingsRepository(context),
                 workManagerProvider = { WorkManager.getInstance(context.applicationContext) },
-                dispatcherProvider = provideDispatcherProvider(context),
+                timeProvider = SystemTimeProvider(),
             ).also {
                 workScheduler = it
             }
