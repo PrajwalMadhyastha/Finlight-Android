@@ -60,30 +60,39 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         super.tearDown()
     }
 
+    private fun createTestTransactionDetails(
+        id: Int,
+        type: TransactionType = TransactionType.EXPENSE,
+        amount: Double = 100.0,
+        description: String = "Test",
+    ): TransactionDetails {
+        return TransactionDetails(
+            transaction =
+                Transaction(
+                    id = id,
+                    description = description,
+                    amount = amount,
+                    transactionType = type,
+                    date = System.currentTimeMillis(),
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    originalDescription = description,
+                ),
+            images = emptyList(),
+            accountName = "Account",
+            categoryName = "Category",
+            categoryIconKey = "icon",
+            categoryColorKey = "color",
+            tagNames = null,
+        )
+    }
+
     @Test
     fun `doWork success case calls NotificationHelper with correct data`() =
         runTest {
             val transactionId = 1
-            val details =
-                TransactionDetails(
-                    Transaction(
-                        id = transactionId,
-                        description = "Test",
-                        amount = 100.0,
-                        transactionType = TransactionType.EXPENSE,
-                        date = System.currentTimeMillis(),
-                        accountId = 1,
-                        categoryId = 1,
-                        notes = null,
-                        originalDescription = "Test",
-                    ),
-                    emptyList(),
-                    "Account",
-                    "Category",
-                    "icon",
-                    "color",
-                    null,
-                )
+            val details = createTestTransactionDetails(transactionId, TransactionType.EXPENSE, 100.0, "Test")
             val summary = FinancialSummary(0.0, 1500.0)
             val visitCount = 5
 
@@ -173,26 +182,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
     fun `doWork handles income transaction and null summary correctly`() =
         runTest {
             val transactionId = 2
-            val details =
-                TransactionDetails(
-                    Transaction(
-                        id = transactionId,
-                        description = "Salary",
-                        amount = 5000.0,
-                        transactionType = TransactionType.INCOME,
-                        date = System.currentTimeMillis(),
-                        accountId = 1,
-                        categoryId = 1,
-                        notes = null,
-                        originalDescription = null,
-                    ),
-                    emptyList(),
-                    "Account",
-                    "Category",
-                    "icon",
-                    "color",
-                    null,
-                )
+            val details = createTestTransactionDetails(transactionId, TransactionType.INCOME, 5000.0, "Salary")
 
             every { transactionRepository.getTransactionDetailsById(transactionId) } returns flowOf(details)
             coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns null
@@ -223,28 +213,48 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `doWork handles expense transaction and null summary correctly`() =
+        runTest {
+            val transactionId = 5
+            val details = createTestTransactionDetails(transactionId, TransactionType.EXPENSE, 100.0, "Coffee")
+
+            every { transactionRepository.getTransactionDetailsById(transactionId) } returns flowOf(details)
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns null
+            every { transactionRepository.getTransactionCountForMerchant("Coffee") } returns flowOf(1)
+            every { transactionRepository.getTotalSpentForMerchant("Coffee") } returns flowOf(100.0)
+
+            val inputData = workDataOf(TransactionNotificationWorker.KEY_TRANSACTION_ID to transactionId)
+            val worker =
+                TestListenableWorkerBuilder<TransactionNotificationWorker>(context)
+                    .setInputData(inputData)
+                    .build()
+
+            val totalCaptor = slot<Double>()
+            val visitCaptor = slot<Int>()
+            val merchantTotalCaptor = slot<Double>()
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showRichTransactionNotification(
+                    context = any(),
+                    details = any(),
+                    monthlyTotal = capture(totalCaptor),
+                    visitCount = capture(visitCaptor),
+                    merchantTotalSpent = capture(merchantTotalCaptor),
+                )
+            }
+            assertEquals(0.0, totalCaptor.captured, 0.0)
+            assertEquals(1, visitCaptor.captured)
+            assertEquals(100.0, merchantTotalCaptor.captured, 0.0)
+        }
+
+    @Test
     fun `doWork handles income transaction with non-null summary and uses totalIncome`() =
         runTest {
             val transactionId = 3
-            val details =
-                TransactionDetails(
-                    Transaction(
-                        id = transactionId,
-                        description = "Salary",
-                        amount = 50000.0,
-                        transactionType = TransactionType.INCOME,
-                        date = System.currentTimeMillis(),
-                        accountId = 1,
-                        categoryId = 1,
-                        notes = null,
-                    ),
-                    emptyList(),
-                    "Account",
-                    "Category",
-                    "icon",
-                    "color",
-                    null,
-                )
+            val details = createTestTransactionDetails(transactionId, TransactionType.INCOME, 50000.0, "Salary")
             val summary = FinancialSummary(totalIncome = 50000.0, totalExpenses = 12000.0)
 
             every { transactionRepository.getTransactionDetailsById(transactionId) } returns flowOf(details)
@@ -279,25 +289,7 @@ class TransactionNotificationWorkerTest : BaseViewModelTest() {
     fun `doWork handles transfer transaction with non-null summary and gets visit count`() =
         runTest {
             val transactionId = 4
-            val details =
-                TransactionDetails(
-                    Transaction(
-                        id = transactionId,
-                        description = "Transfer",
-                        amount = 1000.0,
-                        transactionType = TransactionType.TRANSFER,
-                        date = System.currentTimeMillis(),
-                        accountId = 1,
-                        categoryId = 1,
-                        notes = null,
-                    ),
-                    emptyList(),
-                    "Account",
-                    "Category",
-                    "icon",
-                    "color",
-                    null,
-                )
+            val details = createTestTransactionDetails(transactionId, TransactionType.TRANSFER, 1000.0, "Transfer")
             val summary = FinancialSummary(totalIncome = 10000.0, totalExpenses = 5000.0)
 
             every { transactionRepository.getTransactionDetailsById(transactionId) } returns flowOf(details)

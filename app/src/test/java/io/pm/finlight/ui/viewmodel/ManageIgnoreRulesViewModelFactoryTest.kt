@@ -4,14 +4,12 @@ import android.app.Application
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.CreationExtras
-import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.every
 import io.mockk.mockk
 import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.TestApplication
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DispatcherProvider
 import kotlinx.coroutines.flow.flowOf
@@ -29,23 +27,16 @@ import org.robolectric.annotation.Config
 class ManageIgnoreRulesViewModelFactoryTest {
     private lateinit var application: Application
     private lateinit var factory: ManageIgnoreRulesViewModelFactory
-    private lateinit var db: AppDatabase
 
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
-        db =
-            Room.inMemoryDatabaseBuilder(application, AppDatabase::class.java)
-                .allowMainThreadQueries()
-                .build()
-        AppDatabase.setTestInstance(db)
         factory = ManageIgnoreRulesViewModelFactory(application)
         ServiceLocator.reset()
     }
 
     @After
     fun tearDown() {
-        db.close()
         ServiceLocator.reset()
     }
 
