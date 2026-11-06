@@ -76,12 +76,16 @@ import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
 import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
+import io.pm.finlight.domain.usecase.AnalyzeRecurringPatternsUseCase
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.DefaultAnalyzeRecurringPatternsUseCase
+import io.pm.finlight.domain.usecase.DefaultProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.utils.DefaultWorkScheduler
 import io.pm.finlight.utils.IWorkScheduler
@@ -639,6 +643,68 @@ class ServiceLocatorTest {
     }
 
     @Test
+    fun provideProcessDueRecurringTransactionsUseCase_returnsSingletonInstance() {
+        val useCase1 = ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application)
+        val useCase2 = ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application)
+
+        assertNotNull(useCase1)
+        assertSame(useCase1, useCase2)
+        assertTrue(useCase1 is DefaultProcessDueRecurringTransactionsUseCase)
+    }
+
+    private fun <T : Any> assertOverrideAndResetLifecycle(
+        setter: (T?) -> Unit,
+        getter: () -> T,
+        mock1: T,
+        mock2: T,
+    ) {
+        setter(mock1)
+        assertSame(mock1, getter())
+
+        setter(mock2)
+        assertSame(mock2, getter())
+
+        setter(null)
+        val defaultInstance = getter()
+        assertNotNull(defaultInstance)
+        assertNotSame(mock2, defaultInstance)
+    }
+
+    @Test
+    fun setProcessDueRecurringTransactionsUseCase_overridesInstance() {
+        val mockUseCase1: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
+        val mockUseCase2: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
+        assertOverrideAndResetLifecycle(
+            setter = { ServiceLocator.setProcessDueRecurringTransactionsUseCase(it) },
+            getter = { ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application) },
+            mock1 = mockUseCase1,
+            mock2 = mockUseCase2,
+        )
+    }
+
+    @Test
+    fun provideAnalyzeRecurringPatternsUseCase_returnsSingletonInstance() {
+        val useCase1 = ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application)
+        val useCase2 = ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application)
+
+        assertNotNull(useCase1)
+        assertSame(useCase1, useCase2)
+        assertTrue(useCase1 is DefaultAnalyzeRecurringPatternsUseCase)
+    }
+
+    @Test
+    fun setAnalyzeRecurringPatternsUseCase_overridesInstance() {
+        val mockUseCase1: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
+        val mockUseCase2: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
+        assertOverrideAndResetLifecycle(
+            setter = { ServiceLocator.setAnalyzeRecurringPatternsUseCase(it) },
+            getter = { ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application) },
+            mock1 = mockUseCase1,
+            mock2 = mockUseCase2,
+        )
+    }
+
+    @Test
     fun provideWorkScheduler_returnsSingletonInstance() {
         val scheduler1 = ServiceLocator.provideWorkScheduler(application)
         val scheduler2 = ServiceLocator.provideWorkScheduler(application)
@@ -816,6 +882,8 @@ class ServiceLocatorTest {
         val mockCustomSmsRule: ICustomSmsRuleRepository = mockk(relaxed = true)
         val mockIgnoreRule: IIgnoreRuleRepository = mockk(relaxed = true)
         val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
+        val mockProcessDueUseCase: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
+        val mockAnalyzePatternsUseCase: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
 
         ServiceLocator.setTransactionRepository(mockTxn)
         ServiceLocator.setAccountRepository(mockAccount)
@@ -828,6 +896,8 @@ class ServiceLocatorTest {
         ServiceLocator.setAutoSaveSmsTransactionUseCase(mockAutoSave)
         ServiceLocator.setGetMonthlyConsistencyDataUseCase(mockGetMonthlyConsistency)
         ServiceLocator.setScheduleRecurringTransactionWorkerUseCase(mockScheduleWorker)
+        ServiceLocator.setProcessDueRecurringTransactionsUseCase(mockProcessDueUseCase)
+        ServiceLocator.setAnalyzeRecurringPatternsUseCase(mockAnalyzePatternsUseCase)
         ServiceLocator.setMerchantMappingRepository(mockMerchantMapping)
         ServiceLocator.setBudgetRepository(mockBudget)
         ServiceLocator.setRecurringTransactionRepository(mockRecurring)
@@ -849,6 +919,8 @@ class ServiceLocatorTest {
         assertSame(mockAutoSave, ServiceLocator.provideAutoSaveSmsTransactionUseCase(application))
         assertSame(mockGetMonthlyConsistency, ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application))
         assertSame(mockScheduleWorker, ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application))
+        assertSame(mockProcessDueUseCase, ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application))
+        assertSame(mockAnalyzePatternsUseCase, ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application))
         assertSame(mockMerchantMapping, ServiceLocator.provideMerchantMappingRepository(application))
         assertSame(mockBudget, ServiceLocator.provideBudgetRepository(application))
         assertSame(mockRecurring, ServiceLocator.provideRecurringTransactionRepository(application))
@@ -872,6 +944,8 @@ class ServiceLocatorTest {
         val newAutoSave = ServiceLocator.provideAutoSaveSmsTransactionUseCase(application)
         val newGetMonthlyConsistency = ServiceLocator.provideGetMonthlyConsistencyDataUseCase(application)
         val newScheduleWorker = ServiceLocator.provideScheduleRecurringTransactionWorkerUseCase(application)
+        val newProcessDueUseCase = ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application)
+        val newAnalyzePatternsUseCase = ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application)
         val newMerchantMapping = ServiceLocator.provideMerchantMappingRepository(application)
         val newBudget = ServiceLocator.provideBudgetRepository(application)
         val newRecurring = ServiceLocator.provideRecurringTransactionRepository(application)
@@ -902,6 +976,12 @@ class ServiceLocatorTest {
         assertNotSame(mockAutoSave, newAutoSave)
         assertNotNull(newGetMonthlyConsistency)
         assertNotSame(mockGetMonthlyConsistency, newGetMonthlyConsistency)
+        assertNotNull(newScheduleWorker)
+        assertNotSame(mockScheduleWorker, newScheduleWorker)
+        assertNotNull(newProcessDueUseCase)
+        assertNotSame(mockProcessDueUseCase, newProcessDueUseCase)
+        assertNotNull(newAnalyzePatternsUseCase)
+        assertNotSame(mockAnalyzePatternsUseCase, newAnalyzePatternsUseCase)
         assertNotNull(newMerchantMapping)
         assertNotSame(mockMerchantMapping, newMerchantMapping)
         assertNotNull(newBudget)
