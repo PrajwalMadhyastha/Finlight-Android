@@ -12,7 +12,11 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.*
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import io.mockk.coEvery
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.pm.finlight.*
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,6 +43,8 @@ class ReminderManagerTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
+        mockkObject(DataExportService)
+        coEvery { DataExportService.createBackupSnapshot(any()) } returns true
         runTest {
             context.financeSettingsDataStore.edit { it.clear() }
         }
@@ -60,6 +66,7 @@ class ReminderManagerTest : BaseViewModelTest() {
         super.tearDown()
         // Cancel all work after each test to ensure a clean state
         workManager.cancelAllWork()
+        unmockkObject(DataExportService)
         io.pm.finlight.di.ServiceLocator.reset()
     }
 

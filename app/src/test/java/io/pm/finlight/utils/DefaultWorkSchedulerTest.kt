@@ -12,6 +12,9 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkManager
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
+import io.mockk.coEvery
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.pm.finlight.BackupWorker
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.DailyReportWorker
@@ -22,6 +25,7 @@ import io.pm.finlight.RecurringTransactionWorker
 import io.pm.finlight.TestApplication
 import io.pm.finlight.TransactionNotificationWorker
 import io.pm.finlight.WeeklySummaryWorker
+import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.financeSettingsDataStore
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.workers.GoalSurplusWorker
@@ -54,6 +58,8 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
+        mockkObject(DataExportService)
+        coEvery { DataExportService.createBackupSnapshot(any()) } returns true
         runTest {
             context.financeSettingsDataStore.edit { it.clear() }
         }
@@ -80,6 +86,7 @@ class DefaultWorkSchedulerTest : BaseViewModelTest() {
     override fun tearDown() {
         super.tearDown()
         workManager.cancelAllWork()
+        unmockkObject(DataExportService)
         ServiceLocator.reset()
     }
 
