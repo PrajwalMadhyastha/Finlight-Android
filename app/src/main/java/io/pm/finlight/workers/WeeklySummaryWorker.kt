@@ -27,6 +27,8 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import kotlin.math.roundToInt
 
+private const val TAG = "WeeklySummaryWorker"
+
 class WeeklySummaryWorker(
     context: Context,
     workerParams: WorkerParameters,
@@ -44,7 +46,7 @@ class WeeklySummaryWorker(
             val result =
                 try {
                     if (!settingsRepository.getWeeklySummaryEnabled().first()) {
-                        Log.d("WeeklySummaryWorker", "Feature disabled. Skipping summary generation.")
+                        Log.d(TAG, "Feature disabled. Skipping summary generation.")
                         Result.success()
                     } else {
                         // Date range for LAST 7 DAYS
@@ -108,7 +110,7 @@ class WeeklySummaryWorker(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.e("WeeklySummaryWorker", "Execution failed on attempt $runAttemptCount", e)
+                    Log.e(TAG, "Execution failed on attempt $runAttemptCount", e)
                     if (isFinalAttempt) Result.failure() else Result.retry()
                 }
 

@@ -33,6 +33,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 
+private const val TAG = "DailyReportWorker"
+
 class DailyReportWorker(
     context: Context,
     workerParams: WorkerParameters,
@@ -61,11 +63,11 @@ class DailyReportWorker(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        Log.w("DailyReportWorker", "Failed to check or expire travel mode settings", e)
+                        Log.w(TAG, "Failed to check or expire travel mode settings", e)
                     }
 
                     if (!settingsRepository.getDailyReportEnabled().first()) {
-                        Log.d("DailyReportWorker", "Feature disabled. Skipping summary generation.")
+                        Log.d(TAG, "Feature disabled. Skipping summary generation.")
                         Result.success()
                     } else {
                         // --- Define Date Ranges ---
@@ -137,7 +139,7 @@ class DailyReportWorker(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.e("DailyReportWorker", "Execution failed on attempt $runAttemptCount", e)
+                    Log.e(TAG, "Execution failed on attempt $runAttemptCount", e)
                     if (isFinalAttempt) Result.failure() else Result.retry()
                 }
 

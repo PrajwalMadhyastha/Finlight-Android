@@ -1,90 +1,33 @@
 package io.pm.finlight.workers
 
-import android.content.Context
-import android.os.Build
-import android.util.Log
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.Configuration
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
-import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.coVerifyOrder
 import io.mockk.every
-import io.mockk.just
-import io.mockk.mockkObject
-import io.mockk.runs
 import io.mockk.slot
-import io.mockk.unmockkAll
 import io.mockk.verify
-import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.CategorySpending
 import io.pm.finlight.FinancialSummary
-import io.pm.finlight.ISettingsRepository
-import io.pm.finlight.ITransactionRepository
-import io.pm.finlight.TestApplication
 import io.pm.finlight.WeeklySummaryWorker
-import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.NotificationHelper
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import java.util.Calendar
 
 @ExperimentalCoroutinesApi
-@RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class WeeklySummaryWorkerTest : BaseViewModelTest() {
-    private lateinit var context: Context
-    private lateinit var transactionRepository: ITransactionRepository
-    private lateinit var workScheduler: IWorkScheduler
-    private lateinit var settingsRepository: ISettingsRepository
-
+class WeeklySummaryWorkerTest : BaseSummaryWorkerTest() {
     @Before
     override fun setup() {
         super.setup()
-        context = ApplicationProvider.getApplicationContext()
-
-        transactionRepository = SummaryWorkerTestFixtures.mockTransactionRepository()
-        workScheduler = SummaryWorkerTestFixtures.mockWorkScheduler()
-        settingsRepository = SummaryWorkerTestFixtures.mockSettingsRepository()
-
-        ServiceLocator.setTransactionRepository(transactionRepository)
-        ServiceLocator.setWorkScheduler(workScheduler)
-        ServiceLocator.setSettingsRepository(settingsRepository)
-
         every { settingsRepository.getWeeklySummaryEnabled() } returns flowOf(true)
-
-        val config =
-            Configuration.Builder()
-                .setMinimumLoggingLevel(Log.DEBUG)
-                .setExecutor(SynchronousExecutor())
-                .build()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
-
-        mockkObject(NotificationHelper)
-        every { NotificationHelper.showWeeklySummaryNotification(any(), any(), any(), any()) } just runs
-    }
-
-    @After
-    override fun tearDown() {
-        ServiceLocator.reset()
-        unmockkAll()
-        super.tearDown()
+        every { NotificationHelper.showWeeklySummaryNotification(any(), any(), any(), any()) } returns Unit
     }
 
     @Test
@@ -95,47 +38,56 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
 
             val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
 
-            val now = Calendar.getInstance()
-            val thisWeekEnd =
-                (now.clone() as Calendar).apply {
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-            val thisWeekStart =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -7)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-            val lastWeekEnd =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -8)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-            val lastWeekStart =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -14)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+            val thisWeekStartSlot = slot<Long>()
+            val thisWeekEndSlot = slot<Long>()
+            val lastWeekStartSlot = slot<Long>()
+            val lastWeekEndSlot = slot<Long>()
+            val topCategoriesStartSlot = slot<Long>()
+            val topCategoriesEndSlot = slot<Long>()
 
             val result = worker.doWork()
             assertEquals(ListenableWorker.Result.success(), result)
 
             coVerifyOrder {
-                transactionRepository.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
-                transactionRepository.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
-                transactionRepository.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
+                transactionRepository.getFinancialSummaryForRange(capture(thisWeekStartSlot), capture(thisWeekEndSlot))
+                transactionRepository.getFinancialSummaryForRange(capture(lastWeekStartSlot), capture(lastWeekEndSlot))
+                transactionRepository.getTopSpendingCategoriesForRange(capture(topCategoriesStartSlot), capture(topCategoriesEndSlot))
             }
+
+            val thisWeekEndCal = Calendar.getInstance().apply { timeInMillis = thisWeekEndSlot.captured }
+            assertEquals(23, thisWeekEndCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, thisWeekEndCal.get(Calendar.MINUTE))
+            assertEquals(59, thisWeekEndCal.get(Calendar.SECOND))
+            assertEquals(999, thisWeekEndCal.get(Calendar.MILLISECOND))
+
+            val thisWeekStartCal = Calendar.getInstance().apply { timeInMillis = thisWeekStartSlot.captured }
+            assertEquals(0, thisWeekStartCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, thisWeekStartCal.get(Calendar.MINUTE))
+            assertEquals(0, thisWeekStartCal.get(Calendar.SECOND))
+            assertEquals(0, thisWeekStartCal.get(Calendar.MILLISECOND))
+
+            val lastWeekEndCal = Calendar.getInstance().apply { timeInMillis = lastWeekEndSlot.captured }
+            assertEquals(23, lastWeekEndCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, lastWeekEndCal.get(Calendar.MINUTE))
+            assertEquals(59, lastWeekEndCal.get(Calendar.SECOND))
+            assertEquals(999, lastWeekEndCal.get(Calendar.MILLISECOND))
+
+            val lastWeekStartCal = Calendar.getInstance().apply { timeInMillis = lastWeekStartSlot.captured }
+            assertEquals(0, lastWeekStartCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, lastWeekStartCal.get(Calendar.MINUTE))
+            assertEquals(0, lastWeekStartCal.get(Calendar.SECOND))
+            assertEquals(0, lastWeekStartCal.get(Calendar.MILLISECOND))
+
+            // Last week end is exactly 1 ms prior to this week start (contiguous ranges)
+            assertEquals(1L, thisWeekStartSlot.captured - lastWeekEndSlot.captured)
+
+            // Duration checks: this week spans 8 days (day 0 through -7), last week spans 7 days (day -8 through -14)
+            val dayMillis = 24L * 60 * 60 * 1000
+            assertEquals(8L * dayMillis - 1, thisWeekEndSlot.captured - thisWeekStartSlot.captured)
+            assertEquals(7L * dayMillis - 1, lastWeekEndSlot.captured - lastWeekStartSlot.captured)
+
+            assertEquals(thisWeekStartSlot.captured, topCategoriesStartSlot.captured)
+            assertEquals(thisWeekEndSlot.captured, topCategoriesEndSlot.captured)
             coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
         }
 
@@ -218,48 +170,29 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
     @Test
     fun `doWork returns retry on failure on attempt 0 and does not reschedule`() =
         runTest {
-            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.retry(), result)
-            coVerify(exactly = 0) { workScheduler.scheduleWeeklySummary(any()) }
+            assertRetryOnFirstAttempt<WeeklySummaryWorker> {
+                coVerify(exactly = 0) { it.scheduleWeeklySummary(any()) }
+            }
         }
 
     @Test
     fun `doWork returns failure on final attempt 2 and reschedules`() =
         runTest {
-            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context, runAttemptCount = 2)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.failure(), result)
-            coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
+            assertFailureOnFinalAttemptAndReschedules<WeeklySummaryWorker> {
+                coVerify(exactly = 1) { it.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
+            }
         }
 
     @Test
     fun `doWork returns failure immediately when runAttemptCount is 3 or more`() =
         runTest {
-            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context, runAttemptCount = 3)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.failure(), result)
-            coVerify(exactly = 0) { transactionRepository.getFinancialSummaryForRange(any(), any()) }
-            coVerify(exactly = 0) { workScheduler.scheduleWeeklySummary(any()) }
+            assertImmediateFailureWhenAttemptCapExceeded<WeeklySummaryWorker> {
+                coVerify(exactly = 0) { it.scheduleWeeklySummary(any()) }
+            }
         }
 
     @Test
     fun `doWork rethrows CancellationException`() {
-        coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws CancellationException("Worker cancelled")
-        val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
-
-        assertThrows(CancellationException::class.java) {
-            runBlocking {
-                worker.doWork()
-            }
-        }
+        assertRethrowsCancellationException<WeeklySummaryWorker>()
     }
 }

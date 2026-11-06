@@ -1,96 +1,43 @@
 package io.pm.finlight.workers
 
-import android.content.Context
-import android.os.Build
-import android.util.Log
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.Configuration
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
-import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.WorkManagerTestInitHelper
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
-import io.mockk.mockkObject
-import io.mockk.runs
 import io.mockk.slot
-import io.mockk.unmockkAll
 import io.mockk.verify
-import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.DailyReportWorker
 import io.pm.finlight.FinancialSummary
-import io.pm.finlight.ISettingsRepository
-import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.ITravelSettingsRepository
-import io.pm.finlight.TestApplication
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.NotificationHelper
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import java.util.Calendar
 import kotlin.math.abs
 
 @ExperimentalCoroutinesApi
-@RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class DailyReportWorkerTest : BaseViewModelTest() {
-    private lateinit var context: Context
-    private lateinit var transactionRepository: ITransactionRepository
-    private lateinit var workScheduler: IWorkScheduler
-    private lateinit var settingsRepository: ISettingsRepository
+class DailyReportWorkerTest : BaseSummaryWorkerTest() {
     private lateinit var travelSettingsRepository: ITravelSettingsRepository
 
     @Before
     override fun setup() {
         super.setup()
-        context = ApplicationProvider.getApplicationContext()
-
-        transactionRepository = SummaryWorkerTestFixtures.mockTransactionRepository()
-        workScheduler = SummaryWorkerTestFixtures.mockWorkScheduler()
-        settingsRepository = SummaryWorkerTestFixtures.mockSettingsRepository()
         travelSettingsRepository = SummaryWorkerTestFixtures.mockTravelSettingsRepository()
-
-        ServiceLocator.setTransactionRepository(transactionRepository)
-        ServiceLocator.setWorkScheduler(workScheduler)
-        ServiceLocator.setSettingsRepository(settingsRepository)
         ServiceLocator.setTravelSettingsRepository(travelSettingsRepository)
 
         every { settingsRepository.getDailyReportEnabled() } returns flowOf(true)
         coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns null
 
-        val config =
-            Configuration.Builder()
-                .setMinimumLoggingLevel(Log.DEBUG)
-                .setExecutor(SynchronousExecutor())
-                .build()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
-
-        mockkObject(NotificationHelper)
-        every { NotificationHelper.showDailyReportNotification(any(), any(), any(), any(), any()) } just runs
-    }
-
-    @After
-    override fun tearDown() {
-        ServiceLocator.reset()
-        unmockkAll()
-        super.tearDown()
+        every { NotificationHelper.showDailyReportNotification(any(), any(), any(), any(), any()) } returns Unit
     }
 
     @Test
@@ -359,48 +306,29 @@ class DailyReportWorkerTest : BaseViewModelTest() {
     @Test
     fun `doWork returns retry on failure on attempt 0 and does not reschedule`() =
         runTest {
-            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.retry(), result)
-            coVerify(exactly = 0) { workScheduler.scheduleDailyReport(any()) }
+            assertRetryOnFirstAttempt<DailyReportWorker> {
+                coVerify(exactly = 0) { it.scheduleDailyReport(any()) }
+            }
         }
 
     @Test
     fun `doWork returns failure on final attempt 2 and reschedules`() =
         runTest {
-            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context, runAttemptCount = 2)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.failure(), result)
-            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+            assertFailureOnFinalAttemptAndReschedules<DailyReportWorker> {
+                coVerify(exactly = 1) { it.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+            }
         }
 
     @Test
     fun `doWork returns failure immediately when runAttemptCount is 3 or more`() =
         runTest {
-            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context, runAttemptCount = 3)
-
-            val result = worker.doWork()
-
-            assertEquals(ListenableWorker.Result.failure(), result)
-            coVerify(exactly = 0) { transactionRepository.getFinancialSummaryForRange(any(), any()) }
-            coVerify(exactly = 0) { workScheduler.scheduleDailyReport(any()) }
+            assertImmediateFailureWhenAttemptCapExceeded<DailyReportWorker> {
+                coVerify(exactly = 0) { it.scheduleDailyReport(any()) }
+            }
         }
 
     @Test
     fun `doWork rethrows CancellationException`() {
-        coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws CancellationException("Worker cancelled")
-        val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
-
-        assertThrows(CancellationException::class.java) {
-            runBlocking {
-                worker.doWork()
-            }
-        }
+        assertRethrowsCancellationException<DailyReportWorker>()
     }
 }

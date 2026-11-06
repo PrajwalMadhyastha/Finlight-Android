@@ -25,6 +25,8 @@ import kotlinx.coroutines.withContext
 import java.util.Calendar
 import kotlin.math.roundToInt
 
+private const val TAG = "MonthlySummaryWorker"
+
 class MonthlySummaryWorker(
     context: Context,
     workerParams: WorkerParameters,
@@ -42,7 +44,7 @@ class MonthlySummaryWorker(
             val result =
                 try {
                     if (!settingsRepository.getMonthlySummaryEnabled().first()) {
-                        Log.d("MonthlySummaryWorker", "Feature disabled. Skipping summary generation.")
+                        Log.d(TAG, "Feature disabled. Skipping summary generation.")
                         Result.success()
                     } else {
                         // --- Date range for LAST MONTH ---
@@ -114,7 +116,7 @@ class MonthlySummaryWorker(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.e("MonthlySummaryWorker", "Execution failed on attempt $runAttemptCount", e)
+                    Log.e(TAG, "Execution failed on attempt $runAttemptCount", e)
                     if (isFinalAttempt) Result.failure() else Result.retry()
                 }
 
