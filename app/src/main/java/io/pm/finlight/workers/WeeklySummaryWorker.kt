@@ -7,89 +7,115 @@
 // FIX (Time-bound) - All Calendar instances now explicitly set SECOND and
 // MILLISECOND to their boundaries (0 or 59/999). This prevents calculation
 // errors caused by partial-day time ranges.
+//
+// REFACTOR (Issue #387): Route queries through ITransactionRepository, cap retries
+// at 3, eliminate bare returns, rethrow CancellationException, and apply uniform
+// non-retry rescheduling (result != Result.retry()) via IWorkScheduler.
 // =================================================================================
 package io.pm.finlight
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import kotlin.math.roundToInt
 
 class WeeklySummaryWorker(
-    private val context: Context,
+    context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
     override suspend fun doWork(): Result {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(applicationContext)
         return withContext(dispatcherProvider.io) {
-            try {
-                val transactionAnalyticsDao = AppDatabase.getInstance(context).transactionAnalyticsDao()
+            if (runAttemptCount >= 3) return@withContext Result.failure()
 
-                // Date range for LAST 7 DAYS
-                val thisWeekEnd =
-                    Calendar.getInstance().apply {
-                        set(Calendar.HOUR_OF_DAY, 23)
-                        set(Calendar.MINUTE, 59)
-                        set(Calendar.SECOND, 59)
-                        set(Calendar.MILLISECOND, 999)
-                    }.timeInMillis
-                val thisWeekStart =
-                    Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -7)
-                        set(Calendar.HOUR_OF_DAY, 0)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }.timeInMillis
+            val workScheduler = ServiceLocator.provideWorkScheduler(applicationContext)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(applicationContext)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
 
-                // Date range for PREVIOUS 7 DAYS (8-14 days ago)
-                val lastWeekEnd =
-                    Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -8)
-                        set(Calendar.HOUR_OF_DAY, 23)
-                        set(Calendar.MINUTE, 59)
-                        set(Calendar.SECOND, 59)
-                        set(Calendar.MILLISECOND, 999)
-                    }.timeInMillis
-                val lastWeekStart =
-                    Calendar.getInstance().apply {
-                        add(Calendar.DAY_OF_YEAR, -14)
-                        set(Calendar.HOUR_OF_DAY, 0)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }.timeInMillis
-
-                val thisWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
-                val thisWeekExpenses = thisWeekSummary?.totalExpenses ?: 0.0
-
-                val lastWeekSummary = transactionAnalyticsDao.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
-                val lastWeekExpenses = lastWeekSummary?.totalExpenses ?: 0.0
-
-                val topCategories = transactionAnalyticsDao.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
-
-                val percentageChange =
-                    if (lastWeekExpenses > 0) {
-                        ((thisWeekExpenses - lastWeekExpenses) / lastWeekExpenses * 100).roundToInt()
+            val isFinalAttempt = runAttemptCount >= 2
+            val result =
+                try {
+                    if (!settingsRepository.getWeeklySummaryEnabled().first()) {
+                        Log.d("WeeklySummaryWorker", "Feature disabled. Skipping summary generation.")
+                        Result.success()
                     } else {
-                        null
+                        // Date range for LAST 7 DAYS
+                        val thisWeekEnd =
+                            Calendar.getInstance().apply {
+                                set(Calendar.HOUR_OF_DAY, 23)
+                                set(Calendar.MINUTE, 59)
+                                set(Calendar.SECOND, 59)
+                                set(Calendar.MILLISECOND, 999)
+                            }.timeInMillis
+                        val thisWeekStart =
+                            Calendar.getInstance().apply {
+                                add(Calendar.DAY_OF_YEAR, -7)
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+
+                        // Date range for PREVIOUS 7 DAYS (8-14 days ago)
+                        val lastWeekEnd =
+                            Calendar.getInstance().apply {
+                                add(Calendar.DAY_OF_YEAR, -8)
+                                set(Calendar.HOUR_OF_DAY, 23)
+                                set(Calendar.MINUTE, 59)
+                                set(Calendar.SECOND, 59)
+                                set(Calendar.MILLISECOND, 999)
+                            }.timeInMillis
+                        val lastWeekStart =
+                            Calendar.getInstance().apply {
+                                add(Calendar.DAY_OF_YEAR, -14)
+                                set(Calendar.HOUR_OF_DAY, 0)
+                                set(Calendar.MINUTE, 0)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }.timeInMillis
+
+                        val thisWeekSummary = transactionRepository.getFinancialSummaryForRange(thisWeekStart, thisWeekEnd)
+                        val thisWeekExpenses = thisWeekSummary?.totalExpenses ?: 0.0
+
+                        val lastWeekSummary = transactionRepository.getFinancialSummaryForRange(lastWeekStart, lastWeekEnd)
+                        val lastWeekExpenses = lastWeekSummary?.totalExpenses ?: 0.0
+
+                        val topCategories = transactionRepository.getTopSpendingCategoriesForRange(thisWeekStart, thisWeekEnd)
+
+                        val percentageChange =
+                            if (lastWeekExpenses > 0) {
+                                ((thisWeekExpenses - lastWeekExpenses) / lastWeekExpenses * 100).roundToInt()
+                            } else {
+                                null
+                            }
+
+                        NotificationHelper.showWeeklySummaryNotification(
+                            applicationContext,
+                            thisWeekExpenses,
+                            percentageChange,
+                            topCategories,
+                        )
+                        Result.success()
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e("WeeklySummaryWorker", "Execution failed on attempt $runAttemptCount", e)
+                    if (isFinalAttempt) Result.failure() else Result.retry()
+                }
 
-                NotificationHelper.showWeeklySummaryNotification(context, thisWeekExpenses, percentageChange, topCategories)
-
-                ReminderManager.scheduleWeeklySummary(context)
-                Result.success()
-            } catch (e: Exception) {
-                Log.e("WeeklySummaryWorker", "Worker failed", e)
-                Result.retry()
+            if (result != Result.retry()) {
+                workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE)
             }
+            result
         }
     }
 }

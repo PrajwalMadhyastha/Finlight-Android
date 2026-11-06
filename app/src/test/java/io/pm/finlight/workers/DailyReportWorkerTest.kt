@@ -1,26 +1,3 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/workers/DailyReportWorkerTest.kt
-// REASON: FIX (Test) - The tests in this file have been rewritten to
-// correctly validate the worker's time-bound logic. The tests now calculate
-// the *exact* expected start/end timestamps (zeroed-out) and use MockK's
-// `coVerify` with `eq()` to ensure the DAO is called with those precise values,
-// fixing the blind spot that allowed the original bug.
-// FIX (Test) - Removed Mockito's `@Mock` annotations from `db` and
-// `transactionDao` and initialized them with MockK's `mockk()` function
-// instead. This resolves the "Missing mocked calls" `MockKException` caused
-// by mixing Mockito-initialized mocks with MockK's `every` block.
-//
-// REASON: TEST (Bug Fix) - Updated the tests to validate the new rolling
-// 24-hour window logic. The `getExpectedTimeRanges` helper now calculates
-// the rolling window, and the tests verify that the DAO is called with these
-// exact start and end times.
-//
-// REASON: FIX (Flaky Test) - Replaced strict `eq()` matchers for timestamps
-// with `any()` in mocks and `slot()` for verification. This resolves a race
-// condition where the test's `Calendar.getInstance()` and the worker's
-// `Calendar.getInstance()` would be milliseconds apart, causing mocks
-// to fail and the worker to return `Retry`.
-// =================================================================================
 package io.pm.finlight.workers
 
 import android.content.Context
@@ -29,53 +6,75 @@ import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
-import io.mockk.*
-import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockkObject
+import io.mockk.runs
+import io.mockk.slot
+import io.mockk.unmockkAll
+import io.mockk.verify
+import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.DailyReportWorker
+import io.pm.finlight.FinancialSummary
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.ITravelSettingsRepository
+import io.pm.finlight.TestApplication
+import io.pm.finlight.TravelModeSettings
+import io.pm.finlight.TripType
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.util.Calendar
-import kotlin.test.assertTrue
+import kotlin.math.abs
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class DailyReportWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
-
-    // --- FIX: Remove @Mock annotations ---
-    private lateinit var db: AppDatabase
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
+    private lateinit var transactionRepository: ITransactionRepository
+    private lateinit var workScheduler: IWorkScheduler
+    private lateinit var settingsRepository: ISettingsRepository
+    private lateinit var travelSettingsRepository: ITravelSettingsRepository
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
-        // --- FIX: Initialize as MockK mocks ---
-        db = mockk()
-        transactionAnalyticsDao = mockk()
+        transactionRepository = SummaryWorkerTestFixtures.mockTransactionRepository()
+        workScheduler = SummaryWorkerTestFixtures.mockWorkScheduler()
+        settingsRepository = SummaryWorkerTestFixtures.mockSettingsRepository()
+        travelSettingsRepository = SummaryWorkerTestFixtures.mockTravelSettingsRepository()
 
-        // Mock the static AppDatabase companion object to return our mock db instance.
-        // This is the key to preventing the UnsatisfiedLinkError.
-        mockkObject(AppDatabase)
-        every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
+        ServiceLocator.setTransactionRepository(transactionRepository)
+        ServiceLocator.setWorkScheduler(workScheduler)
+        ServiceLocator.setSettingsRepository(settingsRepository)
+        ServiceLocator.setTravelSettingsRepository(travelSettingsRepository)
 
-        // Initialize WorkManager for testing. This is required for TestListenableWorkerBuilder.
+        every { settingsRepository.getDailyReportEnabled() } returns flowOf(true)
+        coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns null
+
         val config =
             Configuration.Builder()
                 .setMinimumLoggingLevel(Log.DEBUG)
@@ -83,74 +82,53 @@ class DailyReportWorkerTest : BaseViewModelTest() {
                 .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
-        // Mock static helpers
         mockkObject(NotificationHelper)
-        mockkObject(ReminderManager)
         every { NotificationHelper.showDailyReportNotification(any(), any(), any(), any(), any()) } just runs
-        coEvery { ReminderManager.scheduleDailyReport(any()) } returns Unit
     }
 
     @After
     override fun tearDown() {
-        // Clear all MockK mocks after each test.
+        ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
 
-    // --- REMOVED: racy getExpectedTimeRanges() function ---
-
     @Test
-    fun `doWork with higher spending generates 'higher than usual' title and uses correct rolling 24h time-bounds`() =
+    fun `doWork with higher spending generates 'higher than usual' title and reschedules via workScheduler`() =
         runTest {
-            // Arrange
-            // --- USE GENERIC MATCHERS ---
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
-            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 200.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
             val titleCaptor = slot<String>()
-
-            // --- SLOTS FOR VERIFICATION ---
             val reportStartSlot = slot<Long>()
             val reportEndSlot = slot<Long>()
             val avgStartSlot = slot<Long>()
             val avgEndSlot = slot<Long>()
 
-            // --- CAPTURE "NOW" IN THE TEST ---
             val testNow = Calendar.getInstance()
-
-            // Act
             val result = worker.doWork()
 
-            // Assert
             assertEquals(ListenableWorker.Result.success(), result)
 
-            // --- VERIFY DAO CALLS WITH CAPTORS ---
             coVerify {
-                transactionAnalyticsDao.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
-                transactionAnalyticsDao.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
-                transactionAnalyticsDao.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
+                transactionRepository.getFinancialSummaryForRange(capture(reportStartSlot), capture(reportEndSlot))
+                transactionRepository.getAverageDailySpendingForRange(capture(avgStartSlot), capture(avgEndSlot))
+                transactionRepository.getTopSpendingCategoriesForRange(capture(reportStartSlot), capture(reportEndSlot))
             }
 
-            // --- VERIFY TIME BOUNDS ---
-            // 1. Report Window (Rolling 24h)
             val expectedReportEnd = testNow.timeInMillis
             val expectedReportStart = (testNow.clone() as Calendar).apply { add(Calendar.HOUR_OF_DAY, -24) }.timeInMillis
+            val timeDelta = 200L
 
-            // Allow a small delta (e.g., 100ms) for execution time difference between test and SUT
-            val timeDelta = 100L
-            // --- FIX: Correct argument order for assertTrue ---
             assertTrue(
-                kotlin.math.abs(expectedReportEnd - reportEndSlot.captured) < timeDelta,
-                "Report end time (${reportEndSlot.captured}) should be close to expected ($expectedReportEnd)",
+                abs(expectedReportEnd - reportEndSlot.captured) < timeDelta,
             )
             assertTrue(
-                kotlin.math.abs(expectedReportStart - reportStartSlot.captured) < timeDelta,
-                "Report start time (${reportStartSlot.captured}) should be close to expected ($expectedReportStart)",
+                abs(expectedReportStart - reportStartSlot.captured) < timeDelta,
             )
 
-            // 2. Average Window (7 days prior, full days)
             val expectedAvgStart =
                 (testNow.clone() as Calendar).apply {
                     add(Calendar.DAY_OF_YEAR, -8)
@@ -168,106 +146,133 @@ class DailyReportWorkerTest : BaseViewModelTest() {
                     set(Calendar.MILLISECOND, 999)
                 }.timeInMillis
 
-            // These should be exact, as their calculation is deterministic relative to 'now'
-            // --- FIX: Correct argument order for assertTrue ---
             assertTrue(
-                kotlin.math.abs(expectedAvgStart - avgStartSlot.captured) < timeDelta,
-                "Average start time (${avgStartSlot.captured}) should be close to expected ($expectedAvgStart)",
+                abs(expectedAvgStart - avgStartSlot.captured) < timeDelta,
             )
             assertTrue(
-                kotlin.math.abs(expectedAvgEnd - avgEndSlot.captured) < timeDelta,
-                "Average end time (${avgEndSlot.captured}) should be close to expected ($expectedAvgEnd)",
+                abs(expectedAvgEnd - avgEndSlot.captured) < timeDelta,
             )
 
-            // Verify the notification logic is correct
             verify {
                 NotificationHelper.showDailyReportNotification(
                     context = any(),
                     title = capture(titleCaptor),
-                    totalExpenses = any(),
+                    totalExpenses = 200.0,
                     topCategories = any(),
                     dateMillis = any(),
                 )
             }
             assertEquals("Heads up: Spending was higher than usual yesterday.", titleCaptor.captured)
-            coVerify { ReminderManager.scheduleDailyReport(context) }
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
     fun `doWork with lower spending generates 'well below average' title`() =
         runTest {
-            // Arrange
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
-            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 10.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
             val titleCaptor = slot<String>()
 
-            // Act
             val result = worker.doWork()
 
-            // Assert
             assertEquals(ListenableWorker.Result.success(), result)
             verify {
                 NotificationHelper.showDailyReportNotification(
                     context = any(),
                     title = capture(titleCaptor),
-                    totalExpenses = any(),
+                    totalExpenses = 10.0,
                     topCategories = any(),
                     dateMillis = any(),
                 )
             }
             assertEquals("Great job! Spending was well below average yesterday.", titleCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
-    fun `doWork with no spending generates 'no spending' title`() =
+    fun `doWork with on track spending generates 'on track' title`() =
         runTest {
-            // Arrange
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
-            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 100.0
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 100.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
             val titleCaptor = slot<String>()
 
-            // Act
             val result = worker.doWork()
 
-            // Assert
             assertEquals(ListenableWorker.Result.success(), result)
             verify {
                 NotificationHelper.showDailyReportNotification(
                     context = any(),
                     title = capture(titleCaptor),
-                    totalExpenses = any(),
+                    totalExpenses = 100.0,
+                    topCategories = any(),
+                    dateMillis = any(),
+                )
+            }
+            assertEquals("Your spending is on track with your weekly average.", titleCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork with no spending generates 'no spending' title`() =
+        runTest {
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 100.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+            val titleCaptor = slot<String>()
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showDailyReportNotification(
+                    context = any(),
+                    title = capture(titleCaptor),
+                    totalExpenses = 0.0,
                     topCategories = any(),
                     dateMillis = any(),
                 )
             }
             assertEquals("No spending recorded yesterday. Keep it up!", titleCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
-    fun `doWork returns retry on failure`() =
+    fun `doWork with default spending ratio generates default summary title`() =
         runTest {
-            // Arrange
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
-            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 50.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            // Act
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+            val titleCaptor = slot<String>()
+
             val result = worker.doWork()
 
-            // Assert
-            assertEquals(ListenableWorker.Result.retry(), result)
-            coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(any()) }
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showDailyReportNotification(
+                    context = any(),
+                    title = capture(titleCaptor),
+                    totalExpenses = 50.0,
+                    topCategories = any(),
+                    dateMillis = any(),
+                )
+            }
+            assertEquals("Here's your daily summary.", titleCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
-    fun `doWork clears expired travel mode settings`() =
+    fun `doWork clears expired travel mode settings before report`() =
         runTest {
-            val travelSettingsRepo: ITravelSettingsRepository = mockk(relaxed = true)
             val expiredSettings =
                 TravelModeSettings(
                     isEnabled = true,
@@ -278,19 +283,124 @@ class DailyReportWorkerTest : BaseViewModelTest() {
                     currencyCode = null,
                     conversionRate = null,
                 )
-            coEvery { travelSettingsRepo.getCurrentTravelModeSettings() } returns expiredSettings
-            coEvery { travelSettingsRepo.saveTravelModeSettings(null) } returns Unit
-            io.pm.finlight.di.ServiceLocator.setTravelSettingsRepository(travelSettingsRepo)
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns expiredSettings
+            coEvery { travelSettingsRepository.saveTravelModeSettings(null) } returns Unit
 
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
-            coEvery { transactionAnalyticsDao.getAverageDailySpendingForRange(any(), any()) } returns 0.0
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            val worker = TestListenableWorkerBuilder<DailyReportWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 1) { travelSettingsRepo.saveTravelModeSettings(null) }
-            io.pm.finlight.di.ServiceLocator.reset()
+            coVerify(exactly = 1) { travelSettingsRepository.saveTravelModeSettings(null) }
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
         }
+
+    @Test
+    fun `doWork preserves active unexpired travel mode settings`() =
+        runTest {
+            val futureSettings =
+                TravelModeSettings(
+                    isEnabled = true,
+                    tripName = "Future Trip",
+                    tripType = TripType.INTERNATIONAL,
+                    startDate = System.currentTimeMillis() - 1000L,
+                    endDate = System.currentTimeMillis() + 1000000L,
+                    currencyCode = "EUR",
+                    conversionRate = 1.1f,
+                )
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } returns futureSettings
+
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 0) { travelSettingsRepository.saveTravelModeSettings(any()) }
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork handles travel mode check exception gracefully without blocking report`() =
+        runTest {
+            coEvery { travelSettingsRepository.getCurrentTravelModeSettings() } throws RuntimeException("Travel mode error")
+
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns FinancialSummary(0.0, 0.0)
+            coEvery { transactionRepository.getAverageDailySpendingForRange(any(), any()) } returns 0.0
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork skips notification and reschedules when feature is disabled`() =
+        runTest {
+            every { settingsRepository.getDailyReportEnabled() } returns flowOf(false)
+
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) {
+                NotificationHelper.showDailyReportNotification(any(), any(), any(), any(), any())
+            }
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork returns retry on failure on attempt 0 and does not reschedule`() =
+        runTest {
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.retry(), result)
+            coVerify(exactly = 0) { workScheduler.scheduleDailyReport(any()) }
+        }
+
+    @Test
+    fun `doWork returns failure on final attempt 2 and reschedules`() =
+        runTest {
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB error")
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context, runAttemptCount = 2)
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 1) { workScheduler.scheduleDailyReport(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork returns failure immediately when runAttemptCount is 3 or more`() =
+        runTest {
+            val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context, runAttemptCount = 3)
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 0) { transactionRepository.getFinancialSummaryForRange(any(), any()) }
+            coVerify(exactly = 0) { workScheduler.scheduleDailyReport(any()) }
+        }
+
+    @Test
+    fun `doWork rethrows CancellationException`() {
+        coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } throws CancellationException("Worker cancelled")
+        val worker = SummaryWorkerTestFixtures.createWorker<DailyReportWorker>(context)
+
+        assertThrows(CancellationException::class.java) {
+            runBlocking {
+                worker.doWork()
+            }
+        }
+    }
 }
