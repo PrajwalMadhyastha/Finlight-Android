@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
+import androidx.work.WorkManager
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BackupSettingsRepository
@@ -114,7 +115,9 @@ import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DefaultWorkScheduler
 import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SystemTimeProvider
 import io.pm.finlight.utils.TimeProvider
@@ -194,6 +197,9 @@ object ServiceLocator {
 
     @Volatile
     private var scheduleRecurringTransactionWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase? = null
+
+    @Volatile
+    private var workScheduler: IWorkScheduler? = null
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
@@ -669,6 +675,22 @@ object ServiceLocator {
                 context.applicationContext,
             ).also {
                 scheduleRecurringTransactionWorkerUseCase = it
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IWorkScheduler] instance.
+     */
+    fun provideWorkScheduler(context: Context): IWorkScheduler {
+        return workScheduler ?: synchronized(this) {
+            workScheduler ?: DefaultWorkScheduler(
+                context = context.applicationContext,
+                settingsRepository = provideSettingsRepository(context),
+                workManagerProvider = { WorkManager.getInstance(context.applicationContext) },
+                timeProvider = SystemTimeProvider(),
+            ).also {
+                workScheduler = it
             }
         }
     }
@@ -2167,6 +2189,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setWorkScheduler(scheduler: IWorkScheduler?) {
+        workScheduler = scheduler
+    }
+
+    @VisibleForTesting
     fun setMerchantMappingRepository(repository: IMerchantMappingRepository?) {
         merchantMappingRepository = repository
     }
@@ -2428,6 +2455,7 @@ object ServiceLocator {
         autoSaveSmsTransactionUseCase = null
         getMonthlyConsistencyDataUseCase = null
         scheduleRecurringTransactionWorkerUseCase = null
+        workScheduler = null
         merchantMappingRepository = null
         budgetRepository = null
         recurringTransactionRepository = null
