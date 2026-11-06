@@ -179,10 +179,13 @@ internal fun calculateTargetCycleStartEpochMs(
                         set(Calendar.DAY_OF_MONTH, minOf(ruleCal.get(Calendar.DAY_OF_MONTH), prevMax))
                     }
                 }
+                else -> { /* Fallback to start of current day */ }
             }
         }
     return cal.timeInMillis
 }
+
+internal val SUPPORTED_RECURRENCE_INTERVALS = setOf("Daily", "Weekly", "Monthly", "Yearly")
 
 /**
  * Evaluates whether a recurring transaction rule is due at [currentTimeMillis].
@@ -193,6 +196,10 @@ internal fun isDue(
     rule: RecurringTransaction,
     currentTimeMillis: Long,
 ): Boolean {
+    if (rule.recurrenceInterval !in SUPPORTED_RECURRENCE_INTERVALS) {
+        return false
+    }
+
     val todayStartOfDay =
         Calendar.getInstance().apply {
             timeInMillis = currentTimeMillis
@@ -232,6 +239,7 @@ internal fun isDue(
                 "Weekly" -> add(Calendar.WEEK_OF_YEAR, 1)
                 "Monthly" -> add(Calendar.MONTH, 1)
                 "Yearly" -> add(Calendar.YEAR, 1)
+                else -> return false
             }
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)

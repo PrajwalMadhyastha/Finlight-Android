@@ -132,60 +132,59 @@ class AnalyzeRecurringPatternsUseCaseTest {
             coVerify(exactly = 0) { recurringRepo.updatePattern(any()) }
         }
 
+    private suspend fun verifyPatternDetection(
+        signature: String,
+        occurrences: Int,
+        dayOffsetsFromNow: List<Long>,
+        expectedDetected: Boolean,
+        now: Long = 5000000000L,
+    ) {
+        val pattern = createPattern(signature = signature, occurrences = occurrences)
+        val txns =
+            dayOffsetsFromNow.mapIndexed { index, daysAgo ->
+                createTransaction(
+                    id = index + 1,
+                    signature = signature,
+                    date = now - TimeUnit.DAYS.toMillis(daysAgo),
+                )
+            }
+
+        coEvery { transactionRepo.getTransactionsWithSignatureSince(any()) } returns emptyList()
+        coEvery { recurringRepo.getAllPatterns() } returns listOf(pattern)
+        coEvery { transactionRepo.getTransactionsBySignature(signature) } returns txns
+
+        val detected = useCase(now)
+
+        if (expectedDetected) {
+            assertEquals(1, detected.size)
+            assertEquals(signature, detected.first().smsSignature)
+        } else {
+            assertTrue(detected.isEmpty())
+        }
+    }
+
     @Test
     fun `detects weekly pattern meeting occurrence threshold and tolerance`() =
         runTest {
-            val now = 3000000000L
-            val sig = "weekly_sig"
-            val pattern = createPattern(signature = sig, occurrences = 3)
-
-            val t1 = now - TimeUnit.DAYS.toMillis(14)
-            val t2 = now - TimeUnit.DAYS.toMillis(7)
-            val t3 = now
-
-            val txns =
-                listOf(
-                    createTransaction(1, sig, t1),
-                    createTransaction(2, sig, t2),
-                    createTransaction(3, sig, t3),
-                )
-
-            coEvery { transactionRepo.getTransactionsWithSignatureSince(any()) } returns emptyList()
-            coEvery { recurringRepo.getAllPatterns() } returns listOf(pattern)
-            coEvery { transactionRepo.getTransactionsBySignature(sig) } returns txns
-
-            val detected = useCase(now)
-
-            assertEquals(1, detected.size)
-            assertEquals(sig, detected.first().smsSignature)
+            verifyPatternDetection(
+                signature = "weekly_sig",
+                occurrences = 3,
+                dayOffsetsFromNow = listOf(14L, 7L, 0L),
+                expectedDetected = true,
+                now = 3000000000L,
+            )
         }
 
     @Test
     fun `detects monthly pattern meeting occurrence threshold and tolerance`() =
         runTest {
-            val now = 5000000000L
-            val sig = "monthly_sig"
-            val pattern = createPattern(signature = sig, occurrences = 3)
-
-            val t1 = now - TimeUnit.DAYS.toMillis(60)
-            val t2 = now - TimeUnit.DAYS.toMillis(30)
-            val t3 = now
-
-            val txns =
-                listOf(
-                    createTransaction(1, sig, t1),
-                    createTransaction(2, sig, t2),
-                    createTransaction(3, sig, t3),
-                )
-
-            coEvery { transactionRepo.getTransactionsWithSignatureSince(any()) } returns emptyList()
-            coEvery { recurringRepo.getAllPatterns() } returns listOf(pattern)
-            coEvery { transactionRepo.getTransactionsBySignature(sig) } returns txns
-
-            val detected = useCase(now)
-
-            assertEquals(1, detected.size)
-            assertEquals(sig, detected.first().smsSignature)
+            verifyPatternDetection(
+                signature = "monthly_sig",
+                occurrences = 3,
+                dayOffsetsFromNow = listOf(60L, 30L, 0L),
+                expectedDetected = true,
+                now = 5000000000L,
+            )
         }
 
     @Test
@@ -205,22 +204,12 @@ class AnalyzeRecurringPatternsUseCaseTest {
         }
 
     @Test
-    fun `ignores patterns with erratic intervals`() =
+    fun `ignores pattern when underlying transactions size is below threshold despite pattern occurrences`() =
         runTest {
             val now = 5000000000L
-            val sig = "erratic_sig"
+            val sig = "insufficient_txns_sig"
             val pattern = createPattern(signature = sig, occurrences = 3)
-
-            val t1 = now - TimeUnit.DAYS.toMillis(80)
-            val t2 = now - TimeUnit.DAYS.toMillis(45)
-            val t3 = now
-
-            val txns =
-                listOf(
-                    createTransaction(1, sig, t1),
-                    createTransaction(2, sig, t2),
-                    createTransaction(3, sig, t3),
-                )
+            val txns = listOf(createTransaction(1, sig, now))
 
             coEvery { transactionRepo.getTransactionsWithSignatureSince(any()) } returns emptyList()
             coEvery { recurringRepo.getAllPatterns() } returns listOf(pattern)
@@ -229,6 +218,34 @@ class AnalyzeRecurringPatternsUseCaseTest {
             val detected = useCase(now)
 
             assertTrue(detected.isEmpty())
+        }
+
+    @Test
+    fun `ignores dismissed patterns even if occurrences and interval match`() =
+        runTest {
+            val now = 5000000000L
+            val sig = "dismissed_sig"
+            val pattern = createPattern(signature = sig, occurrences = 3).apply { isDismissed = true }
+
+            coEvery { transactionRepo.getTransactionsWithSignatureSince(any()) } returns emptyList()
+            coEvery { recurringRepo.getAllPatterns() } returns listOf(pattern)
+
+            val detected = useCase(now)
+
+            assertTrue(detected.isEmpty())
+            coVerify(exactly = 0) { transactionRepo.getTransactionsBySignature(sig) }
+        }
+
+    @Test
+    fun `ignores patterns with erratic intervals`() =
+        runTest {
+            verifyPatternDetection(
+                signature = "erratic_sig",
+                occurrences = 3,
+                dayOffsetsFromNow = listOf(80L, 45L, 0L),
+                expectedDetected = false,
+                now = 5000000000L,
+            )
         }
 
     @Test

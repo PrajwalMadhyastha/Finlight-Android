@@ -70,6 +70,7 @@ class DefaultAnalyzeRecurringPatternsUseCase(
 
             val allPatterns = recurringTransactionRepository.getAllPatterns()
             for (pattern in allPatterns) {
+                if (pattern.isDismissed) continue
                 if (pattern.occurrences >= MIN_OCCURRENCES_FOR_PATTERN) {
                     val transactions = transactionRepository.getTransactionsBySignature(pattern.smsSignature)
                     if (transactions.size < MIN_OCCURRENCES_FOR_PATTERN) continue

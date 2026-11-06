@@ -84,6 +84,21 @@ class ProcessDueRecurringTransactionsUseCaseTest {
             set(Calendar.MILLISECOND, 0)
         }
 
+    private fun stubRuleExecutionEnvironment(
+        rule: RecurringTransaction,
+        insertedTxnId: Long = 100L,
+        txnSlot: io.mockk.CapturingSlot<Transaction>? = null,
+    ) {
+        coEvery { recurringRepo.getAllRulesList() } returns listOf(rule)
+        coEvery { transactionRepo.hasExecutedTransactionForRuleSince(rule.id, any()) } returns false
+        coEvery { transactionRepo.getPendingTransactionForRule(rule.id) } returns null
+        if (txnSlot != null) {
+            coEvery { transactionRepo.insertTransaction(capture(txnSlot)) } returns insertedTxnId
+        } else {
+            coEvery { transactionRepo.insertTransaction(any()) } returns insertedTxnId
+        }
+    }
+
     @Test
     fun `normalizes dates to start-of-day so rule created after 3 AM is due today`() =
         runTest {
@@ -91,10 +106,7 @@ class ProcessDueRecurringTransactionsUseCaseTest {
             val today0300 = buildCalendar(2026, Calendar.NOVEMBER, 6, 3, 0).timeInMillis
 
             val rule = createRule(id = 1, startDate = today1500, recurrenceInterval = "Daily")
-            coEvery { recurringRepo.getAllRulesList() } returns listOf(rule)
-            coEvery { transactionRepo.hasExecutedTransactionForRuleSince(1, any()) } returns false
-            coEvery { transactionRepo.getPendingTransactionForRule(1) } returns null
-            coEvery { transactionRepo.insertTransaction(any()) } returns 101L
+            stubRuleExecutionEnvironment(rule, insertedTxnId = 101L)
 
             val results = useCase(today0300)
 
@@ -134,6 +146,21 @@ class ProcessDueRecurringTransactionsUseCaseTest {
         }
 
     @Test
+    fun `processes rule with future end date`() =
+        runTest {
+            val today = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
+            val tomorrow = buildCalendar(2026, Calendar.NOVEMBER, 7, 10, 0).timeInMillis
+
+            val rule = createRule(id = 10, startDate = 0L, endDate = tomorrow, recurrenceInterval = "Daily")
+            stubRuleExecutionEnvironment(rule, insertedTxnId = 500L)
+
+            val results = useCase(today)
+
+            assertEquals(1, results.size)
+            assertTrue(results.first() is ProcessedRecurringResult.PendingDraftCreated)
+        }
+
+    @Test
     fun `skips non-due rules when lastRunDate was today`() =
         runTest {
             val today10am = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
@@ -153,12 +180,8 @@ class ProcessDueRecurringTransactionsUseCaseTest {
         runTest {
             val now = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
             val rule = createRule(id = 5, startDate = 0L, autoApprove = true, recurrenceInterval = "Daily")
-            coEvery { recurringRepo.getAllRulesList() } returns listOf(rule)
-            coEvery { transactionRepo.hasExecutedTransactionForRuleSince(5, any()) } returns false
-            coEvery { transactionRepo.getPendingTransactionForRule(5) } returns null
-
             val txnSlot = slot<Transaction>()
-            coEvery { transactionRepo.insertTransaction(capture(txnSlot)) } returns 200L
+            stubRuleExecutionEnvironment(rule, insertedTxnId = 200L, txnSlot = txnSlot)
 
             val results = useCase(now)
 
@@ -177,12 +200,8 @@ class ProcessDueRecurringTransactionsUseCaseTest {
         runTest {
             val now = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
             val rule = createRule(id = 6, startDate = 0L, autoApprove = false, recurrenceInterval = "Daily")
-            coEvery { recurringRepo.getAllRulesList() } returns listOf(rule)
-            coEvery { transactionRepo.hasExecutedTransactionForRuleSince(6, any()) } returns false
-            coEvery { transactionRepo.getPendingTransactionForRule(6) } returns null
-
             val txnSlot = slot<Transaction>()
-            coEvery { transactionRepo.insertTransaction(capture(txnSlot)) } returns 300L
+            stubRuleExecutionEnvironment(rule, insertedTxnId = 300L, txnSlot = txnSlot)
 
             val results = useCase(now)
 
@@ -292,10 +311,63 @@ class ProcessDueRecurringTransactionsUseCaseTest {
     }
 
     @Test
+    fun `calculateTargetCycleStartEpochMs handles monthly interval when now is later in month`() {
+        val ruleStart = buildCalendar(2025, Calendar.JANUARY, 15, 10, 0).timeInMillis
+        val march20 = buildCalendar(2025, Calendar.MARCH, 20, 12, 0).timeInMillis
+
+        val rule = createRule(startDate = ruleStart, recurrenceInterval = "Monthly")
+        val cycleStart = calculateTargetCycleStartEpochMs(rule, march20)
+
+        val expected = buildCalendar(2025, Calendar.MARCH, 15, 0, 0).timeInMillis
+        assertEquals(expected, cycleStart)
+    }
+
+    @Test
+    fun `calculateTargetCycleStartEpochMs handles yearly interval when now is later in year`() {
+        val ruleStart = buildCalendar(2024, Calendar.MARCH, 1, 10, 0).timeInMillis
+        val august2025 = buildCalendar(2025, Calendar.AUGUST, 15, 12, 0).timeInMillis
+
+        val rule = createRule(startDate = ruleStart, recurrenceInterval = "Yearly")
+        val cycleStart = calculateTargetCycleStartEpochMs(rule, august2025)
+
+        val expected = buildCalendar(2025, Calendar.MARCH, 1, 0, 0).timeInMillis
+        assertEquals(expected, cycleStart)
+    }
+
+    @Test
+    fun `calculateTargetCycleStartEpochMs falls back to start of current day for unsupported interval`() {
+        val now = buildCalendar(2026, Calendar.NOVEMBER, 6, 14, 30).timeInMillis
+        val rule = createRule(recurrenceInterval = "Unsupported")
+
+        val cycleStart = calculateTargetCycleStartEpochMs(rule, now)
+        val expected = buildCalendar(2026, Calendar.NOVEMBER, 6, 0, 0).timeInMillis
+        assertEquals(expected, cycleStart)
+    }
+
+    @Test
     fun `isDue returns false when today is before rule start date`() {
         val today = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
         val tomorrow = buildCalendar(2026, Calendar.NOVEMBER, 7, 10, 0).timeInMillis
         val rule = createRule(startDate = tomorrow, recurrenceInterval = "Daily")
+
+        val result = isDue(rule, today)
+        assertEquals(false, result)
+    }
+
+    @Test
+    fun `isDue returns false for unsupported recurrence interval`() {
+        val today = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
+        val rule = createRule(startDate = 0L, recurrenceInterval = "BiWeekly")
+
+        val result = isDue(rule, today)
+        assertEquals(false, result)
+    }
+
+    @Test
+    fun `isDue with last run returns false for unsupported recurrence interval`() {
+        val today = buildCalendar(2026, Calendar.NOVEMBER, 6, 10, 0).timeInMillis
+        val lastRun = buildCalendar(2026, Calendar.NOVEMBER, 1, 10, 0).timeInMillis
+        val rule = createRule(startDate = 0L, lastRunDate = lastRun, recurrenceInterval = "Unsupported")
 
         val result = isDue(rule, today)
         assertEquals(false, result)

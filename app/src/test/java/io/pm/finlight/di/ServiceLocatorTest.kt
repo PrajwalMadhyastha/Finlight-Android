@@ -652,20 +652,34 @@ class ServiceLocatorTest {
         assertTrue(useCase1 is DefaultProcessDueRecurringTransactionsUseCase)
     }
 
+    private fun <T : Any> assertOverrideAndResetLifecycle(
+        setter: (T?) -> Unit,
+        getter: () -> T,
+        mock1: T,
+        mock2: T,
+    ) {
+        setter(mock1)
+        assertSame(mock1, getter())
+
+        setter(mock2)
+        assertSame(mock2, getter())
+
+        setter(null)
+        val defaultInstance = getter()
+        assertNotNull(defaultInstance)
+        assertNotSame(mock2, defaultInstance)
+    }
+
     @Test
     fun setProcessDueRecurringTransactionsUseCase_overridesInstance() {
-        val mockUseCase: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
-        ServiceLocator.setProcessDueRecurringTransactionsUseCase(mockUseCase)
-        assertSame(mockUseCase, ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application))
-
+        val mockUseCase1: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
         val mockUseCase2: ProcessDueRecurringTransactionsUseCase = mockk(relaxed = true)
-        ServiceLocator.setProcessDueRecurringTransactionsUseCase(mockUseCase2)
-        assertSame(mockUseCase2, ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application))
-
-        ServiceLocator.setProcessDueRecurringTransactionsUseCase(null)
-        val defaultUseCase = ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application)
-        assertNotNull(defaultUseCase)
-        assertNotSame(mockUseCase2, defaultUseCase)
+        assertOverrideAndResetLifecycle(
+            setter = { ServiceLocator.setProcessDueRecurringTransactionsUseCase(it) },
+            getter = { ServiceLocator.provideProcessDueRecurringTransactionsUseCase(application) },
+            mock1 = mockUseCase1,
+            mock2 = mockUseCase2,
+        )
     }
 
     @Test
@@ -680,18 +694,14 @@ class ServiceLocatorTest {
 
     @Test
     fun setAnalyzeRecurringPatternsUseCase_overridesInstance() {
-        val mockUseCase: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
-        ServiceLocator.setAnalyzeRecurringPatternsUseCase(mockUseCase)
-        assertSame(mockUseCase, ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application))
-
+        val mockUseCase1: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
         val mockUseCase2: AnalyzeRecurringPatternsUseCase = mockk(relaxed = true)
-        ServiceLocator.setAnalyzeRecurringPatternsUseCase(mockUseCase2)
-        assertSame(mockUseCase2, ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application))
-
-        ServiceLocator.setAnalyzeRecurringPatternsUseCase(null)
-        val defaultUseCase = ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application)
-        assertNotNull(defaultUseCase)
-        assertNotSame(mockUseCase2, defaultUseCase)
+        assertOverrideAndResetLifecycle(
+            setter = { ServiceLocator.setAnalyzeRecurringPatternsUseCase(it) },
+            getter = { ServiceLocator.provideAnalyzeRecurringPatternsUseCase(application) },
+            mock1 = mockUseCase1,
+            mock2 = mockUseCase2,
+        )
     }
 
     @Test
