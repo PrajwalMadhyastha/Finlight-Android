@@ -3,11 +3,13 @@ package io.pm.finlight.ui.viewmodel
 import android.app.Application
 import android.os.Build
 import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.mockk
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.di.assertThrowsUnknownViewModel
 import org.junit.After
@@ -23,10 +25,16 @@ import org.robolectric.annotation.Config
 class DrilldownViewModelFactoryTest {
     private lateinit var application: Application
     private lateinit var factory: DrilldownViewModelFactory
+    private lateinit var db: AppDatabase
 
     @Before
     fun setup() {
         application = ApplicationProvider.getApplicationContext()
+        db =
+            Room.inMemoryDatabaseBuilder(application, AppDatabase::class.java)
+                .allowMainThreadQueries()
+                .build()
+        AppDatabase.setTestInstance(db)
         factory =
             DrilldownViewModelFactory(
                 application = application,
@@ -40,6 +48,7 @@ class DrilldownViewModelFactoryTest {
 
     @After
     fun tearDown() {
+        db.close()
         ServiceLocator.reset()
     }
 
