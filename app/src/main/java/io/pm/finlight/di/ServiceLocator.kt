@@ -70,11 +70,15 @@ import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.data.repository.TripRepository
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.AnalyzeRecurringPatternsUseCase
+import io.pm.finlight.domain.usecase.DefaultAnalyzeRecurringPatternsUseCase
+import io.pm.finlight.domain.usecase.DefaultProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.PotentialTransaction
@@ -197,6 +201,12 @@ object ServiceLocator {
 
     @Volatile
     private var scheduleRecurringTransactionWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase? = null
+
+    @Volatile
+    private var processDueRecurringTransactionsUseCase: ProcessDueRecurringTransactionsUseCase? = null
+
+    @Volatile
+    private var analyzeRecurringPatternsUseCase: AnalyzeRecurringPatternsUseCase? = null
 
     @Volatile
     private var workScheduler: IWorkScheduler? = null
@@ -675,6 +685,53 @@ object ServiceLocator {
                 context.applicationContext,
             ).also {
                 scheduleRecurringTransactionWorkerUseCase = it
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ProcessDueRecurringTransactionsUseCase] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideProcessDueRecurringTransactionsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ProcessDueRecurringTransactionsUseCase {
+        return processDueRecurringTransactionsUseCase ?: synchronized(this) {
+            processDueRecurringTransactionsUseCase ?: run {
+                DefaultProcessDueRecurringTransactionsUseCase(
+                    recurringTransactionRepository = provideRecurringTransactionRepository(context, resolvedDb),
+                    transactionRepository = provideTransactionRepository(context),
+                    transactionRunner = provideTransactionRunner(context, resolvedDb),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    processDueRecurringTransactionsUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [AnalyzeRecurringPatternsUseCase] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideAnalyzeRecurringPatternsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): AnalyzeRecurringPatternsUseCase {
+        return analyzeRecurringPatternsUseCase ?: synchronized(this) {
+            analyzeRecurringPatternsUseCase ?: run {
+                DefaultAnalyzeRecurringPatternsUseCase(
+                    transactionRepository = provideTransactionRepository(context),
+                    recurringTransactionRepository = provideRecurringTransactionRepository(context, resolvedDb),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    analyzeRecurringPatternsUseCase = it
+                }
             }
         }
     }
@@ -2189,6 +2246,16 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setProcessDueRecurringTransactionsUseCase(useCase: ProcessDueRecurringTransactionsUseCase?) {
+        processDueRecurringTransactionsUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setAnalyzeRecurringPatternsUseCase(useCase: AnalyzeRecurringPatternsUseCase?) {
+        analyzeRecurringPatternsUseCase = useCase
+    }
+
+    @VisibleForTesting
     fun setWorkScheduler(scheduler: IWorkScheduler?) {
         workScheduler = scheduler
     }
@@ -2455,6 +2522,8 @@ object ServiceLocator {
         autoSaveSmsTransactionUseCase = null
         getMonthlyConsistencyDataUseCase = null
         scheduleRecurringTransactionWorkerUseCase = null
+        processDueRecurringTransactionsUseCase = null
+        analyzeRecurringPatternsUseCase = null
         workScheduler = null
         merchantMappingRepository = null
         budgetRepository = null
