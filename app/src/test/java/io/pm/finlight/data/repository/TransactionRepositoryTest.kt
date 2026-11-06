@@ -895,4 +895,53 @@ class TransactionRepositoryTest : BaseViewModelTest() {
             }
             verify(transactionDao).getTotalSpentForMerchant("Starbucks")
         }
+
+    @Test
+    fun `worker analytics, insertion, and query methods delegate to transactionDao`() =
+        runTest {
+            setupDefaultPropertyMocks()
+            repository = TransactionRepository(transactionDao, db, testDispatcherProvider)
+            val sampleTxn =
+                Transaction(
+                    id = 11,
+                    description = "Water Bill",
+                    amount = 300.0,
+                    date = 1000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
+
+            `when`(transactionDao.hasExecutedTransactionForRuleSince(5, 500L)).thenReturn(true)
+            `when`(transactionDao.getPendingTransactionForRule(5)).thenReturn(sampleTxn)
+            `when`(transactionDao.insert(sampleTxn)).thenReturn(11L)
+            `when`(transactionDao.getPendingTransactionsSync()).thenReturn(listOf(sampleTxn))
+            `when`(transactionDao.getAverageDailySpendingForRange(100L, 200L)).thenReturn(150.0)
+            `when`(transactionDao.getTransactionsWithSignatureSince(500L)).thenReturn(listOf(sampleTxn))
+            `when`(transactionDao.getTransactionsBySignature("sig123")).thenReturn(listOf(sampleTxn))
+
+            assertEquals(true, repository.hasExecutedTransactionForRuleSince(5, 500L))
+            verify(transactionDao).hasExecutedTransactionForRuleSince(5, 500L)
+
+            assertEquals(sampleTxn, repository.getPendingTransactionForRule(5))
+            verify(transactionDao).getPendingTransactionForRule(5)
+
+            assertEquals(11L, repository.insertTransaction(sampleTxn))
+            verify(transactionDao).insert(sampleTxn)
+
+            repository.updateRecurringRuleId(11, 5)
+            verify(transactionDao).updateRecurringRuleId(11, 5)
+
+            assertEquals(listOf(sampleTxn), repository.getPendingTransactions())
+            verify(transactionDao).getPendingTransactionsSync()
+
+            assertEquals(150.0, repository.getAverageDailySpendingForRange(100L, 200L))
+            verify(transactionDao).getAverageDailySpendingForRange(100L, 200L)
+
+            assertEquals(listOf(sampleTxn), repository.getTransactionsWithSignatureSince(500L))
+            verify(transactionDao).getTransactionsWithSignatureSince(500L)
+
+            assertEquals(listOf(sampleTxn), repository.getTransactionsBySignature("sig123"))
+            verify(transactionDao).getTransactionsBySignature("sig123")
+        }
 }

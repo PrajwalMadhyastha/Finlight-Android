@@ -407,6 +407,22 @@ interface TransactionQueryDao {
     @Query("SELECT * FROM transactions WHERE status = $SQL_STATUS_PENDING AND recurringRuleId = :ruleId LIMIT 1")
     suspend fun getPendingTransactionForRule(ruleId: Int): Transaction?
 
+    /** Checks whether a confirmed or skipped transaction has already been recorded for this rule since cycle start. */
+    @Query(
+        """
+        SELECT EXISTS(
+            SELECT 1 FROM transactions
+            WHERE recurringRuleId = :ruleId
+              AND (status = $SQL_STATUS_CONFIRMED OR status = $SQL_STATUS_SKIPPED)
+              AND date >= :cycleStartEpochMs
+        )
+        """,
+    )
+    suspend fun hasExecutedTransactionForRuleSince(
+        ruleId: Int,
+        cycleStartEpochMs: Long,
+    ): Boolean
+
     @Query(
         """
         SELECT * FROM transactions 
