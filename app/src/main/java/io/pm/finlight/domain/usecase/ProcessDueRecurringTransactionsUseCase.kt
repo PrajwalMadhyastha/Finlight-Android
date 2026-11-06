@@ -239,7 +239,6 @@ internal fun isDue(
                 "Weekly" -> add(Calendar.WEEK_OF_YEAR, 1)
                 "Monthly" -> add(Calendar.MONTH, 1)
                 "Yearly" -> add(Calendar.YEAR, 1)
-                else -> return false
             }
             set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
