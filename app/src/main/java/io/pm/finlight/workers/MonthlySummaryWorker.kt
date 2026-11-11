@@ -1,6 +1,6 @@
 // =================================================================================
 // FILE: ./app/src/main/java/io/pm/finlight/MonthlySummaryWorker.kt
-// REASON: Added a call to ReminderManager.scheduleMonthlySummary at the end of the
+// REASON: Added a call to IWorkScheduler.scheduleMonthlySummary at the end of the
 // worker's execution to create a continuous chain of precisely scheduled tasks.
 // FIX (Time-bound) - All Calendar instances now explicitly set SECOND and
 // MILLISECOND to their boundaries (0 or 59/999). This prevents calculation
