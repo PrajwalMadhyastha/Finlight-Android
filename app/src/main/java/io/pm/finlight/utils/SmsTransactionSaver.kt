@@ -11,6 +11,8 @@ package io.pm.finlight.utils
 import android.content.Context
 import android.util.Log
 import io.pm.finlight.Account
+import io.pm.finlight.AccountRepository
+import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.PotentialTransaction
 import io.pm.finlight.SmsParser
@@ -19,7 +21,6 @@ import io.pm.finlight.TransactionRepository
 import io.pm.finlight.TransactionType
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.DetectSelfTransferUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
@@ -38,33 +39,45 @@ import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
  * correctly falls back to findByName() in that case.
  */
 class SmsTransactionSaver(
-    private val db: AppDatabase,
-    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+    private val accountRepository: IAccountRepository,
     private val transactionRepository: ITransactionRepository,
-    private val detectSelfTransferUseCase: DetectSelfTransferUseCase =
-        DetectSelfTransferUseCase(
-            transactionRepository = transactionRepository,
-            accountDao = db.accountDao(),
-            accountAliasDao = db.accountAliasDao(),
-        ),
+    private val resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+    private val detectSelfTransferUseCase: DetectSelfTransferUseCase,
 ) {
     constructor(
         context: Context,
         resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
-        db: AppDatabase = AppDatabase.getInstance(context),
     ) : this(
-        db = db,
-        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        accountRepository = ServiceLocator.provideAccountRepository(context),
         transactionRepository = ServiceLocator.provideTransactionRepository(context),
+        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        detectSelfTransferUseCase = DetectSelfTransferUseCase(context),
     )
 
+    @Deprecated("Temporary transition constructor for WP-08b -> WP-08")
+    constructor(
+        context: Context,
+        resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
+        db: AppDatabase,
+    ) : this(
+        accountRepository = ServiceLocator.provideAccountRepository(context),
+        transactionRepository = ServiceLocator.provideTransactionRepository(context),
+        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        detectSelfTransferUseCase = DetectSelfTransferUseCase(context),
+    )
+
+    @Deprecated("Temporary transition constructor for test stability")
     constructor(
         db: AppDatabase,
         resolveTravelModeTagUseCase: ResolveTravelModeTagUseCase,
         detectSelfTransferUseCase: DetectSelfTransferUseCase = DetectSelfTransferUseCase(db),
     ) : this(
-        db = db,
-        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+        accountRepository =
+            AccountRepository(
+                accountDao = db.accountDao(),
+                accountAliasDao = db.accountAliasDao(),
+                db = db,
+            ),
         transactionRepository =
             TransactionRepository(
                 transactionWriteDao = db.transactionWriteDao(),
@@ -72,8 +85,8 @@ class SmsTransactionSaver(
                 transactionAnalyticsDao = db.transactionAnalyticsDao(),
                 transactionReimbursementDao = db.transactionReimbursementDao(),
                 db = db,
-                dispatcherProvider = DefaultDispatcherProvider(),
             ),
+        resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
         detectSelfTransferUseCase = detectSelfTransferUseCase,
     )
 
@@ -99,34 +112,31 @@ class SmsTransactionSaver(
             return null
         }
 
-        val accountDao = db.accountDao()
-        val accountAliasDao = db.accountAliasDao()
-
         val accountName = SmsParser.sanitizeAccountName(potentialTxn.potentialAccount?.formattedName)
         val accountType = potentialTxn.potentialAccount?.accountType ?: "General"
 
         // --- Account Resolution (with Bug #1 fix) ---
         val finalAccountId: Int? =
             run {
-                val alias = accountAliasDao.findByAlias(accountName)
+                val alias = accountRepository.findAliasByName(accountName)
                 if (alias != null) {
                     Log.d(tag, "Found alias for '$accountName' → account ID ${alias.destinationAccountId}")
                     alias.destinationAccountId
                 } else {
-                    var account = accountDao.findByName(accountName)
+                    var account = accountRepository.findByName(accountName)
                     if (account == null) {
                         val newAccount = Account(name = accountName, type = accountType)
-                        val newId = accountDao.insert(newAccount)
+                        val newId = accountRepository.insert(newAccount)
                         // BUG FIX: OnConflictStrategy.IGNORE returns -1 if the account already
                         // exists (e.g., created by a concurrent operation). In that case, query
                         // by name to get the already-existing account instead of passing -1 to
                         // getAccountById which would always return null.
                         account =
                             if (newId != -1L) {
-                                accountDao.getAccountByIdSync(newId.toInt())
+                                accountRepository.getAccountByIdSync(newId.toInt())
                             } else {
                                 Log.d(tag, "Account '$accountName' already existed (IGNORE conflict). Fetching by name.")
-                                accountDao.findByName(accountName)
+                                accountRepository.findByName(accountName)
                             }
                     }
                     account?.id
@@ -189,20 +199,20 @@ class SmsTransactionSaver(
 
         // --- Pre-save duplicate guard ---
         potentialTxn.sourceSmsHash?.let { hash ->
-            if (db.transactionQueryDao().existsBySmsHash(hash)) {
+            if (transactionRepository.existsBySmsHash(hash)) {
                 Log.d(tag, "Transaction with sourceSmsHash '$hash' already exists. Dropping duplicate save.")
                 return null
             }
             val legacyHash = SmsParser.computeLegacySmsHash(potentialTxn.smsSender, potentialTxn.originalMessage)
-            if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
+            if (transactionRepository.existsBySmsHash(legacyHash)) {
                 Log.d(tag, "Transaction with legacy sourceSmsHash '$legacyHash' already exists. Upgrading to new hash and dropping duplicate save.")
-                db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
+                transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = hash)
                 return null
             }
-            if (db.deletedSmsHashDao().existsByHash(hash) || db.deletedSmsHashDao().existsByHash(legacyHash)) {
+            if (transactionRepository.existsDeletedSmsHash(hash) || transactionRepository.existsDeletedSmsHash(legacyHash)) {
                 Log.d(tag, "Transaction with sourceSmsHash '$hash' was deleted by user. Dropping duplicate save.")
-                if (db.deletedSmsHashDao().existsByHash(legacyHash)) {
-                    db.deletedSmsHashDao().insert(DeletedSmsHash(hash))
+                if (transactionRepository.existsDeletedSmsHash(legacyHash)) {
+                    transactionRepository.insertDeletedSmsHash(hash)
                 }
                 return null
             }

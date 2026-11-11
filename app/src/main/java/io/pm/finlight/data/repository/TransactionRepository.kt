@@ -41,8 +41,11 @@ class TransactionRepository(
             db = db,
             dispatcherProvider = dispatcherProvider,
         ),
-    private val deletedSmsHashDao: DeletedSmsHashDao = db.deletedSmsHashDao(),
+    private val deletedSmsHashDao: DeletedSmsHashDao? = null,
 ) : ITransactionRepository {
+    private val resolvedDeletedSmsHashDao: DeletedSmsHashDao
+        get() = deletedSmsHashDao ?: db.deletedSmsHashDao()
+
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
@@ -378,11 +381,11 @@ class TransactionRepository(
     }
 
     override suspend fun existsDeletedSmsHash(hash: String): Boolean {
-        return deletedSmsHashDao.existsByHash(hash)
+        return resolvedDeletedSmsHashDao.existsByHash(hash)
     }
 
     override suspend fun insertDeletedSmsHash(hash: String) {
-        deletedSmsHashDao.insert(DeletedSmsHash(hash))
+        resolvedDeletedSmsHashDao.insert(DeletedSmsHash(hash))
     }
 
     override suspend fun getSmsHashesByIds(transactionIds: List<Int>): List<String> {
@@ -390,7 +393,7 @@ class TransactionRepository(
     }
 
     override suspend fun getAllDeletedSmsHashes(): List<String> {
-        return deletedSmsHashDao.getAllHashes()
+        return resolvedDeletedSmsHashDao.getAllHashes()
     }
 
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {

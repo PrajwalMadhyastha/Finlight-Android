@@ -2,13 +2,13 @@ package io.pm.finlight.domain.usecase
 
 import android.content.Context
 import io.pm.finlight.Account
+import io.pm.finlight.AccountRepository
+import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.AccountAliasDao
-import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -28,24 +28,16 @@ import kotlin.math.abs
  */
 class DetectSelfTransferUseCase(
     private val transactionRepository: ITransactionRepository,
-    private val accountDao: AccountDao,
-    private val accountAliasDao: AccountAliasDao,
+    private val accountRepository: IAccountRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) {
-    constructor(
-        context: Context,
-        db: AppDatabase = AppDatabase.getInstance(context),
-    ) : this(
+    constructor(context: Context) : this(
         transactionRepository = ServiceLocator.provideTransactionRepository(context),
-        accountDao = db.accountDao(),
-        accountAliasDao = db.accountAliasDao(),
+        accountRepository = ServiceLocator.provideAccountRepository(context),
         dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
     )
 
-    @Deprecated(
-        message = "Pass ITransactionRepository directly to primary constructor or provide Context to resolve via ServiceLocator",
-        level = DeprecationLevel.WARNING,
-    )
+    @Deprecated("Temporary transition constructor for WP-08b test stability")
     constructor(
         db: AppDatabase,
         dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
@@ -59,8 +51,12 @@ class DetectSelfTransferUseCase(
                 db = db,
                 dispatcherProvider = dispatcherProvider,
             ),
-        accountDao = db.accountDao(),
-        accountAliasDao = db.accountAliasDao(),
+        accountRepository =
+            AccountRepository(
+                accountDao = db.accountDao(),
+                accountAliasDao = db.accountAliasDao(),
+                db = db,
+            ),
         dispatcherProvider = dispatcherProvider,
     )
 
@@ -103,15 +99,15 @@ class DetectSelfTransferUseCase(
                 } else {
                     // Tier 1: Text Validation
                     val currentNewTxnAliases =
-                        newTxnAliases ?: accountAliasDao.getAliasesForAccount(newTxn.accountId).also {
+                        newTxnAliases ?: accountRepository.getAliasesForAccount(newTxn.accountId).also {
                             newTxnAliases = it
                         }
                     if (!fetchedNewTxnAccount) {
-                        newTxnAccount = accountDao.getAccountByIdSync(newTxn.accountId)
+                        newTxnAccount = accountRepository.getAccountByIdSync(newTxn.accountId)
                         fetchedNewTxnAccount = true
                     }
 
-                    val candidateAliases = accountAliasDao.getAliasesForAccount(candidate.accountId)
+                    val candidateAliases = accountRepository.getAliasesForAccount(candidate.accountId)
                     val candidateDesc = (candidate.originalDescription ?: candidate.description).lowercase(Locale.ROOT)
 
                     // Extract digits from alias and check, or use token overlap
@@ -129,7 +125,7 @@ class DetectSelfTransferUseCase(
                                 StringSimilarity.calculateTokenOverlapScore(alias.aliasName, candidateDesc) > 0.6
                         }
 
-                    val candidateAccount = accountDao.getAccountByIdSync(candidate.accountId)
+                    val candidateAccount = accountRepository.getAccountByIdSync(candidate.accountId)
 
                     val candidateBankNameMatches =
                         candidateAccount?.name?.let {
