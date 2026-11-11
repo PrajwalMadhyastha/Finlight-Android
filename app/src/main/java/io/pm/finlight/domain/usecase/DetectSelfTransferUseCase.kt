@@ -2,6 +2,9 @@ package io.pm.finlight.domain.usecase
 
 import android.content.Context
 import io.pm.finlight.Account
+import io.pm.finlight.AccountRepository
+import io.pm.finlight.AccountType
+import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
@@ -28,24 +31,26 @@ import kotlin.math.abs
  */
 class DetectSelfTransferUseCase(
     private val transactionRepository: ITransactionRepository,
-    private val accountDao: AccountDao,
-    private val accountAliasDao: AccountAliasDao,
+    private val accountRepository: IAccountRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
 ) {
-    constructor(
-        context: Context,
-        db: AppDatabase = AppDatabase.getInstance(context),
-    ) : this(
+    constructor(context: Context) : this(
         transactionRepository = ServiceLocator.provideTransactionRepository(context),
-        accountDao = db.accountDao(),
-        accountAliasDao = db.accountAliasDao(),
+        accountRepository = ServiceLocator.provideAccountRepository(context),
         dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
     )
 
-    @Deprecated(
-        message = "Pass ITransactionRepository directly to primary constructor or provide Context to resolve via ServiceLocator",
-        level = DeprecationLevel.WARNING,
+    @Deprecated("Temporary transition constructor for WP-08b test stability")
+    constructor(
+        context: Context,
+        db: AppDatabase,
+    ) : this(
+        transactionRepository = ServiceLocator.provideTransactionRepository(context),
+        accountRepository = ServiceLocator.provideAccountRepository(context),
+        dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
     )
+
+    @Deprecated("Temporary transition constructor for WP-08b test stability")
     constructor(
         db: AppDatabase,
         dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
@@ -59,8 +64,62 @@ class DetectSelfTransferUseCase(
                 db = db,
                 dispatcherProvider = dispatcherProvider,
             ),
-        accountDao = db.accountDao(),
-        accountAliasDao = db.accountAliasDao(),
+        accountRepository =
+            AccountRepository(
+                accountDao = db.accountDao(),
+                accountAliasDao = db.accountAliasDao(),
+                db = db,
+            ),
+        dispatcherProvider = dispatcherProvider,
+    )
+
+    @Deprecated("Temporary transition constructor for WP-08b test stability")
+    constructor(
+        transactionRepository: ITransactionRepository,
+        accountDao: AccountDao,
+        accountAliasDao: AccountAliasDao,
+        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    ) : this(
+        transactionRepository = transactionRepository,
+        accountRepository =
+            object : IAccountRepository {
+                override val accountsWithBalance get() = throw UnsupportedOperationException()
+                override val allAccounts get() = throw UnsupportedOperationException()
+
+                override suspend fun getAllAccountsSnapshot() = throw UnsupportedOperationException()
+
+                override fun getAccountById(accountId: Int) = throw UnsupportedOperationException()
+
+                override suspend fun getAccountByIdSync(accountId: Int) = accountDao.getAccountByIdSync(accountId)
+
+                override suspend fun insert(account: Account) = accountDao.insert(account)
+
+                override suspend fun update(account: Account) = accountDao.update(account)
+
+                override suspend fun delete(account: Account) = accountDao.delete(account)
+
+                @Deprecated("Use MergeAccountsUseCase directly")
+                override suspend fun mergeAccounts(
+                    destinationAccountId: Int,
+                    sourceAccountIds: List<Int>
+                ) = throw UnsupportedOperationException()
+
+                override suspend fun findOrCreateByName(
+                    name: String,
+                    type: AccountType
+                ) = throw UnsupportedOperationException()
+
+                override suspend fun findOrCreateByName(
+                    name: String,
+                    type: String
+                ) = throw UnsupportedOperationException()
+
+                override suspend fun findByName(name: String) = accountDao.findByName(name)
+
+                override suspend fun getAliasesForAccount(accountId: Int) = accountAliasDao.getAliasesForAccount(accountId)
+
+                override suspend fun findAliasByName(aliasName: String) = accountAliasDao.findByAlias(aliasName)
+            },
         dispatcherProvider = dispatcherProvider,
     )
 
@@ -103,15 +162,15 @@ class DetectSelfTransferUseCase(
                 } else {
                     // Tier 1: Text Validation
                     val currentNewTxnAliases =
-                        newTxnAliases ?: accountAliasDao.getAliasesForAccount(newTxn.accountId).also {
+                        newTxnAliases ?: accountRepository.getAliasesForAccount(newTxn.accountId).also {
                             newTxnAliases = it
                         }
                     if (!fetchedNewTxnAccount) {
-                        newTxnAccount = accountDao.getAccountByIdSync(newTxn.accountId)
+                        newTxnAccount = accountRepository.getAccountByIdSync(newTxn.accountId)
                         fetchedNewTxnAccount = true
                     }
 
-                    val candidateAliases = accountAliasDao.getAliasesForAccount(candidate.accountId)
+                    val candidateAliases = accountRepository.getAliasesForAccount(candidate.accountId)
                     val candidateDesc = (candidate.originalDescription ?: candidate.description).lowercase(Locale.ROOT)
 
                     // Extract digits from alias and check, or use token overlap
@@ -129,7 +188,7 @@ class DetectSelfTransferUseCase(
                                 StringSimilarity.calculateTokenOverlapScore(alias.aliasName, candidateDesc) > 0.6
                         }
 
-                    val candidateAccount = accountDao.getAccountByIdSync(candidate.accountId)
+                    val candidateAccount = accountRepository.getAccountByIdSync(candidate.accountId)
 
                     val candidateBankNameMatches =
                         candidateAccount?.name?.let {

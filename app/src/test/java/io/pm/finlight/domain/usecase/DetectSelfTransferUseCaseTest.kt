@@ -6,6 +6,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.pm.finlight.Account
 import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionType
@@ -1347,5 +1348,38 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             useCase(newTxn)
 
             coVerify(exactly = 0) { transactionRepository.linkTransfer(any(), any()) }
+        }
+
+    @Test
+    fun `primary constructor initializes with IAccountRepository and resolves self-transfer`() =
+        runTest(testDispatcher) {
+            val mockAccountRepo = mockk<IAccountRepository>(relaxed = true)
+            val mockTxnRepo = mockk<ITransactionRepository>(relaxed = true)
+            val primaryUseCase = DetectSelfTransferUseCase(mockTxnRepo, mockAccountRepo, testDispatcherProvider)
+
+            val newTxn =
+                Transaction(
+                    id = 1,
+                    description = "Test Txn",
+                    amount = 100.0,
+                    date = 1000L,
+                    accountId = 1,
+                    transactionType = TransactionType.EXPENSE,
+                    sourceSmsId = 50L,
+                    categoryId = null,
+                    notes = null,
+                )
+            coEvery { mockTxnRepo.findPotentialTransfers(any(), any(), any(), any(), any()) } returns emptyList()
+
+            primaryUseCase(newTxn)
+            coVerify(exactly = 1) {
+                mockTxnRepo.findPotentialTransfers(
+                    amount = 100.0,
+                    accountId = 1,
+                    transactionType = TransactionType.EXPENSE,
+                    startTime = any(),
+                    endTime = any(),
+                )
+            }
         }
 }

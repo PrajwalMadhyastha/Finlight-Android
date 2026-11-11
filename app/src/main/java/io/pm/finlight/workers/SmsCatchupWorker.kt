@@ -25,8 +25,6 @@ import androidx.work.WorkerParameters
 import io.pm.finlight.ParseResult
 import io.pm.finlight.SmsMessage
 import io.pm.finlight.SmsParser
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.entity.DeletedSmsHash
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.ml.MlModelFactory
@@ -71,11 +69,18 @@ class SmsCatchupWorker(
         }
 
         return try {
-            val db = AppDatabase.getInstance(context)
             val settingsRepository = ServiceLocator.provideSettingsRepository(context)
             val tagRepository = ServiceLocator.provideTagRepository(context)
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
-            val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(context)
+            val accountRepository = ServiceLocator.provideAccountRepository(context)
+            val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(context)
+            val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(context)
+            val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(context)
+            val merchantCategoryMappingRepository = ServiceLocator.provideMerchantCategoryMappingRepository(context)
+            val smsParseTemplateRepository = ServiceLocator.provideSmsParseTemplateRepository(context)
+            val mappingRepository = ServiceLocator.provideMerchantMappingRepository(context)
+            val saver = SmsTransactionSaver(context, resolveTravelModeTagUseCase)
             val smsRepository = ServiceLocator.provideSmsRepository(context)
 
             val now = System.currentTimeMillis()
@@ -90,11 +95,11 @@ class SmsCatchupWorker(
             }
 
             // Load current hashes once — this is our duplicate guard.
-            val existingSmsHashes = db.transactionQueryDao().getAllSmsHashes().first().toMutableSet()
+            val existingSmsHashes = transactionRepository.getAllSmsHashes().first().toMutableSet()
 
             // Load deleted hashes — transactions the user intentionally removed should
             // never be re-created by this worker, even if their SMS reappears in the inbox.
-            val deletedHashes = db.deletedSmsHashDao().getAllHashes().toMutableSet()
+            val deletedHashes = transactionRepository.getAllDeletedSmsHashes().toMutableSet()
 
             // Filter out already-saved/deleted SMS hashes BEFORE slicing so older unparsed messages
             // are not starved across cycles when inbox volume exceeds the batch cap.
@@ -107,12 +112,12 @@ class SmsCatchupWorker(
                             currentHash in deletedHashes || legacyHash in deletedHashes
                     if (isKnown) {
                         if (legacyHash in existingSmsHashes) {
-                            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                            transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
                             existingSmsHashes.remove(legacyHash)
                             existingSmsHashes.add(currentHash)
                         }
                         if (legacyHash in deletedHashes) {
-                            db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                            transactionRepository.insertDeletedSmsHash(currentHash)
                             deletedHashes.add(currentHash)
                         }
                         false
@@ -128,17 +133,16 @@ class SmsCatchupWorker(
                 return Result.success()
             }
 
-            val mappingRepository = ServiceLocator.provideMerchantMappingRepository(context, db)
             val existingMappings = mappingRepository.allMappings.first().associateBy({ it.smsSender }, { it.merchantName })
 
             // Pre-load all rules, mappings, and templates once before the loop to avoid redundant SQLite queries.
-            val customRules = db.customSmsRuleDao().getAllRules().first()
-            val renameRules = db.merchantRenameRuleDao().getAllRulesList()
+            val customRules = customSmsRuleRepository.getAllRules().first()
+            val renameRules = merchantRenameRuleRepository.getAllRulesList()
             val renameRulesMap = renameRules.associateBy({ it.originalName.lowercase() }, { it.newName })
-            val ignoreRules = db.ignoreRuleDao().getEnabledRules()
-            val categoryMappings = db.merchantCategoryMappingDao().getAll()
+            val ignoreRules = ignoreRuleRepository.getEnabledRules()
+            val categoryMappings = merchantCategoryMappingRepository.getAll()
             val categoryMappingsMap = categoryMappings.associateBy({ it.parsedName.lowercase() }, { it.categoryId })
-            val allTemplates = db.smsParseTemplateDao().getAllTemplates()
+            val allTemplates = smsParseTemplateRepository.getAllTemplates()
             val templatesBySignature = allTemplates.groupBy { it.templateSignature }
 
             val categoryFinderProvider = SmsProviderHelper.getCategoryFinderProvider()
@@ -180,23 +184,23 @@ class SmsCatchupWorker(
                         currentHash in savedHashesThisRun
                     ) {
                         if (legacyHash in existingSmsHashes) {
-                            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                            transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
                             existingSmsHashes.remove(legacyHash)
                             existingSmsHashes.add(currentHash)
                         }
                         if (legacyHash in deletedHashes) {
-                            db.deletedSmsHashDao().insert(DeletedSmsHash(currentHash))
+                            transactionRepository.insertDeletedSmsHash(currentHash)
                             deletedHashes.add(currentHash)
                         }
                         continue
                     }
 
                     // Dynamic TOCTOU check against DB in case real-time worker saved it concurrently
-                    if (db.transactionQueryDao().existsBySmsHash(currentHash) ||
-                        db.transactionQueryDao().existsBySmsHash(legacyHash)
+                    if (transactionRepository.existsBySmsHash(currentHash) ||
+                        transactionRepository.existsBySmsHash(legacyHash)
                     ) {
-                        if (db.transactionQueryDao().existsBySmsHash(legacyHash)) {
-                            db.transactionWriteDao().updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
+                        if (transactionRepository.existsBySmsHash(legacyHash)) {
+                            transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
                         }
                         existingSmsHashes.add(currentHash)
                         continue
@@ -243,7 +247,7 @@ class SmsCatchupWorker(
                         continue
                     }
 
-                    if (db.transactionQueryDao().existsBySmsHash(txnHash)) {
+                    if (transactionRepository.existsBySmsHash(txnHash)) {
                         existingSmsHashes.add(txnHash)
                         continue
                     }
