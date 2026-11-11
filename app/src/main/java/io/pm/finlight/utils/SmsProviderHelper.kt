@@ -7,6 +7,7 @@ import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
+import io.pm.finlight.ISmsParseTemplateRepository
 import io.pm.finlight.IgnoreRule
 import io.pm.finlight.IgnoreRuleProvider
 import io.pm.finlight.MerchantCategoryMappingProvider
@@ -48,6 +49,8 @@ object SmsProviderHelper {
             override suspend fun getAllMappings(): Map<String, Int> =
                 repository.getAllMappings().first().associateBy({ it.parsedName.lowercase() }, { it.categoryId })
         }
+
+    fun getSmsParseTemplateProvider(repository: ISmsParseTemplateRepository): SmsParseTemplateProvider = repository
 
     fun getCustomSmsRuleProvider(db: AppDatabase): CustomSmsRuleProvider =
         object : CustomSmsRuleProvider {
