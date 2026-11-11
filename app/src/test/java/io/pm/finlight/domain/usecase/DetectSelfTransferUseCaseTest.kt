@@ -1,9 +1,12 @@
 package io.pm.finlight.domain.usecase
 
+import android.content.Context
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkObject
 import io.pm.finlight.Account
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.IAccountRepository
@@ -18,17 +21,18 @@ import io.pm.finlight.data.db.dao.TransactionQueryDao
 import io.pm.finlight.data.db.dao.TransactionReimbursementDao
 import io.pm.finlight.data.db.dao.TransactionWriteDao
 import io.pm.finlight.data.db.entity.AccountAlias
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
     private val transactionRepository: ITransactionRepository = mockk(relaxed = true)
-    private val accountDao: AccountDao = mockk(relaxed = true)
-    private val accountAliasDao: AccountAliasDao = mockk(relaxed = true)
+    private val accountRepository: IAccountRepository = mockk(relaxed = true)
     private lateinit var testDispatcherProvider: TestDispatcherProvider
     private lateinit var useCase: DetectSelfTransferUseCase
 
@@ -39,8 +43,7 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
         useCase =
             DetectSelfTransferUseCase(
                 transactionRepository = transactionRepository,
-                accountDao = accountDao,
-                accountAliasDao = accountAliasDao,
+                accountRepository = accountRepository,
                 dispatcherProvider = testDispatcherProvider,
             )
     }
@@ -129,10 +132,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val alias = AccountAlias(aliasName = "HDFC-1234", destinationAccountId = 2)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns listOf(alias)
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Account1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Account2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns listOf(alias)
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Account1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Account2", type = "bank")
 
             useCase(newTxn)
 
@@ -180,10 +183,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val alias = AccountAlias(aliasName = "savings account", destinationAccountId = 2)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns listOf(alias)
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Primary Checking", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Secondary Savings", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns listOf(alias)
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Primary Checking", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Secondary Savings", type = "bank")
 
             useCase(newTxn)
 
@@ -230,10 +233,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 )
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "ICICI Bank", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "State Bank of India", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "ICICI Bank", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "State Bank of India", type = "bank")
 
             useCase(newTxn)
 
@@ -280,10 +283,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 )
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "ICICI Bank", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Axis Bank", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "ICICI Bank", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Axis Bank", type = "bank")
 
             useCase(newTxn)
 
@@ -330,10 +333,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 )
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -380,10 +383,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 )
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -620,10 +623,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val alias = AccountAlias(aliasName = "HDFC-1234", destinationAccountId = 1)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns listOf(alias)
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Account1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Account2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns listOf(alias)
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Account1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Account2", type = "bank")
 
             useCase(newTxn)
 
@@ -665,10 +668,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val alias = AccountAlias(aliasName = "secondary savings account", destinationAccountId = 1)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns listOf(alias)
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Primary Checking", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Other Bank", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns listOf(alias)
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Primary Checking", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Other Bank", type = "bank")
 
             useCase(newTxn)
 
@@ -710,10 +713,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val alias = AccountAlias(aliasName = "Axis-9999", destinationAccountId = 1)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns listOf(alias)
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns listOf(alias)
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -754,10 +757,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -798,10 +801,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -842,10 +845,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -938,10 +941,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns null
-            coEvery { accountDao.getAccountByIdSync(2) } returns null
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns null
+            coEvery { accountRepository.getAccountByIdSync(2) } returns null
 
             useCase(newTxn)
 
@@ -982,10 +985,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Barclays Bank", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Citibank", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Barclays Bank", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Citibank", type = "bank")
 
             useCase(newTxn)
 
@@ -1026,10 +1029,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1071,10 +1074,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val candidateAlias = AccountAlias(aliasName = "emergency savings pool", destinationAccountId = 2)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns listOf(candidateAlias)
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns listOf(candidateAlias)
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1116,10 +1119,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val candidateAlias = AccountAlias(aliasName = "Emergency Fund", destinationAccountId = 2)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns listOf(candidateAlias)
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns listOf(candidateAlias)
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1161,10 +1164,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val candidateAlias = AccountAlias(aliasName = "emergency vault fund 9876", destinationAccountId = 2)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns listOf(candidateAlias)
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns listOf(candidateAlias)
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1206,10 +1209,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val newTxnAlias = AccountAlias(aliasName = "Payroll Account", destinationAccountId = 1)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns listOf(newTxnAlias)
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns listOf(newTxnAlias)
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1251,10 +1254,10 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
             } returns listOf(candidate)
 
             val newTxnAlias = AccountAlias(aliasName = "payroll salary account 5555", destinationAccountId = 1)
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns listOf(newTxnAlias)
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns listOf(newTxnAlias)
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
 
             useCase(newTxn)
 
@@ -1308,18 +1311,18 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 transactionRepository.findPotentialTransfers(any(), any(), any(), any(), any())
             } returns listOf(candidate1, candidate2)
 
-            coEvery { accountAliasDao.getAliasesForAccount(1) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(2) } returns emptyList()
-            coEvery { accountAliasDao.getAliasesForAccount(3) } returns emptyList()
-            coEvery { accountDao.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
-            coEvery { accountDao.getAccountByIdSync(3) } returns Account(id = 3, name = "Acc3", type = "bank")
+            coEvery { accountRepository.getAliasesForAccount(1) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(2) } returns emptyList()
+            coEvery { accountRepository.getAliasesForAccount(3) } returns emptyList()
+            coEvery { accountRepository.getAccountByIdSync(1) } returns Account(id = 1, name = "Acc1", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(2) } returns Account(id = 2, name = "Acc2", type = "bank")
+            coEvery { accountRepository.getAccountByIdSync(3) } returns Account(id = 3, name = "Acc3", type = "bank")
 
             useCase(newTxn)
 
             // Caching verification: newTxn account and aliases should be queried at most ONCE
-            coVerify(exactly = 1) { accountAliasDao.getAliasesForAccount(1) }
-            coVerify(exactly = 1) { accountDao.getAccountByIdSync(1) }
+            coVerify(exactly = 1) { accountRepository.getAliasesForAccount(1) }
+            coVerify(exactly = 1) { accountRepository.getAccountByIdSync(1) }
             // Candidate 2 matched and linked
             coVerify(exactly = 0) { transactionRepository.linkTransfer(1, 2) }
             coVerify(exactly = 1) { transactionRepository.linkTransfer(1, 3) }
@@ -1382,4 +1385,19 @@ class DetectSelfTransferUseCaseTest : BaseViewModelTest() {
                 )
             }
         }
+
+    @Test
+    fun `context constructor resolves dependencies via ServiceLocator`() {
+        val mockContext: Context = mockk(relaxed = true)
+        val mockAccountRepo = mockk<IAccountRepository>(relaxed = true)
+        val mockTxnRepo = mockk<ITransactionRepository>(relaxed = true)
+        mockkObject(ServiceLocator)
+        every { ServiceLocator.provideTransactionRepository(mockContext) } returns mockTxnRepo
+        every { ServiceLocator.provideAccountRepository(mockContext) } returns mockAccountRepo
+        every { ServiceLocator.provideDispatcherProvider(mockContext) } returns testDispatcherProvider
+
+        val contextUseCase = DetectSelfTransferUseCase(mockContext)
+        assertNotNull(contextUseCase)
+        unmockkObject(ServiceLocator)
+    }
 }

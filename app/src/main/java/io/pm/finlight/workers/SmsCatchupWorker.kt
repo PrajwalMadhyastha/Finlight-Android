@@ -73,7 +73,6 @@ class SmsCatchupWorker(
             val tagRepository = ServiceLocator.provideTagRepository(context)
             val resolveTravelModeTagUseCase = ResolveTravelModeTagUseCase(tagRepository)
             val transactionRepository = ServiceLocator.provideTransactionRepository(context)
-            val accountRepository = ServiceLocator.provideAccountRepository(context)
             val customSmsRuleRepository = ServiceLocator.provideCustomSmsRuleRepository(context)
             val merchantRenameRuleRepository = ServiceLocator.provideMerchantRenameRuleRepository(context)
             val ignoreRuleRepository = ServiceLocator.provideIgnoreRuleRepository(context)
@@ -178,20 +177,8 @@ class SmsCatchupWorker(
                     val currentHash = SmsParser.computeSmsHash(sms.sender, sms.body)
                     val legacyHash = SmsParser.computeLegacySmsHash(sms.sender, sms.body)
 
-                    // Fast-path guard: skip duplicate / deleted messages BEFORE running expensive ML/NER models.
-                    if (currentHash in existingSmsHashes || legacyHash in existingSmsHashes ||
-                        currentHash in deletedHashes || legacyHash in deletedHashes ||
-                        currentHash in savedHashesThisRun
-                    ) {
-                        if (legacyHash in existingSmsHashes) {
-                            transactionRepository.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash)
-                            existingSmsHashes.remove(legacyHash)
-                            existingSmsHashes.add(currentHash)
-                        }
-                        if (legacyHash in deletedHashes) {
-                            transactionRepository.insertDeletedSmsHash(currentHash)
-                            deletedHashes.add(currentHash)
-                        }
+                    // Fast-path guard: skip duplicate messages already processed in this batch BEFORE running expensive ML/NER models.
+                    if (currentHash in savedHashesThisRun) {
                         continue
                     }
 

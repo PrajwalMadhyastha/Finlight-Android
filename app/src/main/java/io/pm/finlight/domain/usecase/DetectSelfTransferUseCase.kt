@@ -3,15 +3,12 @@ package io.pm.finlight.domain.usecase
 import android.content.Context
 import io.pm.finlight.Account
 import io.pm.finlight.AccountRepository
-import io.pm.finlight.AccountType
 import io.pm.finlight.IAccountRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionRepository
 import io.pm.finlight.core.utils.StringSimilarity
 import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.AccountAliasDao
-import io.pm.finlight.data.db.dao.AccountDao
 import io.pm.finlight.data.db.entity.AccountAlias
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.DefaultDispatcherProvider
@@ -42,16 +39,6 @@ class DetectSelfTransferUseCase(
 
     @Deprecated("Temporary transition constructor for WP-08b test stability")
     constructor(
-        context: Context,
-        db: AppDatabase,
-    ) : this(
-        transactionRepository = ServiceLocator.provideTransactionRepository(context),
-        accountRepository = ServiceLocator.provideAccountRepository(context),
-        dispatcherProvider = ServiceLocator.provideDispatcherProvider(context),
-    )
-
-    @Deprecated("Temporary transition constructor for WP-08b test stability")
-    constructor(
         db: AppDatabase,
         dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
     ) : this(
@@ -70,56 +57,6 @@ class DetectSelfTransferUseCase(
                 accountAliasDao = db.accountAliasDao(),
                 db = db,
             ),
-        dispatcherProvider = dispatcherProvider,
-    )
-
-    @Deprecated("Temporary transition constructor for WP-08b test stability")
-    constructor(
-        transactionRepository: ITransactionRepository,
-        accountDao: AccountDao,
-        accountAliasDao: AccountAliasDao,
-        dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
-    ) : this(
-        transactionRepository = transactionRepository,
-        accountRepository =
-            object : IAccountRepository {
-                override val accountsWithBalance get() = throw UnsupportedOperationException()
-                override val allAccounts get() = throw UnsupportedOperationException()
-
-                override suspend fun getAllAccountsSnapshot() = throw UnsupportedOperationException()
-
-                override fun getAccountById(accountId: Int) = throw UnsupportedOperationException()
-
-                override suspend fun getAccountByIdSync(accountId: Int) = accountDao.getAccountByIdSync(accountId)
-
-                override suspend fun insert(account: Account) = accountDao.insert(account)
-
-                override suspend fun update(account: Account) = accountDao.update(account)
-
-                override suspend fun delete(account: Account) = accountDao.delete(account)
-
-                @Deprecated("Use MergeAccountsUseCase directly")
-                override suspend fun mergeAccounts(
-                    destinationAccountId: Int,
-                    sourceAccountIds: List<Int>
-                ) = throw UnsupportedOperationException()
-
-                override suspend fun findOrCreateByName(
-                    name: String,
-                    type: AccountType
-                ) = throw UnsupportedOperationException()
-
-                override suspend fun findOrCreateByName(
-                    name: String,
-                    type: String
-                ) = throw UnsupportedOperationException()
-
-                override suspend fun findByName(name: String) = accountDao.findByName(name)
-
-                override suspend fun getAliasesForAccount(accountId: Int) = accountAliasDao.getAliasesForAccount(accountId)
-
-                override suspend fun findAliasByName(aliasName: String) = accountAliasDao.findByAlias(aliasName)
-            },
         dispatcherProvider = dispatcherProvider,
     )
 
