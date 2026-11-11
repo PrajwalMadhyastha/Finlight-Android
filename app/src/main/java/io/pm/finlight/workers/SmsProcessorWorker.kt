@@ -250,25 +250,31 @@ class SmsProcessorWorker(
 
             if (canNotify) {
                 if (potentialTxn.needsReview) {
-                    val savedTxn =
-                        Transaction(
-                            id = newTransactionId.toInt(),
-                            description = potentialTxn.merchantName ?: "Unknown Merchant",
-                            // FIX: Use the raw pre-rename name for originalDescription.
-                            originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
-                            amount = potentialTxn.amount,
-                            date = potentialTxn.date,
-                            // placeholder, not used in the notification
-                            accountId = 0,
-                            categoryId = potentialTxn.categoryId,
-                            notes = "",
-                            transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
-                            sourceSmsId = potentialTxn.sourceSmsId,
-                            sourceSmsHash = potentialTxn.sourceSmsHash,
-                        )
+                    val reviewTxn =
+                        savedTxn ?: run {
+                            Log.w(
+                                tag,
+                                "Saved transaction $newTransactionId could not be re-queried from repository; falling back to synthetic transaction for review notification",
+                            )
+                            Transaction(
+                                id = newTransactionId.toInt(),
+                                description = potentialTxn.merchantName ?: "Unknown Merchant",
+                                // FIX: Use the raw pre-rename name for originalDescription.
+                                originalDescription = potentialTxn.originalMerchantName ?: potentialTxn.merchantName,
+                                amount = potentialTxn.amount,
+                                date = potentialTxn.date,
+                                // placeholder if savedTxn was not found in repo
+                                accountId = 0,
+                                categoryId = potentialTxn.categoryId,
+                                notes = "",
+                                transactionType = TransactionType.fromStringOrNull(potentialTxn.transactionType) ?: TransactionType.EXPENSE,
+                                sourceSmsId = potentialTxn.sourceSmsId,
+                                sourceSmsHash = potentialTxn.sourceSmsHash,
+                            )
+                        }
                     NotificationHelper.showSuspiciousAmountNotification(
                         context,
-                        savedTxn,
+                        reviewTxn,
                         potentialTxn.suspicionReason ?: "Amount flagged for review.",
                     )
                 } else if (settingsRepository.getAutoCaptureNotificationEnabled().first()) {
