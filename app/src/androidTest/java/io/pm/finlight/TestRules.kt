@@ -26,6 +26,16 @@ class DisableOnboardingRule : TestRule {
                     runBlocking {
                         val settingsRepository = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
                         settingsRepository.setHasSeenOnboarding(true)
+                        settingsRepository.setFirstLaunchComplete()
+                        settingsRepository.saveAutoBackupEnabled(false)
+                    }
+                    val snapshotFile = io.pm.finlight.data.DataExportService.getSnapshotFile(context)
+                    if (snapshotFile.exists()) {
+                        snapshotFile.delete()
+                    }
+                    try {
+                        androidx.work.WorkManager.getInstance(context).cancelAllWork()
+                    } catch (_: Exception) {
                     }
                     base.evaluate()
                 } finally {
@@ -105,6 +115,12 @@ class ClearDatabaseRule : TestRule {
             override fun evaluate() {
                 val context = InstrumentationRegistry.getInstrumentation().targetContext
                 val db = AppDatabase.getInstance(context)
+
+                // Delete any residual backup snapshot file to prevent splash screen auto-restore
+                val snapshotFile = io.pm.finlight.data.DataExportService.getSnapshotFile(context)
+                if (snapshotFile.exists()) {
+                    snapshotFile.delete()
+                }
 
                 // Clear any stored budgets from DataStore to avoid cross-test contamination
                 runBlocking {
