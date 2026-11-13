@@ -18,6 +18,7 @@ import io.pm.finlight.Account
 import io.pm.finlight.Category
 import io.pm.finlight.Goal
 import io.pm.finlight.GoalDao
+import io.pm.finlight.IGoalRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.ITransactionRepository
 import io.pm.finlight.TestApplication
@@ -30,8 +31,10 @@ import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.IWorkScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
@@ -313,17 +316,21 @@ class GoalSurplusWorkerTest {
             }
         }
 
+    private suspend fun setupFailingTransactionRepo(throwable: Throwable) {
+        val (prevYear, prevMonth) = getPreviousYearAndMonth()
+        settingsRepository.saveGoalNudgesEnabled(true)
+        settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
+
+        val mockTxnRepo = mockk<ITransactionRepository>()
+        every { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) } returns
+            flow { throw throwable }
+        ServiceLocator.setTransactionRepository(mockTxnRepo)
+    }
+
     @Test
     fun testDoWork_retryOnNonFinalAttempt_preservesBackoffWithoutRescheduling() =
         runTest {
-            val (prevYear, prevMonth) = getPreviousYearAndMonth()
-            settingsRepository.saveGoalNudgesEnabled(true)
-            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
-
-            val mockTxnRepo = mockk<ITransactionRepository>()
-            every { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) } returns
-                flow { throw RuntimeException("Simulated failure") }
-            ServiceLocator.setTransactionRepository(mockTxnRepo)
+            setupFailingTransactionRepo(RuntimeException("Simulated failure"))
 
             val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context, runAttemptCount = 0)
             val result = worker.doWork()
@@ -337,14 +344,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_failureOnFinalAttempt_reschedulesNextMonth() =
         runTest {
-            val (prevYear, prevMonth) = getPreviousYearAndMonth()
-            settingsRepository.saveGoalNudgesEnabled(true)
-            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
-
-            val mockTxnRepo = mockk<ITransactionRepository>()
-            every { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) } returns
-                flow { throw RuntimeException("Simulated persistent failure") }
-            ServiceLocator.setTransactionRepository(mockTxnRepo)
+            setupFailingTransactionRepo(RuntimeException("Simulated persistent failure"))
 
             val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context, runAttemptCount = 2)
             val result = worker.doWork()
@@ -361,14 +361,7 @@ class GoalSurplusWorkerTest {
     @Test
     fun testDoWork_rethrowsCancellationException() =
         runTest {
-            val (prevYear, prevMonth) = getPreviousYearAndMonth()
-            settingsRepository.saveGoalNudgesEnabled(true)
-            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
-
-            val mockTxnRepo = mockk<ITransactionRepository>()
-            every { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) } returns
-                flow { throw CancellationException("Worker cancelled") }
-            ServiceLocator.setTransactionRepository(mockTxnRepo)
+            setupFailingTransactionRepo(CancellationException("Worker cancelled"))
 
             val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context, runAttemptCount = 0)
 
@@ -380,6 +373,85 @@ class GoalSurplusWorkerTest {
 
             verify(exactly = 0) {
                 workScheduler.scheduleGoalSurplusWorker(any(), any())
+            }
+        }
+
+    @Test
+    fun testDoWork_emptyFinancialSummaryFlow_defaultsExpensesToZeroAndProcessesSurplus() =
+        runTest {
+            ShadowApplication.getInstance().grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+            val (prevYear, prevMonth) = getPreviousYearAndMonth()
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
+
+            db.accountDao().insert(Account(id = 1, name = "Cash", type = "Cash"))
+            goalDao.insert(Goal(id = 1, name = "Trip", targetAmount = 5000.0, accountId = 1, targetDate = null))
+
+            val mockTxnRepo = mockk<ITransactionRepository>()
+            every { mockTxnRepo.getFinancialSummaryForRangeFlow(any(), any()) } returns emptyFlow()
+            ServiceLocator.setTransactionRepository(mockTxnRepo)
+
+            val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            assertTrue("Notification should be sent when expenses default to 0", getPostedNotifications().isNotEmpty())
+            verify(exactly = 1) {
+                workScheduler.scheduleGoalSurplusWorker(
+                    forceNextMonth = true,
+                    policy = ExistingWorkPolicy.REPLACE,
+                )
+            }
+        }
+
+    @Test
+    fun testDoWork_emptyActiveGoalsFlow_defaultsToEmptyListAndSkipsNotification() =
+        runTest {
+            val (prevYear, prevMonth) = getPreviousYearAndMonth()
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
+
+            val mockGoalRepo = mockk<IGoalRepository>()
+            every { mockGoalRepo.getActiveGoals() } returns emptyFlow()
+            ServiceLocator.setGoalRepository(mockGoalRepo)
+
+            val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            assertTrue("No notification should be sent when active goals flow is empty", getPostedNotifications().isEmpty())
+            verify(exactly = 1) {
+                workScheduler.scheduleGoalSurplusWorker(
+                    forceNextMonth = true,
+                    policy = ExistingWorkPolicy.REPLACE,
+                )
+            }
+        }
+
+    @Test
+    fun testDoWork_topGoalNotFoundInAllGoalsWithAccountName_showsNotificationWithNullGoal() =
+        runTest {
+            ShadowApplication.getInstance().grantPermissions(android.Manifest.permission.POST_NOTIFICATIONS)
+            val (prevYear, prevMonth) = getPreviousYearAndMonth()
+            settingsRepository.saveGoalNudgesEnabled(true)
+            settingsRepository.saveOverallBudgetForMonth(prevYear, prevMonth, 1000f)
+
+            val mockGoalRepo = mockk<IGoalRepository>()
+            every { mockGoalRepo.getActiveGoals() } returns
+                flowOf(listOf(Goal(id = 999, name = "Active Goal", targetAmount = 500.0, accountId = 1, targetDate = null)))
+            every { mockGoalRepo.getAllGoalsWithAccountName() } returns flowOf(emptyList())
+            ServiceLocator.setGoalRepository(mockGoalRepo)
+
+            val worker = SummaryWorkerTestFixtures.createWorker<GoalSurplusWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            assertTrue("Notification should still be sent even if topGoal is null", getPostedNotifications().isNotEmpty())
+            verify(exactly = 1) {
+                workScheduler.scheduleGoalSurplusWorker(
+                    forceNextMonth = true,
+                    policy = ExistingWorkPolicy.REPLACE,
+                )
             }
         }
 }

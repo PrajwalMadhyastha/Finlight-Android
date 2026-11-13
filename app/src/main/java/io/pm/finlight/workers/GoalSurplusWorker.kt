@@ -33,7 +33,6 @@ class GoalSurplusWorker(
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(applicationContext)
         return withContext(dispatcherProvider.io) {
             val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
-            val featureSettingsRepository = ServiceLocator.provideFeatureSettingsRepository(applicationContext)
             val transactionRepository = ServiceLocator.provideTransactionRepository(applicationContext)
             val goalRepository = ServiceLocator.provideGoalRepository(applicationContext)
             val workScheduler = ServiceLocator.provideWorkScheduler(applicationContext)
@@ -51,7 +50,7 @@ class GoalSurplusWorker(
                         Log.d(TAG, "Surplus checks skipped (nudges=$isNudgesEnabled, budget=$budget)")
                         Result.success()
                     } else {
-                        val lastPrompt = featureSettingsRepository.getLastSurplusPrompt().first()
+                        val lastPrompt = settingsRepository.getLastSurplusPrompt().first()
                         if (lastPrompt != Pair(prevYear, prevMonth)) {
                             cal.set(Calendar.DAY_OF_MONTH, 1)
                             cal.set(Calendar.HOUR_OF_DAY, 0)
@@ -87,7 +86,7 @@ class GoalSurplusWorker(
                                 Log.d(TAG, "No surplus found")
                             }
 
-                            featureSettingsRepository.saveLastSurplusPrompt(prevYear, prevMonth)
+                            settingsRepository.saveLastSurplusPrompt(prevYear, prevMonth)
                         }
                         Result.success()
                     }
