@@ -74,6 +74,28 @@ class SettingsRepositoryTest {
             assertEquals(true, result)
         }
 
+    @Test
+    fun `getNotifiedPatternSignatures delegates to featureSettingsRepository`() =
+        runTest {
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns setOf("sig_1", "sig_2")
+            val result = repository.getNotifiedPatternSignatures()
+            assertEquals(setOf("sig_1", "sig_2"), result)
+        }
+
+    @Test
+    fun `markPatternNotified delegates to featureSettingsRepository`() =
+        runTest {
+            repository.markPatternNotified("sig_1")
+            coVerify(exactly = 1) { featureSettingsRepository.markPatternNotified("sig_1") }
+        }
+
+    @Test
+    fun `clearNotifiedPatternSignatures delegates to featureSettingsRepository`() =
+        runTest {
+            repository.clearNotifiedPatternSignatures()
+            coVerify(exactly = 1) { featureSettingsRepository.clearNotifiedPatternSignatures() }
+        }
+
     // --- Savings Goals Settings ---
 
     @Test
@@ -104,6 +126,21 @@ class SettingsRepositoryTest {
             every { featureSettingsRepository.getGoalNudgesEnabled() } returns flowOf(true)
             val result = repository.getGoalNudgesEnabled().first()
             assertEquals(true, result)
+        }
+
+    @Test
+    fun `saveLastSurplusPrompt delegates to featureSettingsRepository`() =
+        runTest {
+            repository.saveLastSurplusPrompt(2026, 11)
+            coVerify(exactly = 1) { featureSettingsRepository.saveLastSurplusPrompt(2026, 11) }
+        }
+
+    @Test
+    fun `getLastSurplusPrompt delegates to featureSettingsRepository`() =
+        runTest {
+            every { featureSettingsRepository.getLastSurplusPrompt() } returns flowOf(Pair(2026, 11))
+            val result = repository.getLastSurplusPrompt().first()
+            assertEquals(Pair(2026, 11), result)
         }
 
     // --- Outlier Month Management Functions ---

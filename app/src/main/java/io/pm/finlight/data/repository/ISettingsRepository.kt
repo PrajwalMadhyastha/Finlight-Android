@@ -9,6 +9,12 @@ interface ISettingsRepository {
 
     fun getRecurringTransactionsEnabled(): Flow<Boolean>
 
+    suspend fun getNotifiedPatternSignatures(): Set<String>
+
+    suspend fun markPatternNotified(signature: String)
+
+    suspend fun clearNotifiedPatternSignatures()
+
     // --- Savings Goals Settings ---
     suspend fun saveGoalIncomeThreshold(amount: Int)
 
@@ -17,6 +23,13 @@ interface ISettingsRepository {
     suspend fun saveGoalNudgesEnabled(isEnabled: Boolean)
 
     fun getGoalNudgesEnabled(): Flow<Boolean>
+
+    suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int,
+    )
+
+    fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?>
 
     // --- Outlier Month Management Functions ---
     fun getExcludedIncomeMonths(): Flow<Set<String>>

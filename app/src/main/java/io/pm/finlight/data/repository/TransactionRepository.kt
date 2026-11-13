@@ -41,8 +41,11 @@ class TransactionRepository(
             db = db,
             dispatcherProvider = dispatcherProvider,
         ),
-    private val deletedSmsHashDao: DeletedSmsHashDao = db.deletedSmsHashDao(),
+    private val deletedSmsHashDao: DeletedSmsHashDao? = null,
 ) : ITransactionRepository {
+    private val resolvedDeletedSmsHashDao: DeletedSmsHashDao
+        get() = deletedSmsHashDao ?: db.deletedSmsHashDao()
+
     @Deprecated("Use domain DAO constructor", level = DeprecationLevel.WARNING)
     constructor(
         transactionDao: TransactionDao,
@@ -378,11 +381,11 @@ class TransactionRepository(
     }
 
     override suspend fun existsDeletedSmsHash(hash: String): Boolean {
-        return deletedSmsHashDao.existsByHash(hash)
+        return resolvedDeletedSmsHashDao.existsByHash(hash)
     }
 
     override suspend fun insertDeletedSmsHash(hash: String) {
-        deletedSmsHashDao.insert(DeletedSmsHash(hash))
+        resolvedDeletedSmsHashDao.insert(DeletedSmsHash(hash))
     }
 
     override suspend fun getSmsHashesByIds(transactionIds: List<Int>): List<String> {
@@ -390,7 +393,7 @@ class TransactionRepository(
     }
 
     override suspend fun getAllDeletedSmsHashes(): List<String> {
-        return deletedSmsHashDao.getAllHashes()
+        return resolvedDeletedSmsHashDao.getAllHashes()
     }
 
     override fun getTransactionCountForMerchant(description: String): Flow<Int> {
@@ -659,4 +662,38 @@ class TransactionRepository(
     ): Flow<List<TransactionDetails>> {
         return transactionAnalyticsDao.getTransactionsForMerchantName(merchantName, startDate, endDate)
     }
+
+    override suspend fun hasExecutedTransactionForRuleSince(
+        ruleId: Int,
+        cycleStartEpochMs: Long,
+    ): Boolean =
+        transactionQueryDao.hasExecutedTransactionForRuleSince(ruleId, cycleStartEpochMs)
+
+    override suspend fun getPendingTransactionForRule(ruleId: Int): Transaction? =
+        transactionQueryDao.getPendingTransactionForRule(ruleId)
+
+    override suspend fun insertTransaction(transaction: Transaction): Long =
+        transactionWriteDao.insert(transaction)
+
+    override suspend fun updateRecurringRuleId(
+        transactionId: Int,
+        ruleId: Int,
+    ) {
+        transactionWriteDao.updateRecurringRuleId(transactionId, ruleId)
+    }
+
+    override suspend fun getPendingTransactions(): List<Transaction> =
+        transactionQueryDao.getPendingTransactionsSync()
+
+    override suspend fun getAverageDailySpendingForRange(
+        startDate: Long,
+        endDate: Long,
+    ): Double? =
+        transactionAnalyticsDao.getAverageDailySpendingForRange(startDate, endDate)
+
+    override suspend fun getTransactionsWithSignatureSince(sinceDate: Long): List<Transaction> =
+        transactionQueryDao.getTransactionsWithSignatureSince(sinceDate)
+
+    override suspend fun getTransactionsBySignature(signature: String): List<Transaction> =
+        transactionQueryDao.getTransactionsBySignature(signature)
 }
