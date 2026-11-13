@@ -9,6 +9,12 @@ interface ISettingsRepository {
 
     fun getRecurringTransactionsEnabled(): Flow<Boolean>
 
+    suspend fun getNotifiedPatternSignatures(): Set<String>
+
+    suspend fun markPatternNotified(signature: String)
+
+    suspend fun clearNotifiedPatternSignatures()
+
     // --- Savings Goals Settings ---
     suspend fun saveGoalIncomeThreshold(amount: Int)
 

@@ -1,142 +1,84 @@
 // =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/RecurringPatternWorker.kt
-// REASON: FIX - Added check for `recurring_transactions_enabled` preference.
-// If disabled, the worker reschedules itself and returns success immediately,
-// preventing analysis and notifications.
+// FILE: ./app/src/main/java/io/pm/finlight/workers/RecurringPatternWorker.kt
+// REASON: REFACTOR (Issue #391) - Eliminates eager DAO initializers, delegates pattern
+// analysis to AnalyzeRecurringPatternsUseCase, guards notifications against duplicate
+// spam via DataStore cache, suppresses active rules, evaluates try without bare returns,
+// and reschedules via IWorkScheduler on non-retry termination preserving exponential backoff.
 // =================================================================================
 package io.pm.finlight
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
-import java.util.concurrent.TimeUnit
-import kotlin.math.abs
+
+private const val TAG = "RecurringPatternWorker"
 
 class RecurringPatternWorker(
-    private val context: Context,
+    context: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams) {
-    private val transactionQueryDao = AppDatabase.getInstance(context).transactionQueryDao()
-    private val patternDao = AppDatabase.getInstance(context).recurringPatternDao()
-    private val recurringTransactionDao = AppDatabase.getInstance(context).recurringTransactionDao()
-
-    companion object {
-        // The time window to look back for transactions to analyze. 90 days is a good balance.
-        private val ANALYSIS_WINDOW_DAYS = 90L
-
-        // The minimum number of times a transaction must occur to be considered a pattern.
-        private const val MIN_OCCURRENCES_FOR_PATTERN = 3
-
-        // The tolerance for interval matching (in days).
-        private const val WEEKLY_TOLERANCE_DAYS = 1
-        private const val MONTHLY_TOLERANCE_DAYS = 3
-    }
-
     override suspend fun doWork(): Result {
-        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(applicationContext)
         return withContext(dispatcherProvider.io) {
-            try {
-                // FIX: Check if the feature is enabled before proceeding
-                val settingsRepo = ServiceLocator.provideSettingsRepository(context)
-                val isEnabled = settingsRepo.getRecurringTransactionsEnabled().first()
+            val workScheduler = ServiceLocator.provideWorkScheduler(applicationContext)
+            val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
+            val recurringTransactionRepository =
+                ServiceLocator.provideRecurringTransactionRepository(applicationContext)
+            val featureSettingsRepository =
+                ServiceLocator.provideFeatureSettingsRepository(applicationContext)
 
-                if (!isEnabled) {
-                    Log.d("RecurringPatternWorker", "Feature disabled. Rescheduling and exiting.")
-                    // Important: We must still reschedule the worker, otherwise it will stop running forever.
-                    // If the user re-enables the feature later, we want the worker to be alive to catch it.
-                    ReminderManager.scheduleRecurringPatternWorker(context)
-                    return@withContext Result.success()
-                }
-
-                // 1. Fetch recent transactions that have an SMS signature.
-                val recentTransactions =
-                    transactionQueryDao.getTransactionsWithSignatureSince(
-                        System.currentTimeMillis() - TimeUnit.DAYS.toMillis(ANALYSIS_WINDOW_DAYS),
-                    )
-
-                // 2. Update the pattern database with these transactions.
-                for (transaction in recentTransactions) {
-                    val signature = transaction.smsSignature ?: continue
-                    val existingPattern = patternDao.getPatternBySignature(signature)
-
-                    if (existingPattern == null) {
-                        // First time seeing this signature, create a new pattern entry.
-                        patternDao.insert(
-                            RecurringPattern(
-                                smsSignature = signature,
-                                description = transaction.description,
-                                amount = transaction.amount,
-                                transactionType = transaction.transactionType,
-                                accountId = transaction.accountId,
-                                categoryId = transaction.categoryId,
-                                occurrences = 1,
-                                firstSeen = transaction.date,
-                                lastSeen = transaction.date,
-                            ),
-                        )
+            val isFinalAttempt = runAttemptCount >= 2
+            val result =
+                try {
+                    val isEnabled = settingsRepository.getRecurringTransactionsEnabled().first()
+                    if (!isEnabled) {
+                        Log.d(TAG, "Feature disabled. Halting pattern work chain.")
+                        Result.success()
                     } else {
-                        // We've seen this before, update the existing pattern.
-                        existingPattern.occurrences += 1
-                        existingPattern.lastSeen = transaction.date
-                        patternDao.update(existingPattern)
+                        val useCase =
+                            ServiceLocator.provideAnalyzeRecurringPatternsUseCase(applicationContext)
+                        val currentTimeMillis = System.currentTimeMillis()
+                        val detectedPatterns = useCase(currentTimeMillis)
+                        val activeRules = recurringTransactionRepository.getAllRulesList()
+                        val notifiedSignatures = featureSettingsRepository.getNotifiedPatternSignatures()
+
+                        for (pattern in detectedPatterns) {
+                            if (pattern.isDismissed) continue
+                            val hasActiveRule =
+                                activeRules.any { rule ->
+                                    rule.description.equals(pattern.description, ignoreCase = true) &&
+                                        rule.accountId == pattern.accountId
+                                }
+                            if (hasActiveRule) continue
+
+                            if (pattern.smsSignature !in notifiedSignatures) {
+                                NotificationHelper.showRecurringPatternDetectedNotification(
+                                    applicationContext,
+                                    pattern,
+                                )
+                                featureSettingsRepository.markPatternNotified(pattern.smsSignature)
+                            }
+                        }
+                        Result.success()
                     }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Pattern analysis failed on attempt $runAttemptCount", e)
+                    if (isFinalAttempt) Result.failure() else Result.retry()
                 }
 
-                // 3. Analyze all patterns that have occurred enough times.
-                val allPatterns = patternDao.getAllPatterns()
-                for (pattern in allPatterns) {
-                    if (pattern.occurrences >= MIN_OCCURRENCES_FOR_PATTERN) {
-                        analyzeAndCreateRuleIfNeeded(pattern)
-                    }
-                }
-
-                // 4. Reschedule the worker for the next run.
-                ReminderManager.scheduleRecurringPatternWorker(context)
-                Result.success()
-            } catch (e: Exception) {
-                Log.e("RecurringPatternWorker", "Worker failed", e)
-                Result.retry()
+            if (result != Result.retry()) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
             }
+            result
         }
-    }
-
-    private suspend fun analyzeAndCreateRuleIfNeeded(pattern: RecurringPattern) {
-        val transactions = transactionQueryDao.getTransactionsBySignature(pattern.smsSignature)
-        if (transactions.size < MIN_OCCURRENCES_FOR_PATTERN) return
-
-        val timestamps = transactions.map { it.date }.sorted()
-        val intervals = timestamps.zipWithNext { a, b -> TimeUnit.MILLISECONDS.toDays(b - a) }
-
-        // Check for weekly pattern
-        val isWeekly = intervals.all { abs(it - 7) <= WEEKLY_TOLERANCE_DAYS }
-        if (isWeekly) {
-            createRuleAndNotify(pattern, "Weekly")
-            return
-        }
-
-        // Check for monthly pattern
-        val isMonthly = intervals.all { abs(it - 30) <= MONTHLY_TOLERANCE_DAYS }
-        if (isMonthly) {
-            createRuleAndNotify(pattern, "Monthly")
-            return
-        }
-    }
-
-    private suspend fun createRuleAndNotify(
-        pattern: RecurringPattern,
-        interval: String,
-    ) {
-        // Notify the user about the pattern suggestion
-        NotificationHelper.showRecurringPatternDetectedNotification(context, pattern)
-
-        // We do NOT create a RecurringTransaction or delete the pattern.
-        // The dashboard will show this pattern since isDismissed is false by default.
     }
 }

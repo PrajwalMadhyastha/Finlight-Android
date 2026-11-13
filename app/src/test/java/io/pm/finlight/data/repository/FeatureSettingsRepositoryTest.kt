@@ -116,6 +116,7 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertTrue(repo.getGoalNudgesEnabled().first())
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
+            assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
         }
 
     @Test
@@ -130,5 +131,18 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertTrue(repo.getGoalNudgesEnabled().first())
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
+            assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
+        }
+
+    @Test
+    fun `mark, get and clear notified pattern signatures`() =
+        runTest {
+            assertEquals(emptySet(), repository.getNotifiedPatternSignatures())
+            repository.markPatternNotified("sig_1")
+            assertEquals(setOf("sig_1"), repository.getNotifiedPatternSignatures())
+            repository.markPatternNotified("sig_2")
+            assertEquals(setOf("sig_1", "sig_2"), repository.getNotifiedPatternSignatures())
+            repository.clearNotifiedPatternSignatures()
+            assertEquals(emptySet(), repository.getNotifiedPatternSignatures())
         }
 }
