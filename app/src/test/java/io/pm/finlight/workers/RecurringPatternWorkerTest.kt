@@ -3,65 +3,76 @@ package io.pm.finlight.workers
 import android.content.Context
 import android.os.Build
 import android.util.Log
-import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.work.Configuration
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
 import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
-import io.mockk.*
-import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionQueryDao
-import io.pm.finlight.data.financeSettingsDataStore
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.unmockkAll
+import io.mockk.verify
+import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.IFeatureSettingsRepository
+import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.RecurringPattern
+import io.pm.finlight.RecurringPatternWorker
+import io.pm.finlight.RecurringTransaction
+import io.pm.finlight.TestApplication
+import io.pm.finlight.TransactionType
+import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.domain.usecase.AnalyzeRecurringPatternsUseCase
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.TestDispatcherProvider
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
-import java.util.concurrent.TimeUnit
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class RecurringPatternWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
-    private lateinit var db: AppDatabase
-    private lateinit var transactionQueryDao: TransactionQueryDao
-    private lateinit var patternDao: RecurringPatternDao
-    private lateinit var recurringTransactionDao: RecurringTransactionDao
+    private lateinit var workScheduler: IWorkScheduler
+    private lateinit var settingsRepository: ISettingsRepository
+    private lateinit var recurringTransactionRepository: IRecurringTransactionRepository
+    private lateinit var featureSettingsRepository: IFeatureSettingsRepository
+    private lateinit var useCase: AnalyzeRecurringPatternsUseCase
 
     @Before
     override fun setup() {
         super.setup()
         context = ApplicationProvider.getApplicationContext()
 
-        // Enable the recurring transaction feature for tests
-        runBlocking {
-            context.financeSettingsDataStore.edit { it.clear() }
-            io.pm.finlight.di.ServiceLocator.reset()
-            val settingsRepo = io.pm.finlight.di.ServiceLocator.provideSettingsRepository(context)
-            settingsRepo.saveRecurringTransactionsEnabled(true)
-        }
+        workScheduler = mockk(relaxed = true)
+        settingsRepository = mockk(relaxed = true)
+        recurringTransactionRepository = mockk(relaxed = true)
+        featureSettingsRepository = mockk(relaxed = true)
+        useCase = mockk(relaxed = true)
 
-        db = mockk()
-        transactionQueryDao = mockk()
-        patternDao = mockk()
-        recurringTransactionDao = mockk()
-
-        mockkObject(AppDatabase)
-        every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionQueryDao() } returns transactionQueryDao
-        every { db.recurringPatternDao() } returns patternDao
-        every { db.recurringTransactionDao() } returns recurringTransactionDao
+        ServiceLocator.setWorkScheduler(workScheduler)
+        ServiceLocator.setSettingsRepository(settingsRepository)
+        ServiceLocator.setRecurringTransactionRepository(recurringTransactionRepository)
+        ServiceLocator.setFeatureSettingsRepository(featureSettingsRepository)
+        ServiceLocator.setAnalyzeRecurringPatternsUseCase(useCase)
+        ServiceLocator.setDispatcherProvider(TestDispatcherProvider(testDispatcher))
 
         val config =
             Configuration.Builder()
@@ -71,122 +82,220 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
         mockkObject(NotificationHelper)
-        mockkObject(ReminderManager)
-        every { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) } just runs
-        coEvery { ReminderManager.scheduleRecurringPatternWorker(any()) } returns Unit
+        every { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) } returns Unit
     }
 
     @After
     override fun tearDown() {
-        io.pm.finlight.di.ServiceLocator.reset()
+        ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
 
+    private fun createPatternFixture(
+        signature: String = "sig_spotify",
+        description: String = "Spotify",
+        amount: Double = 119.0,
+        accountId: Int = 1,
+        isDismissed: Boolean = false,
+    ): RecurringPattern =
+        RecurringPattern(
+            smsSignature = signature,
+            description = description,
+            amount = amount,
+            transactionType = TransactionType.EXPENSE,
+            accountId = accountId,
+            categoryId = 2,
+            occurrences = 4,
+            firstSeen = 1_000_000L,
+            lastSeen = 2_000_000L,
+            isDismissed = isDismissed,
+        )
+
+    private fun createRuleFixture(
+        id: Int = 1,
+        description: String = "Spotify",
+        accountId: Int = 1,
+    ): RecurringTransaction =
+        RecurringTransaction(
+            id = id,
+            description = description,
+            amount = 119.0,
+            transactionType = TransactionType.EXPENSE,
+            recurrenceInterval = "Monthly",
+            startDate = 1_000_000L,
+            accountId = accountId,
+            categoryId = 2,
+            autoApprove = false,
+        )
+
     @Test
-    fun `doWork inserts new pattern when signed transaction is processed`() =
+    fun `worker construction does not eagerly initialize database or DAOs`() {
+        val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+        assertNotNull(worker)
+    }
+
+    @Test
+    fun `doWork when feature is disabled halts work chain, reschedules, and returns success`() =
         runTest {
-            val signature = "new_pattern_sig"
-            val now = System.currentTimeMillis()
-            val txn =
-                Transaction(
-                    id = 10,
-                    smsSignature = signature,
-                    date = now,
-                    description = "Spotify",
-                    amount = 119.0,
-                    transactionType = TransactionType.EXPENSE,
-                    accountId = 1,
-                    categoryId = 2,
-                    notes = null,
-                )
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(false)
 
-            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } returns listOf(txn)
-            coEvery { patternDao.getPatternBySignature(signature) } returns null
-            val patternCaptor = slot<RecurringPattern>()
-            coEvery { patternDao.insert(capture(patternCaptor)) } just runs
-            coEvery { patternDao.getAllPatterns() } returns emptyList()
-
-            val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            assertEquals(TransactionType.EXPENSE, patternCaptor.captured.transactionType)
-            assertEquals("Spotify", patternCaptor.captured.description)
-            assertEquals(119.0, patternCaptor.captured.amount, 0.0)
-            assertEquals(1, patternCaptor.captured.occurrences)
+            coVerify(exactly = 0) { useCase(any()) }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
         }
 
     @Test
-    fun `doWork correctly detects monthly pattern and notifies user`() =
+    fun `doWork when feature is enabled notifies unnotified patterns and updates cache`() =
         runTest {
-            // Arrange
-            val signature = "monthly_sig"
-            val pattern = RecurringPattern(signature, "Netflix", 149.0, TransactionType.EXPENSE, 1, 1, 4, 0L, 0L)
-            val transactions =
-                listOf(
-                    Transaction(
-                        id = 1,
-                        smsSignature = signature,
-                        date = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(90),
-                        description = "",
-                        amount = 0.0,
-                        accountId = 0,
-                        categoryId = 0,
-                        notes = null,
-                    ),
-                    Transaction(
-                        id = 2,
-                        smsSignature = signature,
-                        date = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(60),
-                        description = "",
-                        amount = 0.0,
-                        accountId = 0,
-                        categoryId = 0,
-                        notes = null,
-                    ),
-                    Transaction(
-                        id = 3,
-                        smsSignature = signature,
-                        date = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(30),
-                        description = "",
-                        amount = 0.0,
-                        accountId = 0,
-                        categoryId = 0,
-                        notes = null,
-                    ),
-                )
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val pattern = createPatternFixture(signature = "sig_spotify", description = "Spotify", accountId = 1)
+            coEvery { useCase(any()) } returns listOf(pattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns emptyList()
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns emptySet()
 
-            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } returns emptyList()
-            coEvery { patternDao.getAllPatterns() } returns listOf(pattern)
-            coEvery { transactionQueryDao.getTransactionsBySignature(signature) } returns transactions
-            coEvery { recurringTransactionDao.insert(any()) } returns 1L
-            coEvery { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) } just runs
-            coEvery { patternDao.deleteBySignature(signature) } just runs
-
-            val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
-
-            // Act
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
             val result = worker.doWork()
 
-            // Assert
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) }
-            coVerify { ReminderManager.scheduleRecurringPatternWorker(context) }
+            verify(exactly = 1) { NotificationHelper.showRecurringPatternDetectedNotification(any(), pattern) }
+            coVerify(exactly = 1) { featureSettingsRepository.markPatternNotified("sig_spotify") }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
         }
 
     @Test
-    fun `doWork returns retry on failure`() =
+    fun `doWork suppresses notifications for dismissed patterns`() =
         runTest {
-            // Arrange
-            coEvery { transactionQueryDao.getTransactionsWithSignatureSince(any()) } throws RuntimeException("DB Error")
-            val worker = TestListenableWorkerBuilder<RecurringPatternWorker>(context).build()
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val dismissedPattern = createPatternFixture(signature = "sig_dismissed", isDismissed = true)
+            coEvery { useCase(any()) } returns listOf(dismissedPattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns emptyList()
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns emptySet()
 
-            // Act
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
             val result = worker.doWork()
 
-            // Assert
-            assertEquals(ListenableWorker.Result.retry(), result)
-            coVerify(exactly = 0) { ReminderManager.scheduleRecurringPatternWorker(any()) }
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) }
+            coVerify(exactly = 0) { featureSettingsRepository.markPatternNotified(any()) }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
+    fun `doWork suppresses notification when active rule matches by description and account ID`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val pattern = createPatternFixture(signature = "sig_matched", description = "Netflix", accountId = 2)
+            val activeRule = createRuleFixture(id = 10, description = "netflix", accountId = 2)
+            coEvery { useCase(any()) } returns listOf(pattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns listOf(activeRule)
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns emptySet()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) }
+            coVerify(exactly = 0) { featureSettingsRepository.markPatternNotified(any()) }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
+    fun `doWork notifies when active rule description matches but account ID differs`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val pattern = createPatternFixture(signature = "sig_diff_acc", description = "Netflix", accountId = 1)
+            val activeRule = createRuleFixture(id = 11, description = "Netflix", accountId = 2)
+            coEvery { useCase(any()) } returns listOf(pattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns listOf(activeRule)
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns emptySet()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 1) { NotificationHelper.showRecurringPatternDetectedNotification(any(), pattern) }
+            coVerify(exactly = 1) { featureSettingsRepository.markPatternNotified("sig_diff_acc") }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
+    fun `doWork suppresses notification when signature is already in notified cache`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val pattern = createPatternFixture(signature = "sig_cached", description = "Prime")
+            coEvery { useCase(any()) } returns listOf(pattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns emptyList()
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns setOf("sig_cached")
+
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) { NotificationHelper.showRecurringPatternDetectedNotification(any(), any()) }
+            coVerify(exactly = 0) { featureSettingsRepository.markPatternNotified(any()) }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
+    fun `doWork on attempt 0 or 1 failure returns retry without rescheduling`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            coEvery { useCase(any()) } throws RuntimeException("Use case failure")
+
+            for (attempt in 0..1) {
+                val worker =
+                    SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context, runAttemptCount = attempt)
+                val result = worker.doWork()
+                assertEquals(ListenableWorker.Result.retry(), result)
+            }
+            verify(exactly = 0) { workScheduler.scheduleRecurringPatternWorker(any()) }
+        }
+
+    @Test
+    fun `doWork on final attempt 2 returns failure and reschedules`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            coEvery { useCase(any()) } throws RuntimeException("Use case failure")
+
+            val worker =
+                SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context, runAttemptCount = 2)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
+    fun `doWork rethrows CancellationException cleanly without swallowing`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            coEvery { useCase(any()) } throws CancellationException("Worker cancelled")
+
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+
+            assertThrows(CancellationException::class.java) {
+                runBlocking {
+                    worker.doWork()
+                }
+            }
+            verify(exactly = 0) { workScheduler.scheduleRecurringPatternWorker(any()) }
         }
 }

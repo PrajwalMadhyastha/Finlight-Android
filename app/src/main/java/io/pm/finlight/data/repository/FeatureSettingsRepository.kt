@@ -11,6 +11,7 @@ import io.pm.finlight.data.financeSettingsDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 class FeatureSettingsRepository(
@@ -26,6 +27,7 @@ class FeatureSettingsRepository(
         private val KEY_EXCLUDED_EXPENSE_MONTHS = stringSetPreferencesKey("excluded_expense_months")
         private val KEY_GOAL_INCOME_THRESHOLD = intPreferencesKey("goal_income_threshold")
         private val KEY_GOAL_NUDGES_ENABLED = booleanPreferencesKey("goal_nudges_enabled")
+        private val KEY_NOTIFIED_PATTERN_SIGNATURES = stringSetPreferencesKey("notified_pattern_signatures")
     }
 
     override suspend fun saveRecurringTransactionsEnabled(isEnabled: Boolean) {
@@ -101,6 +103,28 @@ class FeatureSettingsRepository(
 
     override suspend fun toggleExpenseMonthExclusion(monthKey: String) {
         toggleInSet(KEY_EXCLUDED_EXPENSE_MONTHS, monthKey)
+    }
+
+    override suspend fun getNotifiedPatternSignatures(): Set<String> {
+        return try {
+            val preferences = dataStore.data.first()
+            preferences[KEY_NOTIFIED_PATTERN_SIGNATURES] ?: emptySet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    override suspend fun markPatternNotified(signature: String) {
+        dataStore.edit { preferences ->
+            val current = preferences[KEY_NOTIFIED_PATTERN_SIGNATURES] ?: emptySet()
+            preferences[KEY_NOTIFIED_PATTERN_SIGNATURES] = current + signature
+        }
+    }
+
+    override suspend fun clearNotifiedPatternSignatures() {
+        dataStore.edit { preferences ->
+            preferences.remove(KEY_NOTIFIED_PATTERN_SIGNATURES)
+        }
     }
 
     private fun getSetFlow(key: Preferences.Key<Set<String>>): Flow<Set<String>> {

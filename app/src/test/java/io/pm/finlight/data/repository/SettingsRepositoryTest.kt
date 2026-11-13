@@ -74,6 +74,28 @@ class SettingsRepositoryTest {
             assertEquals(true, result)
         }
 
+    @Test
+    fun `getNotifiedPatternSignatures delegates to featureSettingsRepository`() =
+        runTest {
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns setOf("sig_1", "sig_2")
+            val result = repository.getNotifiedPatternSignatures()
+            assertEquals(setOf("sig_1", "sig_2"), result)
+        }
+
+    @Test
+    fun `markPatternNotified delegates to featureSettingsRepository`() =
+        runTest {
+            repository.markPatternNotified("sig_1")
+            coVerify(exactly = 1) { featureSettingsRepository.markPatternNotified("sig_1") }
+        }
+
+    @Test
+    fun `clearNotifiedPatternSignatures delegates to featureSettingsRepository`() =
+        runTest {
+            repository.clearNotifiedPatternSignatures()
+            coVerify(exactly = 1) { featureSettingsRepository.clearNotifiedPatternSignatures() }
+        }
+
     // --- Savings Goals Settings ---
 
     @Test

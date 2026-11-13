@@ -22,4 +22,10 @@ interface IFeatureSettingsRepository {
     suspend fun toggleIncomeMonthExclusion(monthKey: String)
 
     suspend fun toggleExpenseMonthExclusion(monthKey: String)
+
+    suspend fun getNotifiedPatternSignatures(): Set<String>
+
+    suspend fun markPatternNotified(signature: String)
+
+    suspend fun clearNotifiedPatternSignatures()
 }
