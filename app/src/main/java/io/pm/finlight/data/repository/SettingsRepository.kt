@@ -67,6 +67,14 @@ class SettingsRepository(
     override fun getGoalNudgesEnabled(): Flow<Boolean> =
         featureSettingsRepository.getGoalNudgesEnabled()
 
+    override suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int,
+    ) = featureSettingsRepository.saveLastSurplusPrompt(year, month)
+
+    override fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?> =
+        featureSettingsRepository.getLastSurplusPrompt()
+
     // --- Outlier Month Management Functions ---
 
     override fun getExcludedIncomeMonths(): Flow<Set<String>> =

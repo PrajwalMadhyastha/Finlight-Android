@@ -128,6 +128,21 @@ class SettingsRepositoryTest {
             assertEquals(true, result)
         }
 
+    @Test
+    fun `saveLastSurplusPrompt delegates to featureSettingsRepository`() =
+        runTest {
+            repository.saveLastSurplusPrompt(2026, 11)
+            coVerify(exactly = 1) { featureSettingsRepository.saveLastSurplusPrompt(2026, 11) }
+        }
+
+    @Test
+    fun `getLastSurplusPrompt delegates to featureSettingsRepository`() =
+        runTest {
+            every { featureSettingsRepository.getLastSurplusPrompt() } returns flowOf(Pair(2026, 11))
+            val result = repository.getLastSurplusPrompt().first()
+            assertEquals(Pair(2026, 11), result)
+        }
+
     // --- Outlier Month Management Functions ---
 
     @Test

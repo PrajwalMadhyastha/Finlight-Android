@@ -117,6 +117,7 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
             assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
+            assertEquals(null, repo.getLastSurplusPrompt().first())
         }
 
     @Test
@@ -132,6 +133,7 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
             assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
+            assertEquals(null, repo.getLastSurplusPrompt().first())
         }
 
     @Test
@@ -144,5 +146,16 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertEquals(setOf("sig_1", "sig_2"), repository.getNotifiedPatternSignatures())
             repository.clearNotifiedPatternSignatures()
             assertEquals(emptySet(), repository.getNotifiedPatternSignatures())
+        }
+
+    @Test
+    fun `save and get last surplus prompt`() =
+        runTest {
+            repository.getLastSurplusPrompt().test {
+                assertEquals(null, awaitItem())
+                repository.saveLastSurplusPrompt(2026, 11)
+                assertEquals(Pair(2026, 11), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 }

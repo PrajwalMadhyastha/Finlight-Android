@@ -15,6 +15,13 @@ interface IFeatureSettingsRepository {
 
     fun getGoalNudgesEnabled(): Flow<Boolean>
 
+    suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int
+    )
+
+    fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?>
+
     fun getExcludedIncomeMonths(): Flow<Set<String>>
 
     fun getExcludedExpenseMonths(): Flow<Set<String>>

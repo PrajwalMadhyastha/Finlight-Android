@@ -27,6 +27,8 @@ class FeatureSettingsRepository(
         private val KEY_EXCLUDED_EXPENSE_MONTHS = stringSetPreferencesKey("excluded_expense_months")
         private val KEY_GOAL_INCOME_THRESHOLD = intPreferencesKey("goal_income_threshold")
         private val KEY_GOAL_NUDGES_ENABLED = booleanPreferencesKey("goal_nudges_enabled")
+        private val KEY_LAST_SURPLUS_PROMPT_YEAR = intPreferencesKey("last_surplus_prompt_year")
+        private val KEY_LAST_SURPLUS_PROMPT_MONTH = intPreferencesKey("last_surplus_prompt_month")
         private val KEY_NOTIFIED_PATTERN_SIGNATURES = stringSetPreferencesKey("notified_pattern_signatures")
     }
 
@@ -89,6 +91,37 @@ class FeatureSettingsRepository(
             }
             .catch {
                 emit(true)
+            }
+            .distinctUntilChanged()
+    }
+
+    override suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int,
+    ) {
+        dataStore.edit { preferences ->
+            preferences[KEY_LAST_SURPLUS_PROMPT_YEAR] = year
+            preferences[KEY_LAST_SURPLUS_PROMPT_MONTH] = month
+        }
+    }
+
+    override fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?> {
+        return dataStore.data
+            .map { preferences ->
+                try {
+                    val year = preferences[KEY_LAST_SURPLUS_PROMPT_YEAR]
+                    val month = preferences[KEY_LAST_SURPLUS_PROMPT_MONTH]
+                    if (year != null && month != null) {
+                        Pair(year, month)
+                    } else {
+                        null
+                    }
+                } catch (_: ClassCastException) {
+                    null
+                }
+            }
+            .catch {
+                emit(null)
             }
             .distinctUntilChanged()
     }

@@ -3,87 +3,108 @@
 // REASON: FEATURE (Issue #104) - Smart Allocation Prompts
 // A monthly worker that checks for budget surplus from the previous month
 // and sends a nudge to allocate it to active savings goals.
+//
+// REFACTOR (Issue #392): Zero-DAO migration, Safe non-retry rescheduling expression,
+// and safe surplus prompt idempotency tracking via IFeatureSettingsRepository/ISettingsRepository.
 // =================================================================================
 package io.pm.finlight.workers
 
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.WorkerParameters
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.Goal
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.withContext
 import java.util.Calendar
+
+private const val TAG = "GoalSurplusWorker"
 
 class GoalSurplusWorker(
     appContext: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        val logTag = "GoalSurplusWorker"
-        Log.d(logTag, "Starting GoalSurplusWorker")
+        val dispatcherProvider = ServiceLocator.provideDispatcherProvider(applicationContext)
+        return withContext(dispatcherProvider.io) {
+            val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
+            val featureSettingsRepository = ServiceLocator.provideFeatureSettingsRepository(applicationContext)
+            val transactionRepository = ServiceLocator.provideTransactionRepository(applicationContext)
+            val goalRepository = ServiceLocator.provideGoalRepository(applicationContext)
+            val workScheduler = ServiceLocator.provideWorkScheduler(applicationContext)
 
-        val settingsRepository = ServiceLocator.provideSettingsRepository(applicationContext)
+            val cal = Calendar.getInstance().apply { add(Calendar.MONTH, -1) }
+            val prevYear = cal.get(Calendar.YEAR)
+            val prevMonth = cal.get(Calendar.MONTH) + 1 // 1-indexed for budget storage
 
-        // 1. Check if feature is enabled
-        val isNudgesEnabled = settingsRepository.getGoalNudgesEnabled().first()
-        if (!isNudgesEnabled) {
-            Log.d(logTag, "Goal nudges disabled, skipping surplus check")
-            return Result.success()
-        }
+            val isFinalAttempt = runAttemptCount >= 2
+            val result =
+                try {
+                    val isNudgesEnabled = settingsRepository.getGoalNudgesEnabled().first()
+                    val budget = settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth).first() ?: 0f
+                    if (!isNudgesEnabled || budget <= 0f) {
+                        Log.d(TAG, "Surplus checks skipped (nudges=$isNudgesEnabled, budget=$budget)")
+                        Result.success()
+                    } else {
+                        val lastPrompt = featureSettingsRepository.getLastSurplusPrompt().first()
+                        if (lastPrompt != Pair(prevYear, prevMonth)) {
+                            cal.set(Calendar.DAY_OF_MONTH, 1)
+                            cal.set(Calendar.HOUR_OF_DAY, 0)
+                            cal.set(Calendar.MINUTE, 0)
+                            cal.set(Calendar.SECOND, 0)
+                            cal.set(Calendar.MILLISECOND, 0)
+                            val startTime = cal.timeInMillis
 
-        // 2. Compute previous month
-        val cal = Calendar.getInstance()
-        cal.add(Calendar.MONTH, -1)
-        val prevYear = cal.get(Calendar.YEAR)
-        val prevMonth = cal.get(Calendar.MONTH) + 1 // 1-indexed for budget storage
+                            cal.add(Calendar.MONTH, 1)
+                            cal.add(Calendar.MILLISECOND, -1)
+                            val endTime = cal.timeInMillis
 
-        // 3. Get budget for previous month
-        val budget = settingsRepository.getOverallBudgetForMonth(prevYear, prevMonth).first() ?: 0f
-        if (budget <= 0f) {
-            Log.d(logTag, "No budget set for previous month, skipping surplus check")
-            return Result.success()
-        }
+                            val expenses =
+                                transactionRepository.getFinancialSummaryForRangeFlow(startTime, endTime)
+                                    .firstOrNull()?.totalExpenses ?: 0.0
 
-        // 4. Get expenses for previous month
-        val db = AppDatabase.getInstance(applicationContext)
+                            val surplus = budget.toDouble() - expenses
+                            Log.d(TAG, "Previous month budget: $budget, expenses: $expenses, surplus: $surplus")
 
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val startTime = cal.timeInMillis
+                            if (surplus > 0) {
+                                val activeGoals = goalRepository.getActiveGoals().firstOrNull() ?: emptyList<Goal>()
+                                if (activeGoals.isNotEmpty()) {
+                                    val topGoal =
+                                        goalRepository.getAllGoalsWithAccountName().first()
+                                            .firstOrNull { it.id == activeGoals.first().id }
 
-        cal.add(Calendar.MONTH, 1)
-        cal.add(Calendar.MILLISECOND, -1)
-        val endTime = cal.timeInMillis
+                                    Log.d(TAG, "Found surplus of $surplus and active goals. Sending notification.")
+                                    NotificationHelper.showGoalSurplusNotification(applicationContext, surplus, topGoal)
+                                } else {
+                                    Log.d(TAG, "Surplus exists but no active goals to allocate to")
+                                }
+                            } else {
+                                Log.d(TAG, "No surplus found")
+                            }
 
-        val transactionAnalyticsDao = db.transactionAnalyticsDao()
-        val expenses = transactionAnalyticsDao.getFinancialSummaryForRangeFlow(startTime, endTime).firstOrNull()?.totalExpenses ?: 0.0
+                            featureSettingsRepository.saveLastSurplusPrompt(prevYear, prevMonth)
+                        }
+                        Result.success()
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "GoalSurplusWorker failed (attempt $runAttemptCount)", e)
+                    if (isFinalAttempt) Result.failure() else Result.retry()
+                }
 
-        val surplus = budget.toDouble() - expenses
-        Log.d(logTag, "Previous month budget: $budget, expenses: $expenses, surplus: $surplus")
-
-        if (surplus > 0) {
-            // 5. Get active goals
-            val activeGoals = db.goalDao().getActiveGoals().firstOrNull() ?: emptyList<Goal>()
-            if (activeGoals.isNotEmpty()) {
-                // Find top priority goal
-                val topGoal = db.goalDao().getAllGoalsWithAccountName().first().firstOrNull { it.id == activeGoals.first().id }
-
-                Log.d(logTag, "Found surplus of $surplus and active goals. Sending notification.")
-                NotificationHelper.showGoalSurplusNotification(applicationContext, surplus, topGoal)
-            } else {
-                Log.d(logTag, "Surplus exists but no active goals to allocate to")
+            if (result != Result.retry()) {
+                workScheduler.scheduleGoalSurplusWorker(
+                    forceNextMonth = true,
+                    policy = ExistingWorkPolicy.REPLACE,
+                )
             }
-        } else {
-            Log.d(logTag, "No surplus found")
+            result
         }
-
-        return Result.success()
     }
 }

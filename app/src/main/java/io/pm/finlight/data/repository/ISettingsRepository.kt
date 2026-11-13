@@ -24,6 +24,13 @@ interface ISettingsRepository {
 
     fun getGoalNudgesEnabled(): Flow<Boolean>
 
+    suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int,
+    )
+
+    fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?>
+
     // --- Outlier Month Management Functions ---
     fun getExcludedIncomeMonths(): Flow<Set<String>>
 
