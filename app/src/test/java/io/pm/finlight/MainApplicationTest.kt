@@ -9,10 +9,15 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import coil.Coil
 import coil.memory.MemoryCache
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
+import io.pm.finlight.utils.IWorkScheduler
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -205,5 +210,24 @@ class MainApplicationTest {
         assertEquals("monthly_summary_channel", MainApplication.MONTHLY_SUMMARY_CHANNEL_ID)
         assertEquals("backup_channel", MainApplication.BACKUP_CHANNEL_ID)
         assertEquals("goals_channel", MainApplication.GOALS_CHANNEL_ID)
+    }
+
+    @Test
+    fun `onCreate launches work reconciliation in applicationScope`() {
+        val mockScheduler = mockk<IWorkScheduler>(relaxed = true)
+        val testDispatcher = StandardTestDispatcher()
+        val testScope = TestScope(testDispatcher)
+
+        ServiceLocator.setWorkScheduler(mockScheduler)
+        ServiceLocator.setApplicationScope(testScope)
+
+        try {
+            app.onCreate()
+            testScope.testScheduler.advanceUntilIdle()
+
+            coVerify(atLeast = 1) { mockScheduler.reconcileWorkOnStartup() }
+        } finally {
+            ServiceLocator.reset()
+        }
     }
 }

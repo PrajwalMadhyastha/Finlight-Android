@@ -125,6 +125,9 @@ import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SystemTimeProvider
 import io.pm.finlight.utils.TimeProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 /**
  * ServiceLocator provides centralized, decoupled dependency resolution for repositories
@@ -133,6 +136,9 @@ import io.pm.finlight.utils.TimeProvider
  * Supports dependency overriding for testing.
  */
 object ServiceLocator {
+    @Volatile
+    private var applicationScope: CoroutineScope? = null
+
     @Volatile
     private var dispatcherProvider: DispatcherProvider? = null
 
@@ -365,6 +371,17 @@ object ServiceLocator {
             dispatcherProvider ?: DefaultDispatcherProvider().also {
                 dispatcherProvider = it
             }
+        }
+    }
+
+    /**
+     * Resolves the application-wide [CoroutineScope] backed by [SupervisorJob] and the default dispatcher.
+     */
+    fun provideApplicationScope(context: Context): CoroutineScope {
+        return applicationScope ?: synchronized(this) {
+            applicationScope ?: CoroutineScope(
+                SupervisorJob() + provideDispatcherProvider(context).default,
+            ).also { applicationScope = it }
         }
     }
 
@@ -682,7 +699,7 @@ object ServiceLocator {
     ): ScheduleRecurringTransactionWorkerUseCase {
         return scheduleRecurringTransactionWorkerUseCase ?: synchronized(this) {
             scheduleRecurringTransactionWorkerUseCase ?: DefaultScheduleRecurringTransactionWorkerUseCase(
-                context.applicationContext,
+                workScheduler = provideWorkScheduler(context),
             ).also {
                 scheduleRecurringTransactionWorkerUseCase = it
             }
@@ -2186,6 +2203,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setApplicationScope(scope: CoroutineScope?) {
+        applicationScope = scope
+    }
+
+    @VisibleForTesting
     fun setDispatcherProvider(provider: DispatcherProvider?) {
         dispatcherProvider = provider
     }
@@ -2497,6 +2519,12 @@ object ServiceLocator {
 
     @VisibleForTesting
     fun reset() {
+        try {
+            applicationScope?.cancel()
+        } catch (_: Throwable) {
+            // Safe guard against mock scopes in unit tests
+        }
+        applicationScope = null
         dispatcherProvider = null
         settingsRepository = null
         appConfigRepository = null

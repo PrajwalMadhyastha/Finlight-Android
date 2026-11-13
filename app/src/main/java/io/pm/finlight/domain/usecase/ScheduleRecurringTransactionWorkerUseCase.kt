@@ -1,12 +1,11 @@
 package io.pm.finlight.domain.usecase
 
-import android.content.Context
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.IWorkScheduler
 
 /**
  * UseCase to schedule the recurring transaction background worker.
  *
- * Encapsulates the interaction with [ReminderManager] and Android [Context] so that
+ * Encapsulates the interaction with [IWorkScheduler] so that
  * ViewModels do not need to hold an [android.app.Application] reference.
  */
 fun interface ScheduleRecurringTransactionWorkerUseCase {
@@ -14,12 +13,12 @@ fun interface ScheduleRecurringTransactionWorkerUseCase {
 }
 
 /**
- * Default implementation of [ScheduleRecurringTransactionWorkerUseCase] delegating to [ReminderManager].
+ * Default implementation of [ScheduleRecurringTransactionWorkerUseCase] delegating to [IWorkScheduler].
  */
 class DefaultScheduleRecurringTransactionWorkerUseCase(
-    private val context: Context,
+    private val workScheduler: IWorkScheduler,
 ) : ScheduleRecurringTransactionWorkerUseCase {
     override operator fun invoke() {
-        ReminderManager.scheduleRecurringTransactionWorker(context)
+        workScheduler.scheduleRecurringTransactionWorker()
     }
 }

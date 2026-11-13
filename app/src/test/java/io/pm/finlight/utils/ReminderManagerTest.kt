@@ -18,6 +18,7 @@ import io.mockk.unmockkObject
 import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.financeSettingsDataStore
+import io.pm.finlight.workers.GoalSurplusWorker
 import io.pm.finlight.workers.SmsCatchupWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -170,6 +171,8 @@ class ReminderManagerTest : BaseViewModelTest() {
             assertWorkIsEnqueued("auto_backup_work", BackupWorker::class.java)
             assertWorkIsEnqueued("recurring_transaction_work", RecurringTransactionWorker::class.java)
             assertWorkIsEnqueued("recurring_pattern_work", RecurringPatternWorker::class.java)
+            assertWorkIsEnqueued("sms_catchup_work", SmsCatchupWorker::class.java)
+            assertWorkIsEnqueued("goal_surplus_work", GoalSurplusWorker::class.java)
         }
 
     @Test

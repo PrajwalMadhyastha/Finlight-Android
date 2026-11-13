@@ -2,10 +2,12 @@ package io.pm.finlight
 
 import android.Manifest
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -53,10 +55,10 @@ class AccountListScreenResilienceTest {
         runBlocking {
             db.accountDao().insertAll(
                 listOf(
-                    Account(name = "Bank of India Account", type = "Bank"),
-                    Account(name = "Bandhan Bank Account", type = "Bank"),
-                    Account(name = "NatWest Current Account", type = "Bank"),
-                    Account(name = "Very Long Account Name That Exceeds Normal Length Boundary 12345", type = "General"),
+                    Account(id = 1001, name = "Bank of India Account", type = "Bank"),
+                    Account(id = 1002, name = "Bandhan Bank Account", type = "Bank"),
+                    Account(id = 1003, name = "NatWest Current Account", type = "Bank"),
+                    Account(id = 1004, name = "Very Long Account Name That Exceeds Normal Length Boundary 12345", type = "General"),
                 ),
             )
         }
@@ -79,9 +81,20 @@ class AccountListScreenResilienceTest {
     fun test_accountList_rendersWithEdgeCaseNamesAndLogosWithoutCrashing() {
         navigateToAccountList()
 
+        composeTestRule.waitUntil(timeoutMillis = 10000) {
+            composeTestRule.onAllNodesWithText("Bandhan Bank Account", substring = true).fetchSemanticsNodes().isNotEmpty()
+        }
+
+        val scrollableList = composeTestRule.onNode(hasScrollAction())
+
         // Verify accounts with previously crash-prone vectors render successfully
-        composeTestRule.onNodeWithText("Bank of India Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Bandhan Bank Account").assertIsDisplayed()
-        composeTestRule.onNodeWithText("NatWest Current Account").assertIsDisplayed()
+        scrollableList.performScrollToNode(hasText("Bandhan Bank Account", substring = true))
+        composeTestRule.onNodeWithText("Bandhan Bank Account", substring = true).assertIsDisplayed()
+
+        scrollableList.performScrollToNode(hasText("Bank of India Account", substring = true))
+        composeTestRule.onNodeWithText("Bank of India Account", substring = true).assertIsDisplayed()
+
+        scrollableList.performScrollToNode(hasText("NatWest Current Account", substring = true))
+        composeTestRule.onNodeWithText("NatWest Current Account", substring = true).assertIsDisplayed()
     }
 }

@@ -7,13 +7,12 @@ import io.pm.finlight.data.db.AppDatabase
 
 class FinlightTestRunner : AndroidJUnitRunner() {
     override fun callApplicationOnCreate(app: Application?) {
-        super.callApplicationOnCreate(app)
         app?.let { application ->
             // Create an in-memory database for UI tests, bypassing SQLCipher and disk IO
             val testDatabase =
                 Room.inMemoryDatabaseBuilder(
                     application.applicationContext,
-                    AppDatabase::class.java
+                    AppDatabase::class.java,
                 )
                     // Allow main thread queries in tests to prevent deadlocks when UI components
                     // access the DB synchronously during render.
@@ -23,5 +22,6 @@ class FinlightTestRunner : AndroidJUnitRunner() {
             // Inject the in-memory database into the AppDatabase singleton
             AppDatabase.setTestInstance(testDatabase)
         }
+        super.callApplicationOnCreate(app)
     }
 }
