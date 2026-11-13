@@ -233,6 +233,27 @@ class RecurringPatternWorkerTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `doWork notifies when active rule description differs`() =
+        runTest {
+            every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
+            val pattern = createPatternFixture(signature = "sig_diff_desc", description = "Netflix", accountId = 1)
+            val activeRule = createRuleFixture(id = 12, description = "Gym", accountId = 1)
+            coEvery { useCase(any()) } returns listOf(pattern)
+            coEvery { recurringTransactionRepository.getAllRulesList() } returns listOf(activeRule)
+            coEvery { featureSettingsRepository.getNotifiedPatternSignatures() } returns emptySet()
+
+            val worker = SummaryWorkerTestFixtures.createWorker<RecurringPatternWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 1) { NotificationHelper.showRecurringPatternDetectedNotification(any(), pattern) }
+            coVerify(exactly = 1) { featureSettingsRepository.markPatternNotified("sig_diff_desc") }
+            verify(exactly = 1) {
+                workScheduler.scheduleRecurringPatternWorker(ExistingWorkPolicy.REPLACE)
+            }
+        }
+
+    @Test
     fun `doWork suppresses notification when signature is already in notified cache`() =
         runTest {
             every { settingsRepository.getRecurringTransactionsEnabled() } returns flowOf(true)
