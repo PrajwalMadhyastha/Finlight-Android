@@ -97,6 +97,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
@@ -637,6 +638,28 @@ class ServiceLocatorTest {
             mock1 = mockScope1,
             mock2 = mockScope2,
         )
+    }
+
+    @Test
+    fun reset_cancelsApplicationScope() {
+        val job = SupervisorJob()
+        val scope = CoroutineScope(job)
+        ServiceLocator.setApplicationScope(scope)
+        assertTrue(job.isActive)
+
+        ServiceLocator.reset()
+
+        assertFalse(job.isActive)
+        assertTrue(job.isCancelled)
+    }
+
+    @Test
+    fun reset_whenScopeCancelThrows_handlesGracefully() {
+        val mockScope: CoroutineScope = mockk()
+        every { mockScope.coroutineContext } throws RuntimeException("Scope cancel error")
+        ServiceLocator.setApplicationScope(mockScope)
+
+        ServiceLocator.reset()
     }
 
     @Test

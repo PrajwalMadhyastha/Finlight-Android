@@ -1,12 +1,17 @@
 package io.pm.finlight.workers
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import io.mockk.coEvery
 import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.spyk
+import io.mockk.verify
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.BootReceiver
 import io.pm.finlight.TestApplication
@@ -83,5 +88,56 @@ class BootReceiverTest : BaseViewModelTest() {
             receiver.onReceive(context, intent)
 
             coVerify(exactly = 0) { workScheduler.reconcileWorkOnStartup() }
+        }
+
+    @Test
+    fun `onReceive with exception during BOOT_COMPLETED handles failure safely`() =
+        runTest {
+            coEvery { workScheduler.reconcileWorkOnStartup() } throws RuntimeException("Startup reconciliation failed")
+            val intent = Intent(Intent.ACTION_BOOT_COMPLETED)
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 3000) { workScheduler.reconcileWorkOnStartup() }
+        }
+
+    @Test
+    fun `onReceive with exception during MY_PACKAGE_REPLACED handles failure safely`() =
+        runTest {
+            coEvery { workScheduler.reconcileWorkOnStartup() } throws RuntimeException("Package replaced reconciliation failed")
+            val intent = Intent(Intent.ACTION_MY_PACKAGE_REPLACED)
+
+            receiver.onReceive(context, intent)
+
+            coVerify(timeout = 3000) { workScheduler.reconcileWorkOnStartup() }
+        }
+
+    @Test
+    fun `onReceive with non-null pendingResult finishes successfully on completion`() =
+        runTest {
+            val mockPendingResult = mockk<BroadcastReceiver.PendingResult>(relaxed = true)
+            val spiedReceiver = spyk(receiver)
+            every { spiedReceiver.goAsync() } returns mockPendingResult
+            val intent = Intent(Intent.ACTION_BOOT_COMPLETED)
+
+            spiedReceiver.onReceive(context, intent)
+
+            coVerify(timeout = 3000) { workScheduler.reconcileWorkOnStartup() }
+            verify(timeout = 3000) { mockPendingResult.finish() }
+        }
+
+    @Test
+    fun `onReceive with non-null pendingResult finishes even when exception thrown`() =
+        runTest {
+            coEvery { workScheduler.reconcileWorkOnStartup() } throws RuntimeException("Boom")
+            val mockPendingResult = mockk<BroadcastReceiver.PendingResult>(relaxed = true)
+            val spiedReceiver = spyk(receiver)
+            every { spiedReceiver.goAsync() } returns mockPendingResult
+            val intent = Intent(Intent.ACTION_MY_PACKAGE_REPLACED)
+
+            spiedReceiver.onReceive(context, intent)
+
+            coVerify(timeout = 3000) { workScheduler.reconcileWorkOnStartup() }
+            verify(timeout = 3000) { mockPendingResult.finish() }
         }
 }

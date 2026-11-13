@@ -3,6 +3,7 @@ package io.pm.finlight
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import io.pm.finlight.di.ServiceLocator
 import kotlinx.coroutines.launch
 
@@ -24,6 +25,8 @@ class BootReceiver : BroadcastReceiver() {
             applicationScope.launch {
                 try {
                     workScheduler.reconcileWorkOnStartup()
+                } catch (t: Throwable) {
+                    Log.e("BootReceiver", "Failed to reconcile work on startup", t)
                 } finally {
                     pendingResult?.finish()
                 }
