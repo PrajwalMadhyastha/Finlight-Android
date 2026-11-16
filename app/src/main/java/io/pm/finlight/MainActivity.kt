@@ -78,6 +78,7 @@ import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ui.BottomNavItem
+import io.pm.finlight.ui.common.WindowSecurityController
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
 import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
@@ -125,11 +126,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         enableEdgeToEdge()
-        // Temporarily disable FLAG_SECURE
-//        window.setFlags(
-//            WindowManager.LayoutParams.FLAG_SECURE,
-//            WindowManager.LayoutParams.FLAG_SECURE
-//        )
 
         setContent {
             val application = LocalContext.current.applicationContext as Application
@@ -137,6 +133,11 @@ class MainActivity : AppCompatActivity() {
             val settingsViewModel: SettingsViewModel = viewModel(factory = FinlightViewModelFactory.create(application))
             val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
             val hasSeenOnboarding by settingsViewModel.hasSeenOnboarding.collectAsState()
+            val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
+
+            LaunchedEffect(isPrivacyModeEnabled) {
+                WindowSecurityController.updateSecureFlag(window, isPrivacyModeEnabled)
+            }
 
             // UPDATED: Using ForceAppScaling to handle both Text and Display scaling
             ForceAppScaling {
