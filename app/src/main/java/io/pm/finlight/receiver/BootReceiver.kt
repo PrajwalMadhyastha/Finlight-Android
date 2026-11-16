@@ -5,27 +5,28 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import io.pm.finlight.di.ServiceLocator
-import io.pm.finlight.utils.ReminderManager
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * A BroadcastReceiver that listens for the device boot completion event.
- * Its purpose is to re-schedule all necessary background workers (like daily,
- * weekly, and monthly reports) to ensure they persist across device reboots.
+ * A BroadcastReceiver that listens for device boot completion and package update events.
+ * Reconciles background workers via [IWorkScheduler] on startup.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(
         context: Context,
         intent: Intent,
     ) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            Log.d("BootReceiver", "Device boot completed. Delegating to ReminderManager to reschedule all work.")
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED ||
+            intent.action == Intent.ACTION_MY_PACKAGE_REPLACED
+        ) {
             val pendingResult = goAsync()
-            val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
-            CoroutineScope(dispatcherProvider.io).launch {
+            val applicationScope = ServiceLocator.provideApplicationScope(context)
+            val workScheduler = ServiceLocator.provideWorkScheduler(context)
+            applicationScope.launch {
                 try {
-                    ReminderManager.rescheduleAllWork(context)
+                    workScheduler.reconcileWorkOnStartup()
+                } catch (t: Throwable) {
+                    Log.e("BootReceiver", "Failed to reconcile work on startup", t)
                 } finally {
                     pendingResult?.finish()
                 }
