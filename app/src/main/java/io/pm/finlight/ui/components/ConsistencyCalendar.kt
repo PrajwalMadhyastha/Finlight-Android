@@ -185,7 +185,7 @@ fun ConsistencyCalendar(
             modifier = modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(DAY_SPACING * 2),
         ) {
-            items(months) { monthData ->
+            items(months, key = { it.monthIndex }) { monthData ->
                 MonthColumn(
                     monthData = monthData,
                     year = year,
