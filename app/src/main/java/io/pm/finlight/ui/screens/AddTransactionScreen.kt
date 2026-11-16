@@ -21,18 +21,15 @@ import androidx.compose.animation.core.EaseOutCubic
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -74,8 +71,8 @@ import com.google.gson.reflect.TypeToken
 import io.pm.finlight.*
 import io.pm.finlight.data.model.MerchantPrediction
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.components.pickers.*
 import io.pm.finlight.ui.viewmodel.GoalViewModel
-import io.pm.finlight.ui.theme.GlassPanelBorder
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.utils.CategoryIconHelper
@@ -495,7 +492,7 @@ fun AddTransactionScreen(
         ) {
             when (activeSheet) {
                 is ComposerSheet.Account ->
-                    AccountPickerSheet(
+                    AccountPickerBottomSheet(
                         accounts = accounts,
                         onAccountSelected = {
                             viewModel.onAddTransactionAccountChanged(it)
@@ -507,33 +504,27 @@ fun AddTransactionScreen(
                         },
                     )
                 is ComposerSheet.Category -> {
-                    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
-                        Text(
-                            "Select Category",
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                        CategorySelectionGrid(
-                            categories = categories,
-                            onCategorySelected = {
-                                viewModel.onAddTransactionCategoryChanged(it)
-                                if (categoryNudgeData != null) {
-                                    viewModel.saveWithSelectedCategory(it.id) { txnId ->
-                                        handleSaveComplete(txnId)
-                                    }
+                    CategoryPickerBottomSheet(
+                        title = "Select Category",
+                        categories = categories,
+                        selectedCategoryId = selectedCategory?.id,
+                        onCategorySelected = {
+                            viewModel.onAddTransactionCategoryChanged(it)
+                            if (categoryNudgeData != null) {
+                                viewModel.saveWithSelectedCategory(it.id) { txnId ->
+                                    handleSaveComplete(txnId)
                                 }
-                                activeSheet = null
-                            },
-                            onAddNew = {
-                                showCreateCategoryDialog = true
-                                activeSheet = null
-                            },
-                        )
-                        Spacer(Modifier.height(16.dp))
-                    }
+                            }
+                            activeSheet = null
+                        },
+                        onAddNew = {
+                            showCreateCategoryDialog = true
+                            activeSheet = null
+                        },
+                    )
                 }
                 is ComposerSheet.Tags ->
-                    TagPickerSheet(
+                    TagPickerBottomSheet(
                         allTags = allTags,
                         selectedTags = selectedTags,
                         onTagSelected = viewModel::onTagSelected,
@@ -1234,178 +1225,6 @@ private fun ActionIcon(
 }
 
 @Composable
-private fun AccountPickerSheet(
-    accounts: List<Account>,
-    onAccountSelected: (Account) -> Unit,
-    onAddNew: () -> Unit,
-) {
-    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
-        Text(
-            "Select Account",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            items(accounts) { account ->
-                GlassPanel(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp)),
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                account.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        },
-                        supportingContent =
-                            if (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0) {
-                                {
-                                    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
-                                    Text(
-                                        "Limit: ${currencyFormat.format(account.creditLimit)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            } else {
-                                null
-                            },
-                        leadingContent = {
-                            Image(
-                                painter = rememberSafeBankLogoPainter(account.name),
-                                contentDescription = "${account.name} Logo",
-                                modifier = Modifier.size(40.dp),
-                            )
-                        },
-                        modifier = Modifier.clickable { onAccountSelected(account) },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                }
-            }
-            item {
-                GlassPanel(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp)),
-                ) {
-                    ListItem(
-                        headlineContent = {
-                            Text(
-                                "Create New Account",
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                        },
-                        leadingContent = {
-                            Icon(
-                                Icons.Default.AddCircleOutline,
-                                contentDescription = "Create New Account",
-                                modifier = Modifier.size(40.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        },
-                        modifier = Modifier.clickable { onAddNew() },
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TagPickerSheet(
-    allTags: List<Tag>,
-    selectedTags: Set<Tag>,
-    onTagSelected: (Tag) -> Unit,
-    onAddNewTag: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var newTagName by remember { mutableStateOf("") }
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .navigationBarsPadding()
-                .fillMaxHeight(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Manage Tags", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            allTags.forEach { tag ->
-                FilterChip(
-                    selected = tag in selectedTags,
-                    onClick = { onTagSelected(tag) },
-                    label = { Text(tag.name) },
-                )
-            }
-        }
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = newTagName,
-                onValueChange = { newTagName = it },
-                label = { Text("New Tag Name") },
-                modifier = Modifier.weight(1f),
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-            )
-            IconButton(
-                onClick = {
-                    onAddNewTag(newTagName)
-                    newTagName = ""
-                },
-                enabled = newTagName.isNotBlank(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add New Tag", tint = MaterialTheme.colorScheme.primary)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                if (newTagName.isNotBlank()) {
-                    onAddNewTag(newTagName)
-                }
-                onConfirm()
-            }) { Text("Save") }
-        }
-    }
-}
-
-@Composable
 fun TextInputSheet(
     title: String,
     initialValue: String,
@@ -1455,103 +1274,4 @@ fun TextInputSheet(
             }
         }
     }
-}
-
-@Composable
-fun TransactionTypeToggle(
-    selectedType: TransactionType,
-    onTypeSelected: (TransactionType) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    val glassFillColor =
-        if (isSystemInDarkTheme()) {
-            Color.White.copy(alpha = 0.08f)
-        } else {
-            Color.Black.copy(alpha = 0.04f)
-        }
-
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .clip(CircleShape)
-                .background(glassFillColor)
-                .border(1.dp, GlassPanelBorder, CircleShape)
-                .padding(4.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val expenseSelected = selectedType == TransactionType.EXPENSE
-        val incomeSelected = selectedType == TransactionType.INCOME
-
-        Button(
-            onClick = { onTypeSelected(TransactionType.EXPENSE) },
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(48.dp),
-            shape = CircleShape,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = if (expenseSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    contentColor = if (expenseSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    disabledContainerColor =
-                        if (expenseSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.12f,
-                            )
-                        } else {
-                            Color.Transparent
-                        },
-                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                ),
-            elevation = null,
-        ) {
-            Text("Expense", fontWeight = FontWeight.Bold)
-        }
-
-        Button(
-            onClick = { onTypeSelected(TransactionType.INCOME) },
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(48.dp),
-            shape = CircleShape,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = if (incomeSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    contentColor = if (incomeSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    disabledContainerColor =
-                        if (incomeSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(
-                                alpha = 0.12f,
-                            )
-                        } else {
-                            Color.Transparent
-                        },
-                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                ),
-            elevation = null,
-        ) {
-            Text("Income", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-@Composable
-fun TransactionTypeToggle(
-    selectedType: String,
-    onTypeSelected: (String) -> Unit,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-) {
-    TransactionTypeToggle(
-        selectedType = TransactionType.fromStringOrNull(selectedType) ?: TransactionType.EXPENSE,
-        onTypeSelected = { onTypeSelected(it.name.lowercase()) },
-        modifier = modifier,
-        enabled = enabled,
-    )
 }

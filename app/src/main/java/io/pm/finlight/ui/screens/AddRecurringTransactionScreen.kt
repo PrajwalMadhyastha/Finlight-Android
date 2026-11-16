@@ -16,6 +16,7 @@
 package io.pm.finlight.ui.screens
 
 import io.pm.finlight.TransactionType
+import io.pm.finlight.ui.components.TransactionTypeToggle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

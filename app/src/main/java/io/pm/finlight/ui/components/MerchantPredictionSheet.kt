@@ -14,21 +14,17 @@
 // =================================================================================
 package io.pm.finlight.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalTextToolbar
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextRange
@@ -37,10 +33,8 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.model.MerchantPrediction
-import io.pm.finlight.utils.CategoryIconHelper
 import kotlinx.coroutines.delay
 
 @Composable
@@ -208,43 +202,4 @@ private fun PredictionItem(
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
-}
-
-@Composable
-private fun CategoryIconDisplay(
-    iconKey: String?,
-    colorKey: String?,
-    name: String,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(colorKey ?: "gray_light")),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = name,
-                tint = Color.Black,
-                modifier = Modifier.padding(4.dp),
-            )
-        } else if (iconKey == "letter_default") {
-            Text(
-                text = name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(iconKey ?: "category"),
-                contentDescription = name,
-                tint = Color.Black,
-                modifier = Modifier.padding(4.dp),
-            )
-        }
-    }
 }

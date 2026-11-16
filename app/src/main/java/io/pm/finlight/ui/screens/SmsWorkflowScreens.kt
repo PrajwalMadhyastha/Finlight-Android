@@ -15,7 +15,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Notes
@@ -25,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -35,19 +33,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.navigation.NavController
 import com.google.gson.Gson
 import io.pm.finlight.*
-import io.pm.finlight.ui.components.CategorySelectionGrid
+import io.pm.finlight.ui.components.CategoryIconDisplay
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.InlineTextToolbarActionBar
+import io.pm.finlight.ui.components.TransactionTypeToggle
+import io.pm.finlight.ui.components.pickers.CategoryPickerBottomSheet
+import io.pm.finlight.ui.components.pickers.TagPickerBottomSheet
 import io.pm.finlight.ui.components.rememberInlineTextToolbar
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import kotlinx.coroutines.launch
 import java.net.URLEncoder
@@ -335,7 +334,7 @@ fun ApproveTransactionScreen(
                             value = selectedCategory?.name ?: "Select category",
                             onClick = { activeSheetContent = ApproveSheetContent.Category },
                             valueColor = if (selectedCategory == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-                            leadingIcon = { selectedCategory?.let { CategoryIcon(it, Modifier.size(24.dp)) } },
+                            leadingIcon = { selectedCategory?.let { CategoryIconDisplay(it, Modifier.size(24.dp)) } },
                         )
                         HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                         DetailRow(
@@ -437,20 +436,23 @@ fun ApproveTransactionScreen(
         ) {
             when (activeSheetContent) {
                 is ApproveSheetContent.Category ->
-                    ApproveCategoryPickerSheet(
-                        items = categories,
-                        onItemSelected = {
+                    CategoryPickerBottomSheet(
+                        categories = categories,
+                        selectedCategoryId = selectedCategory?.id,
+                        onCategorySelected = {
                             selectedCategory = it
                             activeSheetContent = null
                         },
+                        onDismiss = { activeSheetContent = null },
                     )
                 is ApproveSheetContent.Tags ->
-                    ApproveTagPickerSheet(
+                    TagPickerBottomSheet(
                         allTags = allTags,
                         selectedTags = selectedTags,
                         onTagSelected = transactionViewModel::onTagSelected,
                         onAddNewTag = transactionViewModel::addTagOnTheGo,
                         onConfirm = { activeSheetContent = null },
+                        onDismiss = { activeSheetContent = null },
                     )
                 is ApproveSheetContent.Description -> {
                     var tempDescription by remember {
@@ -520,133 +522,6 @@ private fun DetailRow(
         Text(value, color = valueColor, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (onClick != null) {
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-@Composable
-private fun ApproveCategoryPickerSheet(
-    items: List<Category>,
-    onItemSelected: (Category) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .navigationBarsPadding()
-                .fillMaxHeight(),
-    ) {
-        Text(
-            "Select Category",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-        )
-        CategorySelectionGrid(
-            categories = items,
-            onCategorySelected = onItemSelected,
-        )
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun ApproveTagPickerSheet(
-    allTags: List<Tag>,
-    selectedTags: Set<Tag>,
-    onTagSelected: (Tag) -> Unit,
-    onAddNewTag: (String) -> Unit,
-    onConfirm: () -> Unit,
-) {
-    var newTagName by remember { mutableStateOf(TextFieldValue("")) }
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .navigationBarsPadding()
-                .fillMaxHeight(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Manage Tags", style = MaterialTheme.typography.titleLarge)
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            allTags.forEach { tag ->
-                FilterChip(
-                    selected = tag in selectedTags,
-                    onClick = { onTagSelected(tag) },
-                    label = { Text(tag.name) },
-                )
-            }
-        }
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = newTagName,
-                onValueChange = { newTagName = it },
-                label = { Text("New Tag Name") },
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(
-                onClick = {
-                    onAddNewTag(newTagName.text)
-                    newTagName = TextFieldValue("")
-                },
-                enabled = newTagName.text.isNotBlank(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add New Tag")
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onConfirm) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                if (newTagName.text.isNotBlank()) {
-                    onAddNewTag(newTagName.text)
-                }
-                onConfirm()
-            }) { Text("Done") }
-        }
-    }
-}
-
-@Composable
-private fun CategoryIcon(
-    category: Category,
-    modifier: Modifier = Modifier,
-) {
-    Box(
-        modifier =
-            modifier
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                fontWeight = FontWeight.Bold,
-                color = Color.Black,
-                fontSize = 22.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.padding(12.dp),
-            )
         }
     }
 }

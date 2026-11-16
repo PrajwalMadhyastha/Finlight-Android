@@ -1,16 +1,7 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/components/CategorySelectionGrid.kt
-// REASON: UX REFINEMENT - The adaptive grid's minSize has been reduced from
-// 100.dp to 85.dp to allow more columns to fit on the screen. The spacing
-// between items has also been reduced from 12.dp to 8.dp, creating a much
-// more compact and information-dense layout.
-// =================================================================================
 package io.pm.finlight.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
@@ -19,7 +10,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
@@ -30,14 +20,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.pm.finlight.Category
-import io.pm.finlight.utils.CategoryIconHelper
 
 private fun Modifier.categoryGridItem(onClick: () -> Unit) =
     this
@@ -57,7 +43,7 @@ fun CategorySelectionGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(categories) { category ->
+        items(categories, key = { it.id }) { category ->
             CategoryGridItem(
                 category = category,
                 onSelected = { onCategorySelected(category) },
@@ -97,7 +83,6 @@ private fun CategoryGridItem(
 private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
     Column(
         modifier = Modifier.categoryGridItem(onClick = onAddNew).height(80.dp),
-        // Match the approximate height of other items
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -112,40 +97,5 @@ private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-    }
-}
-
-@Composable
-private fun CategoryIconDisplay(category: Category) {
-    Box(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        }
     }
 }
