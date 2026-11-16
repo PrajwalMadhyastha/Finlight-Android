@@ -193,4 +193,26 @@ class SplitTransactionTests {
         composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_FOOD_NAME).onFirst().assertIsDisplayed()
         composeTestRule.onAllNodesWithText(TestDataSeeder.CATEGORY_SHOPPING_NAME).onFirst().assertIsDisplayed()
     }
+
+    @Test
+    fun test_splitTransaction_negativeRemainingAmountFormatting() {
+        navigateToTestTransactionDetail()
+
+        composeTestRule.onNodeWithText("Split Transaction").performClick()
+
+        composeTestRule.waitUntil(timeoutMillis = 8000) {
+            composeTestRule.onAllNodesWithText("Add Item").fetchSemanticsNodes().isNotEmpty()
+        }
+
+        composeTestRule.onNodeWithText("Add Item").performClick()
+
+        // Total amount is 800. Set items to 500 and 400 so total split = 900, remaining = -100
+        val amountNodes = composeTestRule.onAllNodes(hasSetTextAction())
+        amountNodes[0].performTextReplacement("500")
+        amountNodes[1].performTextReplacement("400")
+
+        // Verify remaining amount is formatted with leading minus and single currency symbol: -₹100.00
+        composeTestRule.onNodeWithText("Remaining: -₹100.00").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Remaining: ₹₹100.00").assertDoesNotExist()
+    }
 }

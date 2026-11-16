@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.TestApplication
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -13,6 +14,7 @@ import org.robolectric.annotation.Config
 import java.util.Currency
 import java.util.Locale
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class CurrencyHelperTest : BaseViewModelTest() {
@@ -66,5 +68,32 @@ class CurrencyHelperTest : BaseViewModelTest() {
         val countryNames = currencies.map { it.countryName }
         val sortedCountryNames = countryNames.sorted()
         assertEquals("Currencies should be sorted by country name", sortedCountryNames, countryNames)
+    }
+
+    @Test
+    fun `formatAmountWithSymbol formats positive amount with symbol`() {
+        assertEquals("₹240.00", CurrencyHelper.formatAmountWithSymbol(240.0, "₹"))
+        assertEquals("₹14.00", CurrencyHelper.formatAmountWithSymbol(14.0, "₹"))
+    }
+
+    @Test
+    fun `formatAmountWithSymbol formats negative amount with leading minus and symbol`() {
+        assertEquals("-₹14.00", CurrencyHelper.formatAmountWithSymbol(-14.0, "₹"))
+        assertEquals("-₹100.50", CurrencyHelper.formatAmountWithSymbol(-100.5, "₹"))
+    }
+
+    @Test
+    fun `formatAmountWithSymbol formats zero without negative sign`() {
+        assertEquals("₹0.00", CurrencyHelper.formatAmountWithSymbol(0.0, "₹"))
+        assertEquals("₹0.00", CurrencyHelper.formatAmountWithSymbol(-0.0, "₹"))
+        assertEquals("₹0.00", CurrencyHelper.formatAmountWithSymbol(-0.001, "₹"))
+    }
+
+    @Test
+    fun `formatAmountWithSymbol formats foreign currency symbols correctly`() {
+        assertEquals("$240.00", CurrencyHelper.formatAmountWithSymbol(240.0, "$"))
+        assertEquals("-$14.00", CurrencyHelper.formatAmountWithSymbol(-14.0, "$"))
+        assertEquals("€50.25", CurrencyHelper.formatAmountWithSymbol(50.25, "€"))
+        assertEquals("-€50.25", CurrencyHelper.formatAmountWithSymbol(-50.25, "€"))
     }
 }

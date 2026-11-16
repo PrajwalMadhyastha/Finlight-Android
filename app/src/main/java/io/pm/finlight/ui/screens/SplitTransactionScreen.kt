@@ -214,7 +214,7 @@ fun SplitTransactionScreen(
 }
 
 @Composable
-private fun SplitHeader(
+internal fun SplitHeader(
     parentTransaction: Transaction?,
     remainingAmount: Double,
 ) {
@@ -228,7 +228,13 @@ private fun SplitHeader(
             "₹"
         }
 
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val numberFormat =
+        remember {
+            NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).apply {
+                minimumFractionDigits = 2
+                maximumFractionDigits = 2
+            }
+        }
     val remainingColor =
         when {
             remainingAmount > 0.001 || remainingAmount < -0.001 -> MaterialTheme.colorScheme.error
@@ -250,13 +256,13 @@ private fun SplitHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                "$currencySymbol${currencyFormat.format(totalAmount).drop(1)}",
+                CurrencyHelper.formatAmountWithSymbol(totalAmount, currencySymbol, numberFormat),
                 style = MaterialTheme.typography.displaySmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                "Remaining: $currencySymbol${currencyFormat.format(remainingAmount).drop(1)}",
+                "Remaining: ${CurrencyHelper.formatAmountWithSymbol(remainingAmount, currencySymbol, numberFormat)}",
                 style = MaterialTheme.typography.titleMedium,
                 color = remainingColor,
             )
@@ -356,7 +362,7 @@ private fun SplitCategoryPickerSheet(
 private fun ConversionInfoCard(transaction: Transaction) {
     val homeCurrencySymbol = "₹"
     val foreignCurrencySymbol = CurrencyHelper.getCurrencySymbol(transaction.currencyCode)
-    val numberFormat = remember { NumberFormat.getNumberInstance(Locale("en", "IN")).apply { maximumFractionDigits = 2 } }
+    val numberFormat = remember { NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).apply { maximumFractionDigits = 2 } }
 
     GlassPanel {
         Row(

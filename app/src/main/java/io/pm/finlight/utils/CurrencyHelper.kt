@@ -1,7 +1,9 @@
 package io.pm.finlight.utils
 
+import java.text.NumberFormat
 import java.util.Currency
 import java.util.Locale
+import kotlin.math.abs
 
 data class CurrencyInfo(
     val countryName: String,
@@ -67,5 +69,23 @@ object CurrencyHelper {
 
     fun getCurrencyInfo(currencyCode: String?): CurrencyInfo? {
         return commonCurrencies.find { it.currencyCode.equals(currencyCode, ignoreCase = true) }
+    }
+
+    fun formatAmountWithSymbol(
+        amount: Double,
+        currencySymbol: String,
+        numberFormat: NumberFormat =
+            NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).apply {
+                minimumFractionDigits = 2
+                maximumFractionDigits = 2
+            },
+    ): String {
+        val absAmount = abs(amount)
+        val formattedNumber = numberFormat.format(absAmount)
+        return if (amount <= -0.005) {
+            "-$currencySymbol$formattedNumber"
+        } else {
+            "$currencySymbol$formattedNumber"
+        }
     }
 }
