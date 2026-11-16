@@ -64,7 +64,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.*
 import io.pm.finlight.ui.BottomNavItem
-import io.pm.finlight.ui.theme.GlassPanelBorder
+import io.pm.finlight.ui.theme.FinlightTheme
 import io.pm.finlight.ui.theme.getUtilizationColor
 import io.pm.finlight.utils.CategoryIconHelper
 import java.text.NumberFormat
@@ -80,7 +80,7 @@ fun GlassPanel(
     borderColor: Color? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val finalBorderColor = borderColor ?: GlassPanelBorder
+    val finalBorderColor = borderColor ?: FinlightTheme.colors.glassBorder
 
     val borderModifier =
         if (isCustomizationMode) {
@@ -93,12 +93,7 @@ fun GlassPanel(
             Modifier.border(1.dp, finalBorderColor, RoundedCornerShape(24.dp))
         }
 
-    val defaultFillColor =
-        if (isSystemInDarkTheme()) {
-            Color.White.copy(alpha = 0.08f)
-        } else {
-            Color.Black.copy(alpha = 0.04f)
-        }
+    val defaultFillColor = FinlightTheme.colors.glassSurface
 
     val glassFillColor = backgroundColor ?: defaultFillColor
 
@@ -354,44 +349,22 @@ private fun EmphasizedMinimalStatItem(
 internal fun AuroraProgressBar(progress: Float) {
     val animatedPercentage = (progress * 100).roundToInt()
     val clampedProgress = progress.coerceIn(0f, 1f)
-    val isDark = isSystemInDarkTheme()
+    val colors = FinlightTheme.colors
 
     // Vibrant gradient colors - adjusted warning to be more orange
     val progressGradient =
         when {
-            progress > 0.9 -> listOf(Color(0xFFFF3B30), Color(0xFFFF2D55))
-            progress > 0.7 -> listOf(Color(0xFFFF8C00), Color(0xFFFF9500))
-            else -> listOf(Color(0xFF34C759), Color(0xFF30D158))
+            progress > 0.9 -> listOf(colors.expense, Color(0xFFFF2D55))
+            progress > 0.7 -> listOf(colors.warning, Color(0xFFFF9500))
+            else -> listOf(colors.success, Color(0xFF30D158))
         }
 
-    val borderColor =
-        if (isDark) {
-            Color.White.copy(alpha = 0.25f)
-        } else {
-            Color.Black.copy(alpha = 0.15f)
-        }
+    val borderColor = colors.glassBorder
 
     // Zone colors for background - subtle but visible
-    val greenZone =
-        if (isDark) {
-            Color(0xFF34C759).copy(alpha = 0.20f)
-        } else {
-            Color(0xFF34C759).copy(alpha = 0.15f)
-        }
-
-    val orangeZone =
-        if (isDark) {
-            Color(0xFFFF8C00).copy(alpha = 0.20f)
-        } else {
-            Color(0xFFFF8C00).copy(alpha = 0.15f)
-        }
-
-    val redZone =
-        if (isDark) {
-            Color(0xFFFF3B30).copy(alpha = 0.20f)
-        } else {
-            Color(0xFFFF3B30).copy(alpha = 0.15f)
-        }
+    val greenZone = colors.success.copy(alpha = 0.20f)
+    val orangeZone = colors.warning.copy(alpha = 0.20f)
+    val redZone = colors.expense.copy(alpha = 0.20f)
 
     Layout(
         content = {
