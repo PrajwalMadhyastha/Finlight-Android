@@ -17,6 +17,7 @@ import io.pm.finlight.ICustomSmsRuleRepository
 import io.pm.finlight.IIgnoreRuleRepository
 import io.pm.finlight.IMerchantCategoryMappingRepository
 import io.pm.finlight.IMerchantRenameRuleRepository
+import io.pm.finlight.ISmsParseTemplateRepository
 import io.pm.finlight.MerchantCategoryMapping
 import io.pm.finlight.MerchantCategoryMappingDao
 import io.pm.finlight.MerchantRenameRuleDao
@@ -148,6 +149,26 @@ class SmsProviderHelperTest : BaseViewModelTest() {
             assertEquals(listOf(template), provider.getAllTemplates())
             assertEquals(listOf(template), provider.getTemplatesBySignature("sig123"))
             assertTrue(provider.getTemplatesBySignature("missing").isEmpty())
+        }
+
+    @Test
+    fun `getSmsParseTemplateProvider with repository returns provider instance`() =
+        runTest {
+            val mockRepo = mockk<ISmsParseTemplateRepository>()
+            val template =
+                SmsParseTemplate(
+                    templateSignature = "sigRepo",
+                    correctedMerchantName = "Zomato",
+                    originalSmsBody = "Zomato order ₹350",
+                    originalAmountStartIndex = 13,
+                    originalAmountEndIndex = 17,
+                )
+            coEvery { mockRepo.getAllTemplates() } returns listOf(template)
+            coEvery { mockRepo.getTemplatesBySignature("sigRepo") } returns listOf(template)
+
+            val provider = SmsProviderHelper.getSmsParseTemplateProvider(mockRepo)
+            assertEquals(listOf(template), provider.getAllTemplates())
+            assertEquals(listOf(template), provider.getTemplatesBySignature("sigRepo"))
         }
 
     // --- Pre-cached / In-Memory Providers ---

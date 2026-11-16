@@ -61,4 +61,16 @@ interface IRecurringTransactionRepository {
      * @param pattern The [RecurringPattern] to dismiss.
      */
     suspend fun dismissPatternSuggestion(pattern: RecurringPattern)
+
+    suspend fun getRuleBySmsSenderId(senderId: String): RecurringTransaction?
+
+    suspend fun getAllRulesList(): List<RecurringTransaction>
+
+    suspend fun insertPattern(pattern: RecurringPattern)
+
+    suspend fun updatePattern(pattern: RecurringPattern)
+
+    suspend fun getPatternBySignature(signature: String): RecurringPattern?
+
+    suspend fun getAllPatterns(): List<RecurringPattern>
 }

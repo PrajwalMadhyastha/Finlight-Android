@@ -1,28 +1,69 @@
 // =================================================================================
 // FILE: ./app/src/test/java/io/pm/finlight/workers/SmsProcessorWorkerTest.kt
-// REASON: NEW — Tests for SmsProcessorWorker, which runs the full SMS parsing
+// REASON: Tests for SmsProcessorWorker, which runs the full SMS parsing
 // pipeline (custom rules → ML classifier → NER → parser → save). Uses
-// TestListenableWorkerBuilder to exercise the worker in isolation.
+// TestListenableWorkerBuilder to exercise the worker in isolation with zero-DAO
+// repository injection via ServiceLocator.
 // =================================================================================
 package io.pm.finlight.workers
 
+import android.Manifest
+import android.app.Application
 import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.*
+import androidx.work.Configuration
+import androidx.work.ListenableWorker
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.TestListenableWorkerBuilder
 import androidx.work.testing.WorkManagerTestInitHelper
-import io.mockk.*
-import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.*
+import androidx.work.workDataOf
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.mockkObject
+import io.mockk.mockkStatic
+import io.mockk.runs
+import io.mockk.slot
+import io.mockk.unmockkAll
+import io.mockk.unmockkStatic
+import io.mockk.verify
+import io.pm.finlight.Account
+import io.pm.finlight.BaseViewModelTest
+import io.pm.finlight.IAccountRepository
+import io.pm.finlight.ICustomSmsRuleRepository
+import io.pm.finlight.IIgnoreRuleRepository
+import io.pm.finlight.IMerchantCategoryMappingRepository
+import io.pm.finlight.IMerchantMappingRepository
+import io.pm.finlight.IMerchantRenameRuleRepository
+import io.pm.finlight.IRecurringTransactionRepository
+import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.ISmsParseTemplateRepository
+import io.pm.finlight.ITagRepository
+import io.pm.finlight.ITransactionRepository
+import io.pm.finlight.MerchantCategoryMapping
+import io.pm.finlight.MerchantMapping
+import io.pm.finlight.MerchantRenameRule
+import io.pm.finlight.ParseResult
+import io.pm.finlight.PotentialTransaction
+import io.pm.finlight.RecurringTransaction
+import io.pm.finlight.SmsParser
+import io.pm.finlight.TestApplication
+import io.pm.finlight.Transaction
+import io.pm.finlight.TransactionStatus
+import io.pm.finlight.TransactionType
+import io.pm.finlight.core.NerEntity
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.NotificationHelper
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
@@ -33,38 +74,31 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
-import kotlin.test.assertFailsWith
-import io.pm.finlight.core.NerEntity
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import org.robolectric.Shadows
-import android.app.Application
-import android.Manifest
+import org.robolectric.annotation.Config
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
 class SmsProcessorWorkerTest : BaseViewModelTest() {
     private lateinit var context: Context
-    private lateinit var db: AppDatabase
-    private lateinit var transactionQueryDao: TransactionQueryDao
-    private lateinit var transactionWriteDao: TransactionWriteDao
-    private lateinit var merchantMappingDao: MerchantMappingDao
-    private lateinit var customSmsRuleDao: CustomSmsRuleDao
-    private lateinit var ignoreRuleDao: IgnoreRuleDao
-    private lateinit var merchantRenameRuleDao: MerchantRenameRuleDao
-    private lateinit var merchantCategoryMappingDao: MerchantCategoryMappingDao
-    private lateinit var smsParseTemplateDao: SmsParseTemplateDao
-    private lateinit var accountDao: AccountDao
-    private lateinit var accountAliasDao: AccountAliasDao
-    private lateinit var tagDao: TagDao
+    private lateinit var mockTransactionRepo: ITransactionRepository
+    private lateinit var mockRecurringRepo: IRecurringTransactionRepository
+    private lateinit var mockMerchantRenameRepo: IMerchantRenameRuleRepository
+    private lateinit var mockMerchantCategoryRepo: IMerchantCategoryMappingRepository
+    private lateinit var mockCustomSmsRuleRepo: ICustomSmsRuleRepository
+    private lateinit var mockIgnoreRuleRepo: IIgnoreRuleRepository
+    private lateinit var mockSmsParseTemplateRepo: ISmsParseTemplateRepository
+    private lateinit var mockMerchantMappingRepo: IMerchantMappingRepository
+    private lateinit var mockAccountRepo: IAccountRepository
+    private lateinit var mockTagRepo: ITagRepository
+    private lateinit var mockSettingsRepo: ISettingsRepository
+    private lateinit var mockWorkScheduler: IWorkScheduler
     private lateinit var mockClassifier: SmsClassifier
     private lateinit var mockNerExtractor: NerExtractor
-    private lateinit var recurringDao: RecurringTransactionDao
-    private lateinit var deletedSmsHashDao: DeletedSmsHashDao
-    private lateinit var mockSettingsRepo: ISettingsRepository
 
     private fun buildWorker(
         sender: String,
@@ -83,6 +117,86 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             .build()
     }
 
+    private fun createPotentialTransaction(
+        sourceSmsId: Long = 1L,
+        smsSender: String = "AM-HDFCBK",
+        amount: Double = 100.0,
+        transactionType: String = "expense",
+        merchantName: String? = "Swiggy",
+        originalMerchantName: String? = null,
+        originalMessage: String = "Spent Rs.100 at Swiggy",
+        sourceSmsHash: String = "defaultHash",
+        detectedCurrencyCode: String? = null,
+        needsReview: Boolean = false,
+        suspicionReason: String? = null,
+        categoryId: Int? = null,
+    ): PotentialTransaction =
+        PotentialTransaction(
+            sourceSmsId = sourceSmsId,
+            smsSender = smsSender,
+            amount = amount,
+            transactionType = transactionType,
+            merchantName = merchantName,
+            originalMerchantName = originalMerchantName,
+            originalMessage = originalMessage,
+            sourceSmsHash = sourceSmsHash,
+            detectedCurrencyCode = detectedCurrencyCode,
+            needsReview = needsReview,
+            suspicionReason = suspicionReason,
+            categoryId = categoryId,
+        )
+
+    private fun setupTravelMode(
+        isEnabled: Boolean = true,
+        tripName: String = "Trip",
+        tripType: io.pm.finlight.TripType = io.pm.finlight.TripType.INTERNATIONAL,
+        startDate: Long = 0L,
+        endDate: Long = Long.MAX_VALUE,
+        currencyCode: String = "USD",
+        conversionRate: Float = 80f,
+        homeCurrency: String? = null,
+    ): io.pm.finlight.TravelModeSettings {
+        val travelSettings =
+            io.pm.finlight.TravelModeSettings(
+                isEnabled = isEnabled,
+                tripName = tripName,
+                tripType = tripType,
+                startDate = startDate,
+                endDate = endDate,
+                currencyCode = currencyCode,
+                conversionRate = conversionRate,
+            )
+        every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
+        coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
+        if (homeCurrency != null) {
+            every { mockSettingsRepo.getHomeCurrency() } returns flowOf(homeCurrency)
+        }
+        return travelSettings
+    }
+
+    private fun createTestTransaction(
+        id: Int = 10,
+        description: String = "Netflix",
+        amount: Double = 149.0,
+        date: Long = 100L,
+        status: TransactionStatus = TransactionStatus.CONFIRMED,
+        recurringRuleId: Int? = null,
+        accountId: Int = 1,
+        categoryId: Int? = 1,
+    ): Transaction =
+        Transaction(
+            id = id,
+            description = description,
+            amount = amount,
+            transactionType = TransactionType.EXPENSE,
+            date = date,
+            accountId = accountId,
+            categoryId = categoryId,
+            notes = null,
+            status = status,
+            recurringRuleId = recurringRuleId,
+        )
+
     @Before
     override fun setup() {
         super.setup()
@@ -95,66 +209,73 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                 .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
 
-        db = mockk(relaxed = true)
-        transactionWriteDao =
-            mockk(relaxed = true) {
-                coEvery { insert(any()) } returns 1L
-                coEvery { addTagsToTransaction(any()) } just runs
-            }
-        transactionQueryDao = mockk(relaxed = true)
-        merchantMappingDao = mockk(relaxed = true)
-        customSmsRuleDao = mockk(relaxed = true)
-        ignoreRuleDao = mockk(relaxed = true)
-        merchantRenameRuleDao = mockk(relaxed = true)
-        merchantCategoryMappingDao = mockk(relaxed = true)
-        smsParseTemplateDao = mockk(relaxed = true)
-        accountDao = mockk(relaxed = true)
-        accountAliasDao = mockk(relaxed = true)
-        tagDao = mockk(relaxed = true)
-        recurringDao = mockk(relaxed = true)
-
-        mockkObject(AppDatabase)
-        every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionQueryDao() } returns transactionQueryDao
-        every { db.transactionWriteDao() } returns transactionWriteDao
-        every { db.merchantMappingDao() } returns merchantMappingDao
-        every { db.customSmsRuleDao() } returns customSmsRuleDao
-        every { db.ignoreRuleDao() } returns ignoreRuleDao
-        every { db.merchantRenameRuleDao() } returns merchantRenameRuleDao
-        every { db.merchantCategoryMappingDao() } returns merchantCategoryMappingDao
-        every { db.smsParseTemplateDao() } returns smsParseTemplateDao
-        every { db.accountDao() } returns accountDao
-        every { db.accountAliasDao() } returns accountAliasDao
-        every { db.tagDao() } returns tagDao
-        every { db.recurringTransactionDao() } returns recurringDao
-
-        deletedSmsHashDao = mockk(relaxed = true)
-        every { db.deletedSmsHashDao() } returns deletedSmsHashDao
-        coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
-
-        coEvery { merchantMappingDao.getAllMappings() } returns flowOf(emptyList())
-        coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
-        coEvery { customSmsRuleDao.getAllRules() } returns flowOf(emptyList())
-        coEvery { ignoreRuleDao.getEnabledRules() } returns emptyList()
-        coEvery { merchantRenameRuleDao.getAllRules() } returns flowOf(emptyList())
-        coEvery { merchantRenameRuleDao.getAllRulesList() } returns emptyList()
-        coEvery { merchantCategoryMappingDao.getCategoryIdForMerchant(any()) } returns null
-        coEvery { merchantCategoryMappingDao.getAll() } returns emptyList()
-        coEvery { smsParseTemplateDao.getAllTemplates() } returns emptyList()
-        coEvery { smsParseTemplateDao.getTemplatesBySignature(any()) } returns emptyList()
-        coEvery { accountAliasDao.findByAlias(any()) } returns null
-        coEvery { accountDao.findByName(any()) } returns Account(1, "Test", "Bank Account")
-        coEvery { accountDao.insert(any()) } returns 1L
-        coEvery { accountDao.getAccountByIdSync(any()) } returns Account(1, "Test", "Bank Account")
-        coEvery { tagDao.findByName(any()) } returns null
-        coEvery { tagDao.insert(any()) } returns 1L
-
+        mockTransactionRepo = mockk(relaxed = true)
+        mockRecurringRepo = mockk(relaxed = true)
+        mockMerchantRenameRepo = mockk(relaxed = true)
+        mockMerchantCategoryRepo = mockk(relaxed = true)
+        mockCustomSmsRuleRepo = mockk(relaxed = true)
+        mockIgnoreRuleRepo = mockk(relaxed = true)
+        mockSmsParseTemplateRepo = mockk(relaxed = true)
+        mockMerchantMappingRepo = mockk(relaxed = true)
+        mockAccountRepo = mockk(relaxed = true)
+        mockTagRepo = mockk(relaxed = true)
         mockSettingsRepo = mockk(relaxed = true)
+        mockWorkScheduler = mockk(relaxed = true)
+
+        coEvery { mockTransactionRepo.existsBySmsHash(any()) } returns false
+        coEvery { mockTransactionRepo.existsDeletedSmsHash(any()) } returns false
+        coEvery { mockTransactionRepo.insertTransactionWithTags(any(), any()) } returns 1L
+        coEvery { mockTransactionRepo.updateSmsHashByLegacy(any(), any()) } just runs
+        coEvery { mockTransactionRepo.insertDeletedSmsHash(any()) } just runs
+        coEvery { mockTransactionRepo.getTransactionSync(any()) } returns null
+        coEvery { mockTransactionRepo.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns null
+        coEvery { mockTransactionRepo.updateRecurringRuleId(any(), any()) } just runs
+        coEvery { mockTransactionRepo.delete(any()) } just runs
+        coEvery { mockTransactionRepo.getPendingTransactions() } returns emptyList()
+
+        coEvery { mockRecurringRepo.getRuleBySmsSenderId(any()) } returns null
+        coEvery { mockRecurringRepo.updateLastRunDate(any(), any()) } just runs
+
+        coEvery { mockMerchantMappingRepo.allMappings } returns flowOf(emptyList())
+        coEvery { mockCustomSmsRuleRepo.getAllRules() } returns flowOf(emptyList())
+        coEvery { mockIgnoreRuleRepo.getEnabledRules() } returns emptyList()
+        coEvery { mockMerchantRenameRepo.getAllRules() } returns flowOf(emptyList())
+        coEvery { mockMerchantRenameRepo.getAllRulesList() } returns emptyList()
+        coEvery { mockMerchantRenameRepo.getAliasesAsMap() } returns flowOf(emptyMap())
+        coEvery { mockMerchantRenameRepo.insert(any()) } just runs
+        coEvery { mockMerchantCategoryRepo.getCategoryIdForMerchant(any()) } returns null
+        coEvery { mockMerchantCategoryRepo.getAll() } returns emptyList()
+        coEvery { mockMerchantCategoryRepo.getAllMappings() } returns flowOf(emptyList())
+        coEvery { mockMerchantCategoryRepo.insert(any()) } just runs
+        coEvery { mockSmsParseTemplateRepo.getAllTemplates() } returns emptyList()
+        coEvery { mockSmsParseTemplateRepo.getTemplatesBySignature(any()) } returns emptyList()
+
+        coEvery { mockAccountRepo.findAliasByName(any()) } returns null
+        coEvery { mockAccountRepo.findByName(any()) } returns Account(1, "Test", "Bank Account")
+        coEvery { mockAccountRepo.insert(any()) } returns 1L
+        coEvery { mockAccountRepo.getAccountByIdSync(any()) } returns Account(1, "Test", "Bank Account")
+        coEvery { mockTagRepo.findByName(any()) } returns null
+        coEvery { mockTagRepo.insert(any()) } returns 1L
+
         every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(null)
         coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns null
         every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
         every { mockSettingsRepo.getAutoCaptureNotificationEnabled() } returns flowOf(false)
-        io.pm.finlight.di.ServiceLocator.setSettingsRepository(mockSettingsRepo)
+
+        every { mockWorkScheduler.scheduleTransactionNotification(any()) } just runs
+
+        ServiceLocator.setTransactionRepository(mockTransactionRepo)
+        ServiceLocator.setRecurringTransactionRepository(mockRecurringRepo)
+        ServiceLocator.setMerchantRenameRuleRepository(mockMerchantRenameRepo)
+        ServiceLocator.setMerchantCategoryMappingRepository(mockMerchantCategoryRepo)
+        ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRuleRepo)
+        ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
+        ServiceLocator.setSmsParseTemplateRepository(mockSmsParseTemplateRepo)
+        ServiceLocator.setMerchantMappingRepository(mockMerchantMappingRepo)
+        ServiceLocator.setAccountRepository(mockAccountRepo)
+        ServiceLocator.setTagRepository(mockTagRepo)
+        ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         mockClassifier = mockk(relaxed = true)
         mockNerExtractor = mockk(relaxed = true)
@@ -181,7 +302,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
     @After
     override fun tearDown() {
-        io.pm.finlight.di.ServiceLocator.reset()
+        ServiceLocator.reset()
         unmockkAll()
         super.tearDown()
     }
@@ -243,18 +364,13 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
     fun `successful parse saves transaction and returns success`() =
         runTest {
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
-                    transactionType = "expense", merchantName = "Swiggy",
-                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = "newhash",
-                )
+            val txn = createPotentialTransaction(sourceSmsHash = "newhash")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
@@ -262,52 +378,39 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = worker.doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
     fun `already seen hash is skipped without saving`() =
         runTest {
             val existingHash = "existinghash"
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf(existingHash))
+            coEvery { mockTransactionRepo.existsBySmsHash(existingHash) } returns true
 
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
-                    transactionType = "expense", merchantName = "Swiggy",
-                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = existingHash,
-                )
+            val txn = createPotentialTransaction(sourceSmsHash = existingHash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             val result = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
     fun `skips duplicate when existsBySmsHash returns true in dynamic DB check`() =
         runTest {
             val hash = "dynamic_duplicate_hash"
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
-                    transactionType = "expense", merchantName = "Swiggy",
-                    originalMessage = "Spent Rs.100 at Swiggy", sourceSmsHash = hash,
-                )
+            val txn = createPotentialTransaction(sourceSmsHash = hash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
-            // Initial snapshot was empty
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
-            // Dynamic check finds hash in DB
-            coEvery { transactionQueryDao.existsBySmsHash(hash) } returns true
+            coEvery { mockTransactionRepo.existsBySmsHash(hash) } returns true
 
             val result = buildWorker("AM-HDFCBK", "Spent Rs.100 at Swiggy").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
@@ -319,36 +422,39 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = buildWorker("PROMO", "Your OTP is 1234").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
     fun `custom rule match skips ML and saves directly`() =
         runTest {
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "CUSTOM", amount = 200.0,
-                    transactionType = "expense", merchantName = "CustomMerchant",
-                    originalMessage = "Custom rule body", sourceSmsHash = "customhash",
+                createPotentialTransaction(
+                    smsSender = "CUSTOM",
+                    amount = 200.0,
+                    merchantName = "CustomMerchant",
+                    originalMessage = "Custom rule body",
+                    sourceSmsHash = "customhash",
                 )
-            // Custom rule returns a result — ML/NER should NOT be called
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             val result = buildWorker("CUSTOM", "Custom rule body").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
             verify(exactly = 0) { mockClassifier.classify(any()) }
-            coVerify(exactly = 1) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 1) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
     fun `auto-healing aliases are persisted on success`() =
         runTest {
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
-                    transactionType = "expense", merchantName = "Starbucks",
-                    originalMessage = "Spent Rs.100 at Starbucks", sourceSmsHash = "hash99",
+                createPotentialTransaction(
+                    smsSender = "AM-HDFCBK",
+                    amount = 100.0,
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent Rs.100 at Starbucks",
+                    sourceSmsHash = "hash99",
                 )
             val success =
                 ParseResult.Success(
@@ -361,34 +467,29 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             buildWorker("AM-HDFCBK", "Spent Rs.100 at Starbucks").doWork()
 
-            coVerify { merchantRenameRuleDao.insert(any()) }
-            coVerify { merchantCategoryMappingDao.insert(any()) }
+            coVerify { mockMerchantRenameRepo.insert(MerchantRenameRule("STARBUCKS", "Starbucks")) }
+            coVerify { mockMerchantCategoryRepo.insert(MerchantCategoryMapping("Starbucks", 4)) }
         }
 
     @Test
     fun `travel mode correctly applies foreign currency flag`() =
         runTest {
-            val travelSettings =
-                io.pm.finlight.TravelModeSettings(
-                    isEnabled = true, tripName = "Trip", tripType = io.pm.finlight.TripType.INTERNATIONAL,
-                    startDate = 0L, endDate = Long.MAX_VALUE, currencyCode = "USD", conversionRate = 80f
-                )
-            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
-            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
+            setupTravelMode()
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100.0,
-                    transactionType = "expense", merchantName = "Starbucks",
-                    originalMessage = "Spent 100 USD at Starbucks", sourceSmsHash = "hash101",
-                    detectedCurrencyCode = "USD"
+                createPotentialTransaction(
+                    smsSender = "AM-HDFCBK",
+                    merchantName = "Starbucks",
+                    originalMessage = "Spent 100 USD at Starbucks",
+                    sourceSmsHash = "hash101",
+                    detectedCurrencyCode = "USD",
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("AM-HDFCBK", "Spent 100 USD at Starbucks").doWork()
 
             val captor = slot<Transaction>()
-            coVerify { transactionWriteDao.insert(capture(captor)) }
+            coVerify { mockTransactionRepo.insertTransactionWithTags(capture(captor), any()) }
             assertEquals("USD", captor.captured.currencyCode)
         }
 
@@ -396,11 +497,14 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     fun `suspicious transaction triggers review notification instead of auto-capture`() =
         runTest {
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 100000.0,
-                    transactionType = "expense", merchantName = "Fraud",
-                    originalMessage = "Spent 100000 at Fraud", sourceSmsHash = "hash102",
-                    needsReview = true, suspicionReason = "High amount"
+                createPotentialTransaction(
+                    smsSender = "AM-HDFCBK",
+                    amount = 100000.0,
+                    merchantName = "Fraud",
+                    originalMessage = "Spent 100000 at Fraud",
+                    sourceSmsHash = "hash102",
+                    needsReview = true,
+                    suspicionReason = "High amount",
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
@@ -414,19 +518,20 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         runTest {
             every { mockSettingsRepo.getAutoCaptureNotificationEnabled() } returns flowOf(true)
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L, smsSender = "AM-HDFCBK", amount = 10.0,
-                    transactionType = "expense", merchantName = "Coffee",
-                    originalMessage = "Spent 10 at Coffee", sourceSmsHash = "hash103",
-                    needsReview = false
+                createPotentialTransaction(
+                    smsSender = "AM-HDFCBK",
+                    amount = 10.0,
+                    merchantName = "Coffee",
+                    originalMessage = "Spent 10 at Coffee",
+                    sourceSmsHash = "hash103",
+                    needsReview = false,
                 )
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             val result = buildWorker("AM-HDFCBK", "Spent 10 at Coffee").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            // WorkManager enqueue is hard to verify with standard mocks here since we are using
-            // WorkManager.getInstance(context).enqueue, but we can assume it hits the branch.
+            verify(exactly = 1) { mockWorkScheduler.scheduleTransactionNotification(any()) }
         }
 
     @Test
@@ -435,16 +540,16 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId("BESCOM") } returns rule
 
-            val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1100.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash200")
+            val txn = createPotentialTransaction(smsSender = "BESCOM", amount = 1100.0, merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash200")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("BESCOM", "Bill").doWork()
 
-            coVerify { transactionWriteDao.updateRecurringRuleId(10, 5) }
-            coVerify { recurringDao.updateLastRunDate(5, 100L) }
+            coVerify { mockTransactionRepo.updateRecurringRuleId(10, 5) }
+            coVerify { mockRecurringRepo.updateLastRunDate(5, 100L) }
             verify(exactly = 0) { NotificationHelper.showVariableBillAnomalyNotification(any(), any(), any(), any()) }
         }
 
@@ -454,50 +559,50 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val rule = RecurringTransaction(id = 5, description = "Electricity", amount = 1000.0, transactionType = TransactionType.EXPENSE, recurrenceInterval = "Monthly", startDate = 0L, accountId = 1, categoryId = 1)
             val savedTxn = Transaction(id = 10, description = "Electricity", amount = 1500.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { recurringDao.getRuleBySmsSenderId("BESCOM") } returns rule
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId("BESCOM") } returns rule
 
-            val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "BESCOM", amount = 1500.0, transactionType = "expense", merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash201")
+            val txn = createPotentialTransaction(smsSender = "BESCOM", amount = 1500.0, merchantName = "Electricity", originalMessage = "Bill", sourceSmsHash = "hash201")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("BESCOM", "Bill").doWork()
 
-            coVerify { transactionWriteDao.updateRecurringRuleId(10, 5) }
-            coVerify { recurringDao.updateLastRunDate(5, 100L) }
+            coVerify { mockTransactionRepo.updateRecurringRuleId(10, 5) }
+            coVerify { mockRecurringRepo.updateLastRunDate(5, 100L) }
             verify(exactly = 1) { NotificationHelper.showVariableBillAnomalyNotification(context, rule, 1500.0, 1000.0) }
         }
 
     @Test
     fun `auto-link fixed bill by finding matching pending draft`() =
         runTest {
-            val savedTxn = Transaction(id = 10, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
-            val draft = Transaction(id = 20, description = "Netflix", amount = 149.0, transactionType = TransactionType.EXPENSE, date = 99L, accountId = 1, categoryId = 1, notes = null, status = TransactionStatus.PENDING, recurringRuleId = 7)
+            val savedTxn = createTestTransaction(id = 10, amount = 149.0, date = 100L)
+            val draft = createTestTransaction(id = 20, amount = 149.0, date = 99L, status = TransactionStatus.PENDING, recurringRuleId = 7)
 
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
-            coEvery { transactionQueryDao.getPendingTransactionsSync() } returns listOf(draft)
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId(any()) } returns null
+            coEvery { mockTransactionRepo.getPendingTransactions() } returns listOf(draft)
 
-            val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "NETFLIX", amount = 149.0, transactionType = "expense", merchantName = "Netflix", originalMessage = "Sub", sourceSmsHash = "hash202")
+            val txn = createPotentialTransaction(smsSender = "NETFLIX", amount = 149.0, merchantName = "Netflix", originalMessage = "Sub", sourceSmsHash = "hash202")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("NETFLIX", "Sub").doWork()
 
-            coVerify { transactionWriteDao.updateRecurringRuleId(10, 7) }
-            coVerify { recurringDao.updateLastRunDate(7, 100L) }
+            coVerify { mockTransactionRepo.delete(draft) }
+            coVerify { mockTransactionRepo.updateRecurringRuleId(10, 7) }
+            coVerify { mockRecurringRepo.updateLastRunDate(7, 100L) }
         }
 
-    // --- NEW: Tests for Smart Transaction Merge ---
     @Test
     fun `auto-detects mergeable transaction and triggers notification`() =
         runTest {
             val savedTxn = Transaction(id = 10, description = "Amazon", amount = 100.0, transactionType = TransactionType.EXPENSE, date = 100L, accountId = 1, categoryId = 1, notes = null)
             val recentTxn = Transaction(id = 9, description = "Amazon", amount = 50.0, transactionType = TransactionType.EXPENSE, date = 50L, accountId = 1, categoryId = 1, notes = null)
 
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { transactionQueryDao.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockTransactionRepo.findRecentTransactionForMerge(any(), any(), any(), any(), any()) } returns recentTxn
             every { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) } just runs
 
-            val txn = PotentialTransaction(sourceSmsId = 1L, smsSender = "AMZ", amount = 100.0, transactionType = "expense", merchantName = "Amazon", originalMessage = "Bill", sourceSmsHash = "hash300")
+            val txn = createPotentialTransaction(smsSender = "AMZ", amount = 100.0, merchantName = "Amazon", originalMessage = "Bill", sourceSmsHash = "hash300")
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             buildWorker("AMZ", "Bill").doWork()
@@ -548,35 +653,25 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `skips and upgrades duplicate when legacy 32-bit hash exists in DB`() =
+    fun `skips and upgrades when legacy hash exists in transaction repository`() =
         runTest {
             val sender = "AM-HDFCBK"
             val body = "Spent Rs.100 at Swiggy"
             val currentHash = SmsParser.computeSmsHash(sender, body)
             val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
 
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
+            val txn = createPotentialTransaction(smsSender = sender, originalMessage = body, sourceSmsHash = currentHash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
             // Legacy hash exists in DB
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf(legacyHash))
-            coEvery { transactionWriteDao.updateSmsHashByLegacy(any(), any()) } just runs
+            coEvery { mockTransactionRepo.existsBySmsHash(legacyHash) } returns true
 
             val result = buildWorker(sender, body).doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
-            coVerify(exactly = 1) { transactionWriteDao.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
+            coVerify(exactly = 1) { mockTransactionRepo.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash) }
         }
 
     @Test
@@ -587,57 +682,37 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val currentHash = SmsParser.computeSmsHash(sender, body)
             val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
 
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
+            val txn = createPotentialTransaction(smsSender = sender, originalMessage = body, sourceSmsHash = currentHash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
-            coEvery { deletedSmsHashDao.getAllHashes() } returns listOf(legacyHash)
-            coEvery { deletedSmsHashDao.insert(any()) } just runs
+            coEvery { mockTransactionRepo.existsDeletedSmsHash(legacyHash) } returns true
 
             val result = buildWorker(sender, body).doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
-            coVerify(exactly = 1) { deletedSmsHashDao.insert(match { it.smsHash == currentHash }) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
+            coVerify(exactly = 1) { mockTransactionRepo.insertDeletedSmsHash(currentHash) }
         }
 
     @Test
-    fun `skips duplicate when current hash is in existingSmsHashes in DB`() =
+    fun `skips duplicate when current hash exists in transaction repository`() =
         runTest {
             val sender = "AM-HDFCBK"
             val body = "Spent Rs.100 at Swiggy"
             val currentHash = SmsParser.computeSmsHash(sender, body)
 
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
+            val txn = createPotentialTransaction(smsSender = sender, originalMessage = body, sourceSmsHash = currentHash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(listOf(currentHash))
-            coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
+            coEvery { mockTransactionRepo.existsBySmsHash(currentHash) } returns true
 
             val result = buildWorker(sender, body).doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
-            coVerify(exactly = 0) { transactionWriteDao.updateSmsHashByLegacy(any(), any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.updateSmsHashByLegacy(any(), any()) }
         }
 
     @Test
@@ -647,93 +722,17 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val body = "Spent Rs.100 at Swiggy"
             val currentHash = SmsParser.computeSmsHash(sender, body)
 
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
+            val txn = createPotentialTransaction(smsSender = sender, originalMessage = body, sourceSmsHash = currentHash)
             coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
             coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
 
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
-            coEvery { deletedSmsHashDao.getAllHashes() } returns listOf(currentHash)
+            coEvery { mockTransactionRepo.existsDeletedSmsHash(currentHash) } returns true
 
             val result = buildWorker(sender, body).doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
-            coVerify(exactly = 0) { deletedSmsHashDao.insert(any()) }
-        }
-
-    @Test
-    fun `skips and upgrades when legacy hash exists dynamically in transactionQueryDao`() =
-        runTest {
-            val sender = "AM-HDFCBK"
-            val body = "Spent Rs.100 at Swiggy"
-            val currentHash = SmsParser.computeSmsHash(sender, body)
-            val legacyHash = SmsParser.computeLegacySmsHash(sender, body)
-
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
-            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
-            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
-
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
-            coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
-
-            coEvery { transactionQueryDao.existsBySmsHash(currentHash) } returns false
-            coEvery { transactionQueryDao.existsBySmsHash(legacyHash) } returns true
-            coEvery { transactionWriteDao.updateSmsHashByLegacy(any(), any()) } just runs
-
-            val result = buildWorker(sender, body).doWork()
-
-            assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
-            coVerify(exactly = 1) { transactionWriteDao.updateSmsHashByLegacy(oldHash = legacyHash, newHash = currentHash) }
-        }
-
-    @Test
-    fun `skips when current hash exists dynamically in transactionQueryDao`() =
-        runTest {
-            val sender = "AM-HDFCBK"
-            val body = "Spent Rs.100 at Swiggy"
-            val currentHash = SmsParser.computeSmsHash(sender, body)
-
-            val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
-                    smsSender = sender,
-                    amount = 100.0,
-                    transactionType = "expense",
-                    merchantName = "Swiggy",
-                    originalMessage = body,
-                    sourceSmsHash = currentHash,
-                )
-            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns null
-            coEvery { SmsParser.parseWithReason(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
-
-            coEvery { transactionQueryDao.getAllSmsHashes() } returns flowOf(emptyList())
-            coEvery { deletedSmsHashDao.getAllHashes() } returns emptyList()
-
-            coEvery { transactionQueryDao.existsBySmsHash(currentHash) } returns true
-
-            val result = buildWorker(sender, body).doWork()
-
-            assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertDeletedSmsHash(any()) }
         }
 
     @Test
@@ -744,7 +743,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.failure(), result)
             coVerify(exactly = 0) { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) }
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
         }
 
     @Test
@@ -838,26 +837,11 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `travel mode with home currency saves non-foreign transaction`() =
         runTest {
-            val travelSettings =
-                io.pm.finlight.TravelModeSettings(
-                    isEnabled = true,
-                    tripName = "Trip",
-                    tripType = io.pm.finlight.TripType.INTERNATIONAL,
-                    startDate = 0L,
-                    endDate = Long.MAX_VALUE,
-                    currencyCode = "USD",
-                    conversionRate = 80f,
-                )
-            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
-            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
-            every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
+            setupTravelMode(homeCurrency = "INR")
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
                     smsSender = "AM-HDFCBK",
-                    amount = 100.0,
-                    transactionType = "expense",
                     merchantName = "Starbucks",
                     originalMessage = "Spent 100 INR at Starbucks",
                     sourceSmsHash = "hashHomeCurrency",
@@ -869,7 +853,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.success(), result)
             val captor = slot<Transaction>()
-            coVerify { transactionWriteDao.insert(capture(captor)) }
+            coVerify { mockTransactionRepo.insertTransactionWithTags(capture(captor), any()) }
             assertNull(captor.captured.currencyCode)
             assertEquals(100.0, captor.captured.amount, 0.001)
         }
@@ -877,26 +861,11 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
     @Test
     fun `travel mode with unhandled currency shows notification and returns success without saving`() =
         runTest {
-            val travelSettings =
-                io.pm.finlight.TravelModeSettings(
-                    isEnabled = true,
-                    tripName = "Trip",
-                    tripType = io.pm.finlight.TripType.INTERNATIONAL,
-                    startDate = 0L,
-                    endDate = Long.MAX_VALUE,
-                    currencyCode = "USD",
-                    conversionRate = 80f,
-                )
-            every { mockSettingsRepo.getTravelModeSettings() } returns flowOf(travelSettings)
-            coEvery { mockSettingsRepo.getCurrentTravelModeSettings() } returns travelSettings
-            every { mockSettingsRepo.getHomeCurrency() } returns flowOf("INR")
+            val travelSettings = setupTravelMode(homeCurrency = "INR")
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
                     smsSender = "AM-HDFCBK",
-                    amount = 100.0,
-                    transactionType = "expense",
                     merchantName = "Starbucks",
                     originalMessage = "Spent 100 EUR at Starbucks",
                     sourceSmsHash = "hashEUR",
@@ -907,48 +876,24 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             val result = buildWorker("AM-HDFCBK", "Spent 100 EUR at Starbucks").doWork()
 
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify(exactly = 0) { transactionWriteDao.insert(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.insertTransactionWithTags(any(), any()) }
             verify { NotificationHelper.showTravelModeSmsNotification(context, txn, travelSettings) }
         }
 
     @Test
     fun `auto-link fixed bill with null recurringRuleId does not update rule`() =
         runTest {
-            val savedTxn =
-                Transaction(
-                    id = 10,
-                    description = "Netflix",
-                    amount = 149.0,
-                    transactionType = TransactionType.EXPENSE,
-                    date = 100L,
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                )
-            val draftWithoutRule =
-                Transaction(
-                    id = 20,
-                    description = "Netflix",
-                    amount = 149.0,
-                    transactionType = TransactionType.EXPENSE,
-                    date = 99L,
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                    status = TransactionStatus.PENDING,
-                    recurringRuleId = null,
-                )
+            val savedTxn = createTestTransaction(id = 10, amount = 149.0, date = 100L)
+            val draftWithoutRule = createTestTransaction(id = 20, amount = 149.0, date = 99L, status = TransactionStatus.PENDING, recurringRuleId = null)
 
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns savedTxn
-            coEvery { recurringDao.getRuleBySmsSenderId(any()) } returns null
-            coEvery { transactionQueryDao.getPendingTransactionsSync() } returns listOf(draftWithoutRule)
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId(any()) } returns null
+            coEvery { mockTransactionRepo.getPendingTransactions() } returns listOf(draftWithoutRule)
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
                     smsSender = "NETFLIX",
                     amount = 149.0,
-                    transactionType = "expense",
                     merchantName = "Netflix",
                     originalMessage = "Sub",
                     sourceSmsHash = "hash202NullRule",
@@ -957,9 +902,64 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             buildWorker("NETFLIX", "Sub").doWork()
 
-            coVerify { transactionWriteDao.delete(draftWithoutRule) }
-            coVerify(exactly = 0) { transactionWriteDao.updateRecurringRuleId(any(), any()) }
-            coVerify(exactly = 0) { recurringDao.updateLastRunDate(any(), any()) }
+            coVerify { mockTransactionRepo.delete(draftWithoutRule) }
+            coVerify(exactly = 0) { mockTransactionRepo.updateRecurringRuleId(any(), any()) }
+            coVerify(exactly = 0) { mockRecurringRepo.updateLastRunDate(any(), any()) }
+        }
+
+    @Test
+    fun `pending draft does not match when amount difference is one or greater`() =
+        runTest {
+            val savedTxn = createTestTransaction(id = 10, amount = 149.0, date = 100L)
+            val draft = createTestTransaction(id = 20, amount = 151.0, date = 100L, status = TransactionStatus.PENDING, recurringRuleId = 7)
+
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId(any()) } returns null
+            coEvery { mockTransactionRepo.getPendingTransactions() } returns listOf(draft)
+
+            val txn =
+                createPotentialTransaction(
+                    smsSender = "NETFLIX",
+                    amount = 149.0,
+                    merchantName = "Netflix",
+                    originalMessage = "Sub",
+                    sourceSmsHash = "hash202AmountMismatch",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            buildWorker("NETFLIX", "Sub").doWork()
+
+            coVerify(exactly = 0) { mockTransactionRepo.delete(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.updateRecurringRuleId(any(), any()) }
+            coVerify(exactly = 0) { mockRecurringRepo.updateLastRunDate(any(), any()) }
+        }
+
+    @Test
+    fun `pending draft does not match when date difference is four days or greater`() =
+        runTest {
+            val fourDaysMs = 4 * 24 * 60 * 60 * 1000L
+            val savedTxn = createTestTransaction(id = 10, amount = 149.0, date = fourDaysMs + 1000L)
+            val draft = createTestTransaction(id = 20, amount = 149.0, date = 0L, status = TransactionStatus.PENDING, recurringRuleId = 7)
+
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns savedTxn
+            coEvery { mockRecurringRepo.getRuleBySmsSenderId(any()) } returns null
+            coEvery { mockTransactionRepo.getPendingTransactions() } returns listOf(draft)
+
+            val txn =
+                createPotentialTransaction(
+                    smsSender = "NETFLIX",
+                    amount = 149.0,
+                    merchantName = "Netflix",
+                    originalMessage = "Sub",
+                    sourceSmsHash = "hash202DateMismatch",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            buildWorker("NETFLIX", "Sub").doWork()
+
+            coVerify(exactly = 0) { mockTransactionRepo.delete(any()) }
+            coVerify(exactly = 0) { mockTransactionRepo.updateRecurringRuleId(any(), any()) }
+            coVerify(exactly = 0) { mockRecurringRepo.updateLastRunDate(any(), any()) }
         }
 
     @Test
@@ -968,11 +968,9 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
             Shadows.shadowOf(context as Application).denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
                     smsSender = "AM-HDFCBK",
                     amount = 50000.0,
-                    transactionType = "expense",
                     merchantName = "Jeweler",
                     originalMessage = "Spent 50000 at Jeweler",
                     sourceSmsHash = "hashPermissionDenied",
@@ -1022,16 +1020,58 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `null savedTxn skips merge check and recurring linking`() =
+    fun `suspicious transaction uses savedTxn from repository if available`() =
         runTest {
-            coEvery { transactionQueryDao.getTransactionByIdSync(any()) } returns null
+            val dbTxn =
+                Transaction(
+                    id = 42,
+                    description = "Jeweler",
+                    originalDescription = "Jeweler",
+                    amount = 50000.0,
+                    date = 1000L,
+                    accountId = 99,
+                    categoryId = 5,
+                    notes = "Real DB Txn",
+                    transactionType = TransactionType.EXPENSE,
+                )
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns dbTxn
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
+                    smsSender = "AM-HDFCBK",
+                    amount = 50000.0,
+                    merchantName = "Jeweler",
+                    originalMessage = "Spent 50000 at Jeweler",
+                    sourceSmsHash = "hashSuspiciousWithDbTxn",
+                    needsReview = true,
+                    suspicionReason = "High amount",
+                )
+            coEvery { SmsParser.parseWithOnlyCustomRules(any(), any(), any(), any(), any()) } returns ParseResult.Success(txn)
+
+            val result = buildWorker("AM-HDFCBK", "Spent 50000 at Jeweler").doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            val captor = slot<Transaction>()
+            verify {
+                NotificationHelper.showSuspiciousAmountNotification(
+                    context,
+                    capture(captor),
+                    "High amount",
+                )
+            }
+            assertEquals(99, captor.captured.accountId)
+            assertEquals(42, captor.captured.id)
+        }
+
+    @Test
+    fun `null savedTxn skips merge check and recurring linking`() =
+        runTest {
+            coEvery { mockTransactionRepo.getTransactionSync(any()) } returns null
+
+            val txn =
+                createPotentialTransaction(
                     smsSender = "AM-HDFCBK",
                     amount = 50.0,
-                    transactionType = "expense",
                     merchantName = "Tea",
                     originalMessage = "Spent 50",
                     sourceSmsHash = "hashNullSavedTxn",
@@ -1042,7 +1082,7 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
 
             assertEquals(ListenableWorker.Result.success(), result)
             verify(exactly = 0) { NotificationHelper.showMergeTransactionNotification(any(), any(), any()) }
-            coVerify(exactly = 0) { recurringDao.getRuleBySmsSenderId(any()) }
+            coVerify(exactly = 0) { mockRecurringRepo.getRuleBySmsSenderId(any()) }
         }
 
     @Test
@@ -1053,14 +1093,12 @@ class SmsProcessorWorkerTest : BaseViewModelTest() {
                 flowOf(
                     listOf(MerchantMapping(smsSender = "CUSTOM_SENDER", merchantName = "CustomMerchant")),
                 )
-            io.pm.finlight.di.ServiceLocator.setMerchantMappingRepository(mockMappingRepo)
+            ServiceLocator.setMerchantMappingRepository(mockMappingRepo)
 
             val txn =
-                PotentialTransaction(
-                    sourceSmsId = 1L,
+                createPotentialTransaction(
                     smsSender = "CUSTOM_SENDER",
                     amount = 50.0,
-                    transactionType = "expense",
                     merchantName = "Tea",
                     originalMessage = "Spent 50",
                     sourceSmsHash = "hashCustomSender",

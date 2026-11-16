@@ -6,6 +6,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.unmockkAll
 import io.pm.finlight.BaseViewModelTest
 import io.pm.finlight.IRecurringTransactionRepository
@@ -22,6 +23,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -56,22 +58,44 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         unmockkAll()
     }
 
+    private fun createTestDraft(
+        id: Int = 1,
+        date: Long = 1_695_000_000_000L,
+        amount: Double = 100.0,
+    ): Transaction =
+        Transaction(
+            id = id,
+            description = "Test Pending",
+            amount = amount,
+            transactionType = TransactionType.EXPENSE,
+            date = date,
+            accountId = 1,
+            categoryId = 1,
+            notes = null,
+            status = TransactionStatus.PENDING,
+        )
+
+    private fun createTestRule(
+        id: Int = 2,
+        skipCount: Int = 1,
+    ): RecurringTransaction =
+        RecurringTransaction(
+            id = id,
+            description = "Test Rule",
+            amount = 100.0,
+            transactionType = TransactionType.EXPENSE,
+            recurrenceInterval = "Monthly",
+            startDate = 0L,
+            accountId = 1,
+            categoryId = 1,
+            skipCount = skipCount,
+        )
+
     @Test
     fun `pendingTransactions emits from repository flow`() =
         runTest {
             // Arrange
-            val pendingTxn =
-                Transaction(
-                    id = 1,
-                    description = "Test Pending",
-                    amount = 100.0,
-                    transactionType = TransactionType.EXPENSE,
-                    date = 0L,
-                    accountId = 1,
-                    categoryId = 1,
-                    notes = null,
-                    status = TransactionStatus.PENDING,
-                )
+            val pendingTxn = createTestDraft(date = 0L)
             val flow = MutableStateFlow(listOf(pendingTxn))
             every { transactionRepository.getPendingTransactionsFlow() } returns flow
 
@@ -177,18 +201,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
     fun `skipPending skips transaction and increments skip count when rule exists`() =
         runTest {
             // Arrange
-            val rule =
-                RecurringTransaction(
-                    id = 2,
-                    description = "Test Rule",
-                    amount = 100.0,
-                    transactionType = TransactionType.EXPENSE,
-                    recurrenceInterval = "Monthly",
-                    startDate = 0L,
-                    accountId = 1,
-                    categoryId = 1,
-                    skipCount = 1,
-                )
+            val rule = createTestRule(id = 2, skipCount = 1)
             coEvery { recurringTransactionRepository.getRuleById(2) } returns rule
 
             // Act
@@ -371,18 +384,7 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
         runTest {
             // Arrange
             val testTimestamp = 1_700_000_000_000L
-            coEvery { recurringTransactionRepository.getRuleById(2) } returns
-                RecurringTransaction(
-                    id = 2,
-                    description = "Test Rule",
-                    amount = 100.0,
-                    transactionType = TransactionType.EXPENSE,
-                    recurrenceInterval = "Monthly",
-                    startDate = 0L,
-                    accountId = 1,
-                    categoryId = 1,
-                    skipCount = 0,
-                )
+            coEvery { recurringTransactionRepository.getRuleById(2) } returns createTestRule(id = 2, skipCount = 0)
             coEvery { transactionRepository.skipTransaction(1) } coAnswers {
                 viewModel.viewModelScope.cancel()
             }
@@ -433,6 +435,152 @@ class PendingTransactionsViewModelTest : BaseViewModelTest() {
                 viewModel.skipPending(draftId = 1, ruleId = 2)
                 assertEquals("Failed to skip transaction: DB locked", awaitItem())
                 cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `confirmPending when lastRunDate is null uses canonical date from draft via getTransactionSync`() =
+        runTest {
+            // Arrange
+            val draftDate = 1_695_000_000_000L
+            val draft = createTestDraft(id = 1, date = draftDate)
+            coEvery { transactionRepository.getTransactionSync(1) } returns draft
+
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.getTransactionSync(1) }
+            coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, null) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = draftDate,
+                    skipCount = 0,
+                )
+            }
+        }
+
+    @Test
+    fun `confirmPending when lastRunDate is null and draft not found falls back to current time`() =
+        runTest {
+            // Arrange
+            coEvery { transactionRepository.getTransactionSync(1) } returns null
+            val before = System.currentTimeMillis()
+
+            // Act
+            viewModel.confirmPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+            val after = System.currentTimeMillis()
+
+            // Assert
+            val capturedDate = slot<Long>()
+            coVerify(exactly = 1) { transactionRepository.getTransactionSync(1) }
+            coVerify(exactly = 1) { transactionRepository.confirmTransaction(1, null) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = capture(capturedDate),
+                    skipCount = 0,
+                )
+            }
+            assertTrue(capturedDate.captured in before..after)
+        }
+
+    @Test
+    fun `confirmPending when lastRunDate is explicit bypasses getTransactionSync`() =
+        runTest {
+            // Act
+            val explicitDate = 1_720_000_000_000L
+            viewModel.confirmPending(draftId = 1, ruleId = 2, lastRunDate = explicitDate)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.getTransactionSync(any()) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = explicitDate,
+                    skipCount = 0,
+                )
+            }
+        }
+
+    @Test
+    fun `skipPending when lastRunDate is null uses canonical date from draft via getTransactionSync`() =
+        runTest {
+            // Arrange
+            val draftDate = 1_695_000_000_000L
+            val draft = createTestDraft(id = 1, date = draftDate)
+            val rule = createTestRule(id = 2, skipCount = 2)
+            coEvery { transactionRepository.getTransactionSync(1) } returns draft
+            coEvery { recurringTransactionRepository.getRuleById(2) } returns rule
+
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 1) { transactionRepository.getTransactionSync(1) }
+            coVerify(exactly = 1) { transactionRepository.skipTransaction(1) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = draftDate,
+                    skipCount = 3,
+                )
+            }
+        }
+
+    @Test
+    fun `skipPending when lastRunDate is null and draft not found falls back to current time`() =
+        runTest {
+            // Arrange
+            val rule = createTestRule(id = 2, skipCount = 1)
+            coEvery { transactionRepository.getTransactionSync(1) } returns null
+            coEvery { recurringTransactionRepository.getRuleById(2) } returns rule
+            val before = System.currentTimeMillis()
+
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = 2)
+            advanceUntilIdle()
+            val after = System.currentTimeMillis()
+
+            // Assert
+            val capturedDate = slot<Long>()
+            coVerify(exactly = 1) { transactionRepository.getTransactionSync(1) }
+            coVerify(exactly = 1) { transactionRepository.skipTransaction(1) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = capture(capturedDate),
+                    skipCount = 2,
+                )
+            }
+            assertTrue(capturedDate.captured in before..after)
+        }
+
+    @Test
+    fun `skipPending when lastRunDate is explicit bypasses getTransactionSync`() =
+        runTest {
+            // Arrange
+            val rule = createTestRule(id = 2, skipCount = 1)
+            coEvery { recurringTransactionRepository.getRuleById(2) } returns rule
+            val explicitDate = 1_720_000_000_000L
+
+            // Act
+            viewModel.skipPending(draftId = 1, ruleId = 2, lastRunDate = explicitDate)
+            advanceUntilIdle()
+
+            // Assert
+            coVerify(exactly = 0) { transactionRepository.getTransactionSync(any()) }
+            coVerify(exactly = 1) {
+                recurringTransactionRepository.updateLastRunAndSkipCount(
+                    ruleId = 2,
+                    lastRunDate = explicitDate,
+                    skipCount = 2,
+                )
             }
         }
 }

@@ -22,6 +22,8 @@ class MerchantRenameRuleRepository(private val dao: MerchantRenameRuleDao) :
         return dao.getAllRules()
     }
 
+    override suspend fun getAllRulesList(): List<MerchantRenameRule> = dao.getAllRulesList()
+
     /**
      * Retrieves all rename rules and transforms them into a key-value map
      * for efficient lookups at display time.

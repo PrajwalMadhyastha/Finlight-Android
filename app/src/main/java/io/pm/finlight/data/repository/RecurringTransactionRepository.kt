@@ -59,4 +59,24 @@ class RecurringTransactionRepository(
     override suspend fun dismissPatternSuggestion(pattern: RecurringPattern) {
         recurringPatternDao.update(pattern.copy(isDismissed = true))
     }
+
+    override suspend fun getRuleBySmsSenderId(senderId: String): RecurringTransaction? =
+        recurringTransactionDao.getRuleBySmsSenderId(senderId)
+
+    override suspend fun getAllRulesList(): List<RecurringTransaction> =
+        recurringTransactionDao.getAllRulesList()
+
+    override suspend fun insertPattern(pattern: RecurringPattern) {
+        recurringPatternDao.insert(pattern)
+    }
+
+    override suspend fun updatePattern(pattern: RecurringPattern) {
+        recurringPatternDao.update(pattern)
+    }
+
+    override suspend fun getPatternBySignature(signature: String): RecurringPattern? =
+        recurringPatternDao.getPatternBySignature(signature)
+
+    override suspend fun getAllPatterns(): List<RecurringPattern> =
+        recurringPatternDao.getAllPatterns()
 }

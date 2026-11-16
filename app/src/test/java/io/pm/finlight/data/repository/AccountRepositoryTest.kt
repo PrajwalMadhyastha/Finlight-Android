@@ -405,4 +405,28 @@ class AccountRepositoryTest : BaseViewModelTest() {
 
             results.forEach { assertEquals(existing, it) }
         }
+
+    @Test
+    fun `getAliasesForAccount delegates to accountAliasDao`() =
+        runTest {
+            val aliases = listOf(AccountAlias(aliasName = "OldBank", destinationAccountId = 1))
+            `when`(accountAliasDao.getAliasesForAccount(1)).thenReturn(aliases)
+
+            val result = repository.getAliasesForAccount(1)
+
+            assertEquals(aliases, result)
+            verify(accountAliasDao).getAliasesForAccount(1)
+        }
+
+    @Test
+    fun `findAliasByName delegates to accountAliasDao`() =
+        runTest {
+            val alias = AccountAlias(aliasName = "OldBank", destinationAccountId = 1)
+            `when`(accountAliasDao.findByAlias("OldBank")).thenReturn(alias)
+
+            val result = repository.findAliasByName("OldBank")
+
+            assertEquals(alias, result)
+            verify(accountAliasDao).findByAlias("OldBank")
+        }
 }

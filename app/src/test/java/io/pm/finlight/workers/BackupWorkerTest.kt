@@ -14,10 +14,12 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.utils.NotificationHelper
 import io.pm.finlight.utils.ReminderManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -100,7 +102,7 @@ class BackupWorkerTest : BaseViewModelTest() {
 
             val result = worker.doWork()
 
-            assertEquals(ListenableWorker.Result.success(), result)
+            assertEquals(ListenableWorker.Result.retry(), result)
             coVerify(exactly = 1) { DataExportService.createBackupSnapshot(context) }
             verify(exactly = 0) { anyConstructed<BackupManager>().dataChanged() }
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(context) }
@@ -120,4 +122,64 @@ class BackupWorkerTest : BaseViewModelTest() {
             coVerify(exactly = 0) { ReminderManager.scheduleAutoBackup(any()) }
             verify(exactly = 0) { NotificationHelper.showAutoBackupNotification(any(), any()) }
         }
+
+    @Test
+    fun `doWork returns failure when runAttemptCount is 3 or more`() =
+        runTest {
+            val worker =
+                TestListenableWorkerBuilder<BackupWorker>(context)
+                    .setRunAttemptCount(3)
+                    .build()
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 0) { DataExportService.createBackupSnapshot(any()) }
+        }
+
+    @Test
+    fun `doWork returns failure when snapshot fails and runAttemptCount is 2`() =
+        runTest {
+            coEvery { DataExportService.createBackupSnapshot(context) } returns false
+
+            val worker =
+                TestListenableWorkerBuilder<BackupWorker>(context)
+                    .setRunAttemptCount(2)
+                    .build()
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            coVerify(exactly = 1) { DataExportService.createBackupSnapshot(context) }
+            verify(exactly = 0) { anyConstructed<BackupManager>().dataChanged() }
+        }
+
+    @Test
+    fun `doWork returns failure when exception thrown and runAttemptCount is 2`() =
+        runTest {
+            coEvery { DataExportService.createBackupSnapshot(context) } throws RuntimeException("Test exception")
+
+            val worker =
+                TestListenableWorkerBuilder<BackupWorker>(context)
+                    .setRunAttemptCount(2)
+                    .build()
+
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.failure(), result)
+            verify(exactly = 0) { anyConstructed<BackupManager>().dataChanged() }
+        }
+
+    @Test
+    fun `doWork rethrows CancellationException`() {
+        coEvery { DataExportService.createBackupSnapshot(context) } throws CancellationException("Cancelled")
+
+        val worker = TestListenableWorkerBuilder<BackupWorker>(context).build()
+
+        assertThrows(CancellationException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                worker.doWork()
+            }
+        }
+    }
 }

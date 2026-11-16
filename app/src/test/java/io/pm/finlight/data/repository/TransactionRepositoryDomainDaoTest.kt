@@ -257,4 +257,71 @@ class TransactionRepositoryDomainDaoTest {
 
             coVerify(exactly = 1) { writeDao.skipTransaction(42) }
         }
+
+    @Test
+    fun testDelegationToWorkerAnalyticsAndQueryApis() =
+        runTest {
+            val sampleTxn =
+                Transaction(
+                    id = 7,
+                    description = "Electricity Bill",
+                    amount = 1200.0,
+                    date = 1500L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    smsSignature = "sig_elec",
+                    status = TransactionStatus.PENDING,
+                    recurringRuleId = 10,
+                )
+
+            coEvery { queryDao.hasExecutedTransactionForRuleSince(10, 1000L) } returns true
+            coEvery { queryDao.getPendingTransactionForRule(10) } returns sampleTxn
+            coEvery { queryDao.getPendingTransactionsSync() } returns listOf(sampleTxn)
+            coEvery { analyticsDao.getAverageDailySpendingForRange(100L, 200L) } returns 45.5
+            coEvery { queryDao.getTransactionsWithSignatureSince(500L) } returns listOf(sampleTxn)
+            coEvery { queryDao.getTransactionsBySignature("sig_elec") } returns listOf(sampleTxn)
+
+            assertEquals(true, repository.hasExecutedTransactionForRuleSince(10, 1000L))
+            coVerify(exactly = 1) { queryDao.hasExecutedTransactionForRuleSince(10, 1000L) }
+
+            assertEquals(sampleTxn, repository.getPendingTransactionForRule(10))
+            coVerify(exactly = 1) { queryDao.getPendingTransactionForRule(10) }
+
+            assertEquals(listOf(sampleTxn), repository.getPendingTransactions())
+            coVerify(exactly = 1) { queryDao.getPendingTransactionsSync() }
+
+            assertEquals(45.5, repository.getAverageDailySpendingForRange(100L, 200L))
+            coVerify(exactly = 1) { analyticsDao.getAverageDailySpendingForRange(100L, 200L) }
+
+            assertEquals(listOf(sampleTxn), repository.getTransactionsWithSignatureSince(500L))
+            coVerify(exactly = 1) { queryDao.getTransactionsWithSignatureSince(500L) }
+
+            assertEquals(listOf(sampleTxn), repository.getTransactionsBySignature("sig_elec"))
+            coVerify(exactly = 1) { queryDao.getTransactionsBySignature("sig_elec") }
+        }
+
+    @Test
+    fun testDelegationToInsertTransactionAndUpdateRecurringRuleId() =
+        runTest {
+            val sampleTxn =
+                Transaction(
+                    id = 15,
+                    description = "Wifi",
+                    amount = 800.0,
+                    date = 2000L,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                )
+            coEvery { writeDao.insert(sampleTxn) } returns 15L
+            coJustRun { writeDao.updateRecurringRuleId(15, 20) }
+
+            val insertedId = repository.insertTransaction(sampleTxn)
+            assertEquals(15L, insertedId)
+            coVerify(exactly = 1) { writeDao.insert(sampleTxn) }
+
+            repository.updateRecurringRuleId(15, 20)
+            coVerify(exactly = 1) { writeDao.updateRecurringRuleId(15, 20) }
+        }
 }

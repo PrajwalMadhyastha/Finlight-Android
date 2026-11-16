@@ -11,6 +11,7 @@ import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISettingsRepository
 import io.pm.finlight.TestApplication
 import io.pm.finlight.di.ServiceLocator
+import io.pm.finlight.utils.IWorkScheduler
 import org.junit.After
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
@@ -42,9 +43,11 @@ class OnboardingViewModelFactoryTest {
     fun create_withOnboardingViewModelClass_resolvesRepositoriesFromServiceLocator() {
         val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
         val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
 
         ServiceLocator.setCategoryRepository(mockCategoryRepo)
         ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         val viewModel = factory.create(OnboardingViewModel::class.java)
 
@@ -61,6 +64,12 @@ class OnboardingViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockSettingsRepo, settingsField)
+
+        val workSchedulerField =
+            OnboardingViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockWorkScheduler, workSchedulerField)
     }
 
     @Test

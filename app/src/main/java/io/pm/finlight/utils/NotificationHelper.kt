@@ -23,7 +23,6 @@ import android.os.Build
 import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.TaskStackBuilder
@@ -40,6 +39,13 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
 
+internal fun canPostNotifications(context: Context): Boolean =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+    } else {
+        true
+    }
+
 object NotificationHelper {
     private const val DEEP_LINK_URI_EDIT = "app://finlight.pm.io/transaction_detail"
     private const val DEEP_LINK_URI_REPORT_BASE = "app://finlight.pm.io/report"
@@ -50,16 +56,13 @@ object NotificationHelper {
     private const val DEEP_LINK_URI_APPROVE = "app://finlight.pm.io/approve_transaction_screen"
     const val BACKUP_NOTIFICATION_ID = 99
 
+    fun canPostNotifications(context: Context): Boolean = io.pm.finlight.utils.canPostNotifications(context)
+
     fun showAutoBackupNotification(
         context: Context,
         backupTimestamp: Long,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -89,12 +92,7 @@ object NotificationHelper {
         potentialTxn: PotentialTransaction,
         travelSettings: TravelModeSettings,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -163,12 +161,7 @@ object NotificationHelper {
         visitCount: Int,
         merchantTotalSpent: Double = 0.0,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -335,12 +328,7 @@ object NotificationHelper {
         context: Context,
         pattern: RecurringPattern,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -383,12 +371,7 @@ object NotificationHelper {
         rule: RecurringTransaction,
         draftTransactionId: Int,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -441,12 +424,7 @@ object NotificationHelper {
         actualAmount: Double,
         averageAmount: Double
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -465,12 +443,7 @@ object NotificationHelper {
         context: Context,
         rule: RecurringTransaction,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) return
 
@@ -499,12 +472,7 @@ object NotificationHelper {
         topCategories: List<CategorySpending>,
         deepLinkUri: String,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -561,12 +529,7 @@ object NotificationHelper {
         newTxn: Transaction,
         parentTxn: Transaction
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) return
 
@@ -715,12 +678,7 @@ object NotificationHelper {
         context: Context,
         transaction: Transaction,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -765,12 +723,7 @@ object NotificationHelper {
         context: Context,
         transaction: Transaction,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) {
             return
@@ -825,12 +778,7 @@ object NotificationHelper {
         transaction: Transaction,
         reason: String,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) return
 
@@ -879,12 +827,7 @@ object NotificationHelper {
         surplusAmount: Double,
         topGoal: GoalWithAccountName?,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) return
 
@@ -928,12 +871,7 @@ object NotificationHelper {
         goalName: String,
         percentReached: Int,
     ) {
-        val canShowNotification =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true
-            }
+        val canShowNotification = canPostNotifications(context)
 
         if (!canShowNotification) return
 

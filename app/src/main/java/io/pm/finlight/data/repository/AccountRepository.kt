@@ -140,4 +140,10 @@ class AccountRepository(
     }
 
     override suspend fun findByName(name: String): Account? = accountDao.findByName(name)
+
+    override suspend fun getAliasesForAccount(accountId: Int): List<AccountAlias> =
+        accountAliasDao.getAliasesForAccount(accountId)
+
+    override suspend fun findAliasByName(aliasName: String): AccountAlias? =
+        accountAliasDao.findByAlias(aliasName)
 }

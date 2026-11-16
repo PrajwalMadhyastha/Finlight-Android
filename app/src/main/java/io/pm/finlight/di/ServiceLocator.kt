@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelProvider
+import androidx.work.WorkManager
 import io.pm.finlight.AccountRepository
 import io.pm.finlight.AppConfigRepository
 import io.pm.finlight.BackupSettingsRepository
@@ -69,11 +70,15 @@ import io.pm.finlight.data.health.IDatabaseHealthChecker
 import io.pm.finlight.data.repository.ITripRepository
 import io.pm.finlight.data.repository.TripRepository
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
+import io.pm.finlight.domain.usecase.AnalyzeRecurringPatternsUseCase
+import io.pm.finlight.domain.usecase.DefaultAnalyzeRecurringPatternsUseCase
+import io.pm.finlight.domain.usecase.DefaultProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.DefaultScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.domain.usecase.GetMonthlyConsistencyDataUseCase
 import io.pm.finlight.domain.usecase.ManageReimbursementUseCase
 import io.pm.finlight.domain.usecase.MergeAccountsUseCase
 import io.pm.finlight.domain.usecase.MergeTransactionsUseCase
+import io.pm.finlight.domain.usecase.ProcessDueRecurringTransactionsUseCase
 import io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase
 import io.pm.finlight.domain.usecase.ScheduleRecurringTransactionWorkerUseCase
 import io.pm.finlight.PotentialTransaction
@@ -114,10 +119,15 @@ import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.WhatIfViewModel
 import io.pm.finlight.utils.DefaultDispatcherProvider
+import io.pm.finlight.utils.DefaultWorkScheduler
 import io.pm.finlight.utils.DispatcherProvider
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.SmsProviderHelper
 import io.pm.finlight.utils.SystemTimeProvider
 import io.pm.finlight.utils.TimeProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 /**
  * ServiceLocator provides centralized, decoupled dependency resolution for repositories
@@ -126,6 +136,9 @@ import io.pm.finlight.utils.TimeProvider
  * Supports dependency overriding for testing.
  */
 object ServiceLocator {
+    @Volatile
+    private var applicationScope: CoroutineScope? = null
+
     @Volatile
     private var dispatcherProvider: DispatcherProvider? = null
 
@@ -194,6 +207,15 @@ object ServiceLocator {
 
     @Volatile
     private var scheduleRecurringTransactionWorkerUseCase: ScheduleRecurringTransactionWorkerUseCase? = null
+
+    @Volatile
+    private var processDueRecurringTransactionsUseCase: ProcessDueRecurringTransactionsUseCase? = null
+
+    @Volatile
+    private var analyzeRecurringPatternsUseCase: AnalyzeRecurringPatternsUseCase? = null
+
+    @Volatile
+    private var workScheduler: IWorkScheduler? = null
 
     @Volatile
     private var merchantMappingRepository: IMerchantMappingRepository? = null
@@ -349,6 +371,17 @@ object ServiceLocator {
             dispatcherProvider ?: DefaultDispatcherProvider().also {
                 dispatcherProvider = it
             }
+        }
+    }
+
+    /**
+     * Resolves the application-wide [CoroutineScope] backed by [SupervisorJob] and the default dispatcher.
+     */
+    fun provideApplicationScope(context: Context): CoroutineScope {
+        return applicationScope ?: synchronized(this) {
+            applicationScope ?: CoroutineScope(
+                SupervisorJob() + provideDispatcherProvider(context).default,
+            ).also { applicationScope = it }
         }
     }
 
@@ -666,9 +699,72 @@ object ServiceLocator {
     ): ScheduleRecurringTransactionWorkerUseCase {
         return scheduleRecurringTransactionWorkerUseCase ?: synchronized(this) {
             scheduleRecurringTransactionWorkerUseCase ?: DefaultScheduleRecurringTransactionWorkerUseCase(
-                context.applicationContext,
+                workScheduler = provideWorkScheduler(context),
             ).also {
                 scheduleRecurringTransactionWorkerUseCase = it
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [ProcessDueRecurringTransactionsUseCase] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideProcessDueRecurringTransactionsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): ProcessDueRecurringTransactionsUseCase {
+        return processDueRecurringTransactionsUseCase ?: synchronized(this) {
+            processDueRecurringTransactionsUseCase ?: run {
+                DefaultProcessDueRecurringTransactionsUseCase(
+                    recurringTransactionRepository = provideRecurringTransactionRepository(context, resolvedDb),
+                    transactionRepository = provideTransactionRepository(context),
+                    transactionRunner = provideTransactionRunner(context, resolvedDb),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    processDueRecurringTransactionsUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [AnalyzeRecurringPatternsUseCase] instance.
+     *
+     * @param context Application or activity context.
+     * @param resolvedDb Optional pre-resolved [AppDatabase] instance.
+     */
+    fun provideAnalyzeRecurringPatternsUseCase(
+        context: Context,
+        resolvedDb: AppDatabase? = null,
+    ): AnalyzeRecurringPatternsUseCase {
+        return analyzeRecurringPatternsUseCase ?: synchronized(this) {
+            analyzeRecurringPatternsUseCase ?: run {
+                DefaultAnalyzeRecurringPatternsUseCase(
+                    transactionRepository = provideTransactionRepository(context),
+                    recurringTransactionRepository = provideRecurringTransactionRepository(context, resolvedDb),
+                    dispatcherProvider = provideDispatcherProvider(context),
+                ).also {
+                    analyzeRecurringPatternsUseCase = it
+                }
+            }
+        }
+    }
+
+    /**
+     * Resolves the singleton [IWorkScheduler] instance.
+     */
+    fun provideWorkScheduler(context: Context): IWorkScheduler {
+        return workScheduler ?: synchronized(this) {
+            workScheduler ?: DefaultWorkScheduler(
+                context = context.applicationContext,
+                settingsRepository = provideSettingsRepository(context),
+                workManagerProvider = { WorkManager.getInstance(context.applicationContext) },
+                timeProvider = SystemTimeProvider(),
+            ).also {
+                workScheduler = it
             }
         }
     }
@@ -1293,6 +1389,7 @@ object ServiceLocator {
                 categoryRepository = categoryRepository,
                 settingsRepository = settingsRepository,
                 dispatcherProvider = dispatcherProvider,
+                workScheduler = provideWorkScheduler(app),
             )
         }
     }
@@ -1541,6 +1638,7 @@ object ServiceLocator {
                 transactionRunner = transactionRunner,
                 databaseHealthChecker = databaseHealthChecker,
                 dispatchers = dispatcherProvider,
+                workScheduler = provideWorkScheduler(app),
             )
         }
     }
@@ -2107,6 +2205,11 @@ object ServiceLocator {
     }
 
     @VisibleForTesting
+    fun setApplicationScope(scope: CoroutineScope?) {
+        applicationScope = scope
+    }
+
+    @VisibleForTesting
     fun setDispatcherProvider(provider: DispatcherProvider?) {
         dispatcherProvider = provider
     }
@@ -2164,6 +2267,21 @@ object ServiceLocator {
     @VisibleForTesting
     fun setScheduleRecurringTransactionWorkerUseCase(useCase: ScheduleRecurringTransactionWorkerUseCase?) {
         scheduleRecurringTransactionWorkerUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setProcessDueRecurringTransactionsUseCase(useCase: ProcessDueRecurringTransactionsUseCase?) {
+        processDueRecurringTransactionsUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setAnalyzeRecurringPatternsUseCase(useCase: AnalyzeRecurringPatternsUseCase?) {
+        analyzeRecurringPatternsUseCase = useCase
+    }
+
+    @VisibleForTesting
+    fun setWorkScheduler(scheduler: IWorkScheduler?) {
+        workScheduler = scheduler
     }
 
     @VisibleForTesting
@@ -2403,6 +2521,12 @@ object ServiceLocator {
 
     @VisibleForTesting
     fun reset() {
+        try {
+            applicationScope?.cancel()
+        } catch (_: Throwable) {
+            // Safe guard against mock scopes in unit tests
+        }
+        applicationScope = null
         dispatcherProvider = null
         settingsRepository = null
         appConfigRepository = null
@@ -2428,6 +2552,9 @@ object ServiceLocator {
         autoSaveSmsTransactionUseCase = null
         getMonthlyConsistencyDataUseCase = null
         scheduleRecurringTransactionWorkerUseCase = null
+        processDueRecurringTransactionsUseCase = null
+        analyzeRecurringPatternsUseCase = null
+        workScheduler = null
         merchantMappingRepository = null
         budgetRepository = null
         recurringTransactionRepository = null

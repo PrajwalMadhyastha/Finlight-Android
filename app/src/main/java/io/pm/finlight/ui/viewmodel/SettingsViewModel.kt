@@ -25,6 +25,7 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.data.health.IDatabaseHealthChecker
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.SmsClassifier
@@ -34,7 +35,7 @@ import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
 import io.pm.finlight.utils.FormatUtils
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.IWorkScheduler
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -71,6 +72,7 @@ class SettingsViewModel(
     private val transactionRunner: TransactionRunner,
     private val databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
     private val dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+    private val workScheduler: IWorkScheduler = ServiceLocator.provideWorkScheduler(application),
 ) : AndroidViewModel(application) {
     // Secondary constructor for backward compatibility
     constructor(
@@ -94,6 +96,7 @@ class SettingsViewModel(
         transactionRunner: TransactionRunner,
         databaseHealthChecker: IDatabaseHealthChecker = DatabaseHealthChecker,
         dispatchers: DispatcherProvider = DefaultDispatcherProvider(),
+        workScheduler: IWorkScheduler = ServiceLocator.provideWorkScheduler(application),
     ) : this(
         application = application,
         settingsRepository = settingsRepository,
@@ -115,6 +118,7 @@ class SettingsViewModel(
         transactionRunner = transactionRunner,
         databaseHealthChecker = databaseHealthChecker,
         dispatchers = dispatchers,
+        workScheduler = workScheduler,
     )
 
     private val context = application
@@ -613,7 +617,7 @@ class SettingsViewModel(
     fun setAutoBackupEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.saveAutoBackupEnabled(enabled)
-            if (enabled) ReminderManager.scheduleAutoBackup(context) else ReminderManager.cancelAutoBackup(context)
+            if (enabled) workScheduler.scheduleAutoBackup() else workScheduler.cancelAutoBackup()
         }
     }
 
@@ -680,7 +684,7 @@ class SettingsViewModel(
     fun setDailyReportEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.saveDailyReportEnabled(enabled)
-            if (enabled) ReminderManager.scheduleDailyReport(context) else ReminderManager.cancelDailyReport(context)
+            if (enabled) workScheduler.scheduleDailyReport() else workScheduler.cancelDailyReport()
         }
     }
 
@@ -691,7 +695,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.saveDailyReportTime(hour, minute)
             if (dailyReportEnabled.value) {
-                ReminderManager.scheduleDailyReport(context)
+                workScheduler.scheduleDailyReport()
             }
         }
     }
@@ -699,7 +703,7 @@ class SettingsViewModel(
     fun setWeeklySummaryEnabled(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepository.saveWeeklySummaryEnabled(enabled)
-            if (enabled) ReminderManager.scheduleWeeklySummary(context) else ReminderManager.cancelWeeklySummary(context)
+            if (enabled) workScheduler.scheduleWeeklySummary() else workScheduler.cancelWeeklySummary()
         }
     }
 
@@ -711,7 +715,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.saveWeeklyReportTime(dayOfWeek, hour, minute)
             if (weeklySummaryEnabled.value) {
-                ReminderManager.scheduleWeeklySummary(context)
+                workScheduler.scheduleWeeklySummary()
             }
         }
     }
@@ -720,9 +724,9 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.saveMonthlySummaryEnabled(enabled)
             if (enabled) {
-                ReminderManager.scheduleMonthlySummary(context)
+                workScheduler.scheduleMonthlySummary()
             } else {
-                ReminderManager.cancelMonthlySummary(context)
+                workScheduler.cancelMonthlySummary()
             }
         }
     }
@@ -735,7 +739,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             settingsRepository.saveMonthlyReportTime(dayOfMonth, hour, minute)
             if (monthlySummaryEnabled.value) {
-                ReminderManager.scheduleMonthlySummary(context)
+                workScheduler.scheduleMonthlySummary()
             }
         }
     }

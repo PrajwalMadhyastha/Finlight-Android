@@ -13,7 +13,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 @ExperimentalCoroutinesApi
 @RunWith(AndroidJUnit4::class)
@@ -165,5 +167,81 @@ class TransactionQueryDaoTest {
                 )
             assertNotNull(recent)
             assertEquals(id1, recent.id)
+        }
+
+    @Test
+    fun testHasExecutedTransactionForRuleSince() =
+        runTest {
+            val ruleId = 42
+            val cycleStart = 2000L
+
+            // 1. Initially no transactions for ruleId 42
+            assertFalse(queryDao.hasExecutedTransactionForRuleSince(ruleId, cycleStart))
+
+            // 2. Insert transaction before cycle start
+            val pastTxn =
+                Transaction(
+                    description = "Past Bill",
+                    amount = 100.0,
+                    date = 1000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.CONFIRMED,
+                    recurringRuleId = ruleId,
+                )
+            writeDao.insert(pastTxn)
+            assertFalse(queryDao.hasExecutedTransactionForRuleSince(ruleId, cycleStart))
+
+            // 3. Insert PENDING transaction within cycle -> should still be false
+            val pendingTxn =
+                Transaction(
+                    description = "Draft Bill",
+                    amount = 100.0,
+                    date = 3000L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.PENDING,
+                    recurringRuleId = ruleId,
+                )
+            writeDao.insert(pendingTxn)
+            assertFalse(queryDao.hasExecutedTransactionForRuleSince(ruleId, cycleStart))
+
+            // 4. Insert CONFIRMED transaction within cycle -> should return true
+            val confirmedTxn =
+                Transaction(
+                    description = "Confirmed Bill",
+                    amount = 100.0,
+                    date = 2500L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.CONFIRMED,
+                    recurringRuleId = ruleId,
+                )
+            writeDao.insert(confirmedTxn)
+            assertTrue(queryDao.hasExecutedTransactionForRuleSince(ruleId, cycleStart))
+
+            // 5. Test another rule with SKIPPED transaction within cycle -> should also return true
+            val skippedRuleId = 43
+            assertFalse(queryDao.hasExecutedTransactionForRuleSince(skippedRuleId, cycleStart))
+            val skippedTxn =
+                Transaction(
+                    description = "Skipped Bill",
+                    amount = 50.0,
+                    date = 2200L,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    notes = null,
+                    status = TransactionStatus.SKIPPED,
+                    recurringRuleId = skippedRuleId,
+                )
+            writeDao.insert(skippedTxn)
+            assertTrue(queryDao.hasExecutedTransactionForRuleSince(skippedRuleId, cycleStart))
         }
 }

@@ -31,6 +31,7 @@ import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -1143,5 +1144,23 @@ class NotificationHelperTest : BaseViewModelTest() {
         assertNotNull(lines)
         assertTrue(lines!!.any { it.contains("spent this month") })
         assertTrue(lines.any { it.contains("first visit here") })
+    }
+
+    @Test
+    fun `canPostNotifications returns true when POST_NOTIFICATIONS is granted on API 33+`() {
+        val shadowApplication = shadowOf(context)
+        shadowApplication.grantPermissions(Manifest.permission.POST_NOTIFICATIONS)
+
+        assertTrue(NotificationHelper.canPostNotifications(context))
+        assertTrue(canPostNotifications(context))
+    }
+
+    @Test
+    fun `canPostNotifications returns false when POST_NOTIFICATIONS is denied on API 33+`() {
+        val shadowApplication = shadowOf(context)
+        shadowApplication.denyPermissions(Manifest.permission.POST_NOTIFICATIONS)
+
+        assertFalse(NotificationHelper.canPostNotifications(context))
+        assertFalse(canPostNotifications(context))
     }
 }

@@ -1,5 +1,6 @@
 package io.pm.finlight
 
+import io.pm.finlight.data.db.entity.AccountAlias
 import kotlinx.coroutines.flow.Flow
 
 interface IAccountRepository {
@@ -53,4 +54,8 @@ interface IAccountRepository {
     ): Account
 
     suspend fun findByName(name: String): Account?
+
+    suspend fun getAliasesForAccount(accountId: Int): List<AccountAlias>
+
+    suspend fun findAliasByName(aliasName: String): AccountAlias?
 }

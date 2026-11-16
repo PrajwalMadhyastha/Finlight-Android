@@ -22,6 +22,8 @@ class MerchantCategoryMappingRepository(private val dao: MerchantCategoryMapping
      */
     override fun getAllMappings(): Flow<List<MerchantCategoryMapping>> = dao.getAllMappingsFlow()
 
+    override suspend fun getAll(): List<MerchantCategoryMapping> = dao.getAll()
+
     /**
      * Looks up the category ID associated with a given merchant name.
      */

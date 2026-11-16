@@ -223,4 +223,87 @@ class RecurringTransactionRepositoryTest : BaseViewModelTest() {
             // Assert
             verify(recurringPatternDao).update(pattern.copy(isDismissed = true))
         }
+
+    @Test
+    fun `getRuleBySmsSenderId calls recurringTransactionDao`() =
+        runTest {
+            val rule =
+                RecurringTransaction(
+                    id = 1,
+                    description = "Electricity",
+                    amount = 1000.0,
+                    transactionType = TransactionType.EXPENSE,
+                    recurrenceInterval = "Monthly",
+                    startDate = 0L,
+                    accountId = 1,
+                    categoryId = 1,
+                    smsSenderId = "BESCOM",
+                    isVariableBill = true,
+                )
+            `when`(recurringTransactionDao.getRuleBySmsSenderId("BESCOM")).thenReturn(rule)
+
+            val result = repository.getRuleBySmsSenderId("BESCOM")
+
+            assertEquals(rule, result)
+            verify(recurringTransactionDao).getRuleBySmsSenderId("BESCOM")
+        }
+
+    @Test
+    fun `getAllRulesList calls recurringTransactionDao`() =
+        runTest {
+            val rules =
+                listOf(
+                    RecurringTransaction(
+                        id = 1,
+                        description = "Rent",
+                        amount = 20000.0,
+                        transactionType = TransactionType.EXPENSE,
+                        recurrenceInterval = "Monthly",
+                        startDate = 0L,
+                        accountId = 1,
+                        categoryId = 1,
+                    ),
+                )
+            `when`(recurringTransactionDao.getAllRulesList()).thenReturn(rules)
+
+            val result = repository.getAllRulesList()
+
+            assertEquals(rules, result)
+            verify(recurringTransactionDao).getAllRulesList()
+        }
+
+    @Test
+    fun `pattern methods delegate to recurringPatternDao`() =
+        runTest {
+            val pattern =
+                RecurringPattern(
+                    smsSignature = "SPOTIFY",
+                    description = "Spotify",
+                    amount = 119.0,
+                    transactionType = TransactionType.EXPENSE,
+                    accountId = 1,
+                    categoryId = 1,
+                    occurrences = 3,
+                    firstSeen = 1000L,
+                    lastSeen = 3000L,
+                    isDismissed = false,
+                )
+
+            `when`(recurringPatternDao.getPatternBySignature("SPOTIFY")).thenReturn(pattern)
+            `when`(recurringPatternDao.getAllPatterns()).thenReturn(listOf(pattern))
+
+            repository.insertPattern(pattern)
+            verify(recurringPatternDao).insert(pattern)
+
+            repository.updatePattern(pattern)
+            verify(recurringPatternDao).update(pattern)
+
+            val singleResult = repository.getPatternBySignature("SPOTIFY")
+            assertEquals(pattern, singleResult)
+            verify(recurringPatternDao).getPatternBySignature("SPOTIFY")
+
+            val listResult = repository.getAllPatterns()
+            assertEquals(listOf(pattern), listResult)
+            verify(recurringPatternDao).getAllPatterns()
+        }
 }

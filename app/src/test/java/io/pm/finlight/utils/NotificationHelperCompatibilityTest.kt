@@ -13,6 +13,7 @@ import io.pm.finlight.MainApplication
 import io.pm.finlight.TestApplication
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,5 +63,11 @@ class NotificationHelperCompatibilityTest : BaseViewModelTest() {
         val postedNotification = shadowNotificationManager.getNotification(notificationId)
         assertNotNull("Notification should have been posted on API 31", postedNotification)
         assertEquals("Notification title should match", "Backup Complete", postedNotification.extras.getString(Notification.EXTRA_TITLE))
+    }
+
+    @Test
+    fun `canPostNotifications returns true on API 31 without explicit permission`() {
+        assertTrue(NotificationHelper.canPostNotifications(context))
+        assertTrue(canPostNotifications(context))
     }
 }

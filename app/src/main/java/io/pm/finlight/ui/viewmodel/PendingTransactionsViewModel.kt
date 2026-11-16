@@ -3,6 +3,8 @@
 // REASON: REFACTOR (Issue #338) - Decouples PendingTransactionsViewModel from
 // AndroidViewModel and direct Room database/DAO access, injecting repository interfaces
 // (ITransactionRepository, IRecurringTransactionRepository) and DispatcherProvider.
+// REFACTOR (Issue #390) - Preserves canonical recurrence anchors (draft.date) via
+// getTransactionSync when lastRunDate is omitted, while retaining NonCancellable containment.
 // =================================================================================
 package io.pm.finlight.ui.viewmodel
 
@@ -49,13 +51,13 @@ class PendingTransactionsViewModel(
      * @param ruleId The ID of the recurring rule that generated this draft, or null.
      * @param confirmedAmount If non-null, overrides the draft amount before confirming.
      *                       Used when the user edits the amount on a variable bill.
-     * @param lastRunDate The timestamp of last execution (defaults to current system time).
+     * @param lastRunDate The timestamp of last execution (defaults to canonical draft date, falling back to current system time).
      */
     fun confirmPending(
         draftId: Int,
         ruleId: Int? = null,
         confirmedAmount: Double? = null,
-        lastRunDate: Long = System.currentTimeMillis(),
+        lastRunDate: Long? = null,
     ) {
         if (confirmedAmount != null && (confirmedAmount <= 0.0 || confirmedAmount.isNaN() || confirmedAmount.isInfinite())) {
             Log.e(TAG, "Cannot confirm draft $draftId: Invalid confirmedAmount $confirmedAmount")
@@ -65,13 +67,17 @@ class PendingTransactionsViewModel(
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 withContext(NonCancellable) {
+                    val targetRunDate =
+                        lastRunDate
+                            ?: transactionRepository.getTransactionSync(draftId)?.date
+                            ?: System.currentTimeMillis()
                     transactionRepository.confirmTransaction(draftId, confirmedAmount)
                     if (ruleId != null) {
                         // Update the rule's lastRunDate so it doesn't fire again this cycle
                         // and reset skip counter on successful confirmation
                         recurringTransactionRepository.updateLastRunAndSkipCount(
                             ruleId = ruleId,
-                            lastRunDate = lastRunDate,
+                            lastRunDate = targetRunDate,
                             skipCount = 0,
                         )
                     }
@@ -90,18 +96,22 @@ class PendingTransactionsViewModel(
      *
      * @param draftId The ID of the PENDING Transaction to skip.
      * @param ruleId The ID of the recurring rule that generated this draft, or null.
-     * @param lastRunDate The timestamp of last execution (defaults to current system time).
+     * @param lastRunDate The timestamp of last execution (defaults to canonical draft date, falling back to current system time).
      * @param skipCount Optional target skip count. If null, the existing skip count is incremented by 1.
      */
     fun skipPending(
         draftId: Int,
         ruleId: Int? = null,
-        lastRunDate: Long = System.currentTimeMillis(),
+        lastRunDate: Long? = null,
         skipCount: Int? = null,
     ) {
         viewModelScope.launch(dispatcherProvider.io) {
             try {
                 withContext(NonCancellable) {
+                    val targetRunDate =
+                        lastRunDate
+                            ?: transactionRepository.getTransactionSync(draftId)?.date
+                            ?: System.currentTimeMillis()
                     transactionRepository.skipTransaction(draftId)
                     if (ruleId != null) {
                         val finalSkipCount =
@@ -114,7 +124,7 @@ class PendingTransactionsViewModel(
                         if (finalSkipCount != null) {
                             recurringTransactionRepository.updateLastRunAndSkipCount(
                                 ruleId = ruleId,
-                                lastRunDate = lastRunDate,
+                                lastRunDate = targetRunDate,
                                 skipCount = finalSkipCount,
                             )
                         }

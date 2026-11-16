@@ -3,6 +3,7 @@ package io.pm.finlight.data.repository
 import android.app.Application
 import android.os.Build
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import app.cash.turbine.test
@@ -116,6 +117,8 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertTrue(repo.getGoalNudgesEnabled().first())
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
+            assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
+            assertEquals(null, repo.getLastSurplusPrompt().first())
         }
 
     @Test
@@ -130,5 +133,47 @@ class FeatureSettingsRepositoryTest : BaseViewModelTest() {
             assertTrue(repo.getGoalNudgesEnabled().first())
             assertEquals(emptySet<String>(), repo.getExcludedIncomeMonths().first())
             assertEquals(emptySet<String>(), repo.getExcludedExpenseMonths().first())
+            assertEquals(emptySet<String>(), repo.getNotifiedPatternSignatures())
+            assertEquals(null, repo.getLastSurplusPrompt().first())
+        }
+
+    @Test
+    fun `mark, get and clear notified pattern signatures`() =
+        runTest {
+            assertEquals(emptySet(), repository.getNotifiedPatternSignatures())
+            repository.markPatternNotified("sig_1")
+            assertEquals(setOf("sig_1"), repository.getNotifiedPatternSignatures())
+            repository.markPatternNotified("sig_2")
+            assertEquals(setOf("sig_1", "sig_2"), repository.getNotifiedPatternSignatures())
+            repository.clearNotifiedPatternSignatures()
+            assertEquals(emptySet(), repository.getNotifiedPatternSignatures())
+        }
+
+    @Test
+    fun `save and get last surplus prompt`() =
+        runTest {
+            repository.getLastSurplusPrompt().test {
+                assertEquals(null, awaitItem())
+                repository.saveLastSurplusPrompt(2026, 11)
+                assertEquals(Pair(2026, 11), awaitItem())
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+    @Test
+    fun `get last surplus prompt returns null when only year or only month is stored`() =
+        runTest {
+            val dataStore = context.financeSettingsDataStore
+            dataStore.edit { preferences ->
+                preferences[intPreferencesKey("last_surplus_prompt_year")] = 2026
+                preferences.remove(intPreferencesKey("last_surplus_prompt_month"))
+            }
+            assertEquals(null, repository.getLastSurplusPrompt().first())
+
+            dataStore.edit { preferences ->
+                preferences.remove(intPreferencesKey("last_surplus_prompt_year"))
+                preferences[intPreferencesKey("last_surplus_prompt_month")] = 11
+            }
+            assertEquals(null, repository.getLastSurplusPrompt().first())
         }
 }

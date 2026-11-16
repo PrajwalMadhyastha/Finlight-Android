@@ -59,6 +59,13 @@ class MerchantCategoryMappingRepositoryTest : BaseViewModelTest() {
         }
 
     @Test
+    fun `getAll calls DAO getAll`() =
+        runTest {
+            repository.getAll()
+            verify(merchantCategoryMappingDao).getAll()
+        }
+
+    @Test
     fun `insertAll calls DAO insertAll`() =
         runTest {
             val mappings = listOf(MerchantCategoryMapping(parsedName = "Swiggy", categoryId = 2))

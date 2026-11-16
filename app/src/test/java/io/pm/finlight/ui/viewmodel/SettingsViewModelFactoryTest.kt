@@ -32,6 +32,7 @@ import io.pm.finlight.ml.MlModelFactory
 import io.pm.finlight.ml.NerExtractor
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ui.theme.AppTheme
+import io.pm.finlight.utils.IWorkScheduler
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -105,6 +106,7 @@ class SettingsViewModelFactoryTest {
         val mockCustomSmsRuleRepo: ICustomSmsRuleRepository = mockk(relaxed = true)
         val mockIgnoreRuleRepo: IIgnoreRuleRepository = mockk(relaxed = true)
         val mockTransactionRunner: TransactionRunner = mockk(relaxed = true)
+        val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
 
         mockkObject(MlModelFactory)
         val mockClassifier: SmsClassifier = mockk(relaxed = true)
@@ -127,6 +129,7 @@ class SettingsViewModelFactoryTest {
         ServiceLocator.setCustomSmsRuleRepository(mockCustomSmsRuleRepo)
         ServiceLocator.setIgnoreRuleRepository(mockIgnoreRuleRepo)
         ServiceLocator.setTransactionRunner(mockTransactionRunner)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         val factory = SettingsViewModelFactory(application)
         val viewModel = factory.create(SettingsViewModel::class.java)
@@ -222,6 +225,12 @@ class SettingsViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockTransactionRunner, transactionRunnerField)
+
+        val workSchedulerField =
+            SettingsViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockWorkScheduler, workSchedulerField)
 
         // NerExtractor is NOT eagerly instantiated on creation
         verify(exactly = 0) { MlModelFactory.getNerExtractor(any()) }

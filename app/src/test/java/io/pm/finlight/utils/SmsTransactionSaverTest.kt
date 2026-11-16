@@ -14,6 +14,7 @@ import io.pm.finlight.*
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.db.dao.*
 import io.pm.finlight.data.db.entity.*
+import io.pm.finlight.domain.usecase.DetectSelfTransferUseCase
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -551,5 +552,48 @@ class SmsTransactionSaverTest : BaseViewModelTest() {
             saver.resolveAndSaveTransaction(makeTxn().copy(amount = 200.0), isForeign = true, travelSettings = nanRateSettings)
             assertEquals(200.0, captor.captured.amount, 0.001)
             assertEquals(1.0, captor.captured.conversionRate ?: 0.0, 0.001)
+        }
+
+    @Test
+    fun `primary constructor saves transaction and invokes detectSelfTransferUseCase`() =
+        runTest {
+            val mockAccountRepo = mockk<IAccountRepository>(relaxed = true)
+            val mockTxnRepo = mockk<ITransactionRepository>(relaxed = true)
+            val mockSelfTransferUseCase = mockk<DetectSelfTransferUseCase>(relaxed = true)
+            val tagRepo = TagRepository(tagDao, db.transactionQueryDao())
+            val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepo)
+
+            coEvery { mockAccountRepo.findAliasByName(any()) } returns AccountAlias("HDFC Bank - X1234", 99)
+            coEvery { mockTxnRepo.insertTransactionWithTags(any(), any()) } returns 101L
+
+            val primarySaver =
+                SmsTransactionSaver(
+                    accountRepository = mockAccountRepo,
+                    transactionRepository = mockTxnRepo,
+                    resolveTravelModeTagUseCase = resolveTravelModeTagUseCase,
+                    detectSelfTransferUseCase = mockSelfTransferUseCase,
+                )
+
+            val id = primarySaver.resolveAndSaveTransaction(makeTxn())
+
+            assertEquals(101L, id)
+            coVerify(exactly = 1) { mockAccountRepo.findAliasByName("HDFC Bank - X1234") }
+            coVerify(exactly = 1) { mockTxnRepo.insertTransactionWithTags(match { it.accountId == 99 }, any()) }
+            coVerify(exactly = 1) { mockSelfTransferUseCase.invoke(match { it.id == 101 && it.accountId == 99 }) }
+        }
+
+    @Test
+    fun `convenience constructor resolves dependencies via ServiceLocator`() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val tagRepo = TagRepository(tagDao, db.transactionQueryDao())
+            val resolveTravelModeTagUseCase = io.pm.finlight.domain.usecase.ResolveTravelModeTagUseCase(tagRepo)
+
+            val convenienceSaver = SmsTransactionSaver(context, resolveTravelModeTagUseCase)
+            assertNotNull(convenienceSaver)
+
+            @Suppress("DEPRECATION")
+            val deprecatedContextSaver = SmsTransactionSaver(context, resolveTravelModeTagUseCase, db)
+            assertNotNull(deprecatedContextSaver)
         }
 }

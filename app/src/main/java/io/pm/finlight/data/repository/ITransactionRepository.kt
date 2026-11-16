@@ -371,4 +371,29 @@ interface ITransactionRepository {
         startDate: Long,
         endDate: Long,
     ): Flow<List<TransactionDetails>>
+
+    suspend fun hasExecutedTransactionForRuleSince(
+        ruleId: Int,
+        cycleStartEpochMs: Long,
+    ): Boolean
+
+    suspend fun getPendingTransactionForRule(ruleId: Int): Transaction?
+
+    suspend fun insertTransaction(transaction: Transaction): Long
+
+    suspend fun updateRecurringRuleId(
+        transactionId: Int,
+        ruleId: Int,
+    )
+
+    suspend fun getPendingTransactions(): List<Transaction>
+
+    suspend fun getAverageDailySpendingForRange(
+        startDate: Long,
+        endDate: Long,
+    ): Double?
+
+    suspend fun getTransactionsWithSignatureSince(sinceDate: Long): List<Transaction>
+
+    suspend fun getTransactionsBySignature(signature: String): List<Transaction>
 }

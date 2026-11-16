@@ -1,161 +1,115 @@
-// =================================================================================
-// FILE: ./app/src/test/java/io/pm/finlight/workers/WeeklySummaryWorkerTest.kt
-// REASON: FIX (Test) - The `doWork calls DAO with correct date ranges` test has
-// been rewritten to be precise. It now calculates the *exact* expected
-// millisecond timestamps for the date ranges and uses `coVerify` with `eq()`
-// to ensure the DAO is called with the correct, zeroed-out time boundaries.
-// This fixes the original test's flawed logic.
-// =================================================================================
 package io.pm.finlight.workers
 
-import android.content.Context
-import android.os.Build
-import android.util.Log
-import androidx.test.core.app.ApplicationProvider
-import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.work.Configuration
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ListenableWorker
-import androidx.work.testing.SynchronousExecutor
-import androidx.work.testing.TestListenableWorkerBuilder
-import androidx.work.testing.WorkManagerTestInitHelper
-import io.mockk.*
-import io.pm.finlight.*
-import io.pm.finlight.data.db.AppDatabase
-import io.pm.finlight.data.db.dao.TransactionAnalyticsDao
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.coVerifyOrder
+import io.mockk.every
+import io.mockk.slot
+import io.mockk.verify
+import io.pm.finlight.CategorySpending
+import io.pm.finlight.FinancialSummary
+import io.pm.finlight.WeeklySummaryWorker
 import io.pm.finlight.utils.NotificationHelper
-import io.pm.finlight.utils.ReminderManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.annotation.Config
 import java.util.Calendar
 
 @ExperimentalCoroutinesApi
-@RunWith(AndroidJUnit4::class)
-@Config(sdk = [Build.VERSION_CODES.UPSIDE_DOWN_CAKE], application = TestApplication::class)
-class WeeklySummaryWorkerTest : BaseViewModelTest() {
-    private lateinit var context: Context
-    private lateinit var db: AppDatabase
-    private lateinit var transactionAnalyticsDao: TransactionAnalyticsDao
-
+class WeeklySummaryWorkerTest : BaseSummaryWorkerTest() {
     @Before
     override fun setup() {
         super.setup()
-        context = ApplicationProvider.getApplicationContext()
-
-        // Create mocks with MockK
-        db = mockk()
-        transactionAnalyticsDao = mockk()
-
-        // Mock the static AppDatabase to return our mock db instance
-        mockkObject(AppDatabase)
-        every { AppDatabase.getInstance(any()) } returns db
-        every { db.transactionAnalyticsDao() } returns transactionAnalyticsDao
-
-        // Initialize WorkManager for testing
-        val config =
-            Configuration.Builder()
-                .setMinimumLoggingLevel(Log.DEBUG)
-                .setExecutor(SynchronousExecutor())
-                .build()
-        WorkManagerTestInitHelper.initializeTestWorkManager(context, config)
-
-        // Mock static helpers
-        mockkObject(NotificationHelper)
-        mockkObject(ReminderManager)
-        every { NotificationHelper.showWeeklySummaryNotification(any(), any(), any(), any()) } just runs
-        coEvery { ReminderManager.scheduleWeeklySummary(any()) } returns Unit
-    }
-
-    @After
-    override fun tearDown() {
-        unmockkAll()
-        super.tearDown()
+        every { settingsRepository.getWeeklySummaryEnabled() } returns flowOf(true)
+        every { NotificationHelper.showWeeklySummaryNotification(any(), any(), any(), any()) } returns Unit
     }
 
     @Test
-    fun `doWork calls DAO with correct date ranges`() =
+    fun `doWork calls repository with correct date ranges`() =
         runTest {
-            // Arrange
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns null
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns null
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
 
-            // Calculate expected ranges EXACTLY as the worker does
-            val now = Calendar.getInstance()
-            val thisWeekEnd =
-                (now.clone() as Calendar).apply {
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-            val thisWeekStart =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -7)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
-            val lastWeekEnd =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -8)
-                    set(Calendar.HOUR_OF_DAY, 23)
-                    set(Calendar.MINUTE, 59)
-                    set(Calendar.SECOND, 59)
-                    set(Calendar.MILLISECOND, 999)
-                }.timeInMillis
-            val lastWeekStart =
-                (now.clone() as Calendar).apply {
-                    add(Calendar.DAY_OF_YEAR, -14)
-                    set(Calendar.HOUR_OF_DAY, 0)
-                    set(Calendar.MINUTE, 0)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+            val thisWeekStartSlot = slot<Long>()
+            val thisWeekEndSlot = slot<Long>()
+            val lastWeekStartSlot = slot<Long>()
+            val lastWeekEndSlot = slot<Long>()
+            val topCategoriesStartSlot = slot<Long>()
+            val topCategoriesEndSlot = slot<Long>()
 
-            // Act
             val result = worker.doWork()
             assertEquals(ListenableWorker.Result.success(), result)
 
-            // Assert
-            // Verify the DAO was called with the *exact* calculated timestamps
             coVerifyOrder {
-                transactionAnalyticsDao.getFinancialSummaryForRange(eq(thisWeekStart), eq(thisWeekEnd))
-                transactionAnalyticsDao.getFinancialSummaryForRange(eq(lastWeekStart), eq(lastWeekEnd))
-                transactionAnalyticsDao.getTopSpendingCategoriesForRange(eq(thisWeekStart), eq(thisWeekEnd))
+                transactionRepository.getFinancialSummaryForRange(capture(thisWeekStartSlot), capture(thisWeekEndSlot))
+                transactionRepository.getFinancialSummaryForRange(capture(lastWeekStartSlot), capture(lastWeekEndSlot))
+                transactionRepository.getTopSpendingCategoriesForRange(capture(topCategoriesStartSlot), capture(topCategoriesEndSlot))
             }
+
+            val thisWeekEndCal = Calendar.getInstance().apply { timeInMillis = thisWeekEndSlot.captured }
+            assertEquals(23, thisWeekEndCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, thisWeekEndCal.get(Calendar.MINUTE))
+            assertEquals(59, thisWeekEndCal.get(Calendar.SECOND))
+            assertEquals(999, thisWeekEndCal.get(Calendar.MILLISECOND))
+
+            val thisWeekStartCal = Calendar.getInstance().apply { timeInMillis = thisWeekStartSlot.captured }
+            assertEquals(0, thisWeekStartCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, thisWeekStartCal.get(Calendar.MINUTE))
+            assertEquals(0, thisWeekStartCal.get(Calendar.SECOND))
+            assertEquals(0, thisWeekStartCal.get(Calendar.MILLISECOND))
+
+            val lastWeekEndCal = Calendar.getInstance().apply { timeInMillis = lastWeekEndSlot.captured }
+            assertEquals(23, lastWeekEndCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(59, lastWeekEndCal.get(Calendar.MINUTE))
+            assertEquals(59, lastWeekEndCal.get(Calendar.SECOND))
+            assertEquals(999, lastWeekEndCal.get(Calendar.MILLISECOND))
+
+            val lastWeekStartCal = Calendar.getInstance().apply { timeInMillis = lastWeekStartSlot.captured }
+            assertEquals(0, lastWeekStartCal.get(Calendar.HOUR_OF_DAY))
+            assertEquals(0, lastWeekStartCal.get(Calendar.MINUTE))
+            assertEquals(0, lastWeekStartCal.get(Calendar.SECOND))
+            assertEquals(0, lastWeekStartCal.get(Calendar.MILLISECOND))
+
+            // Last week end is exactly 1 ms prior to this week start (contiguous ranges)
+            assertEquals(1L, thisWeekStartSlot.captured - lastWeekEndSlot.captured)
+
+            // Duration checks: this week spans 8 days (day 0 through -7), last week spans 7 days (day -8 through -14)
+            val dayMillis = 24L * 60 * 60 * 1000
+            assertEquals(8L * dayMillis - 1, thisWeekEndSlot.captured - thisWeekStartSlot.captured)
+            assertEquals(7L * dayMillis - 1, lastWeekEndSlot.captured - lastWeekStartSlot.captured)
+
+            assertEquals(thisWeekStartSlot.captured, topCategoriesStartSlot.captured)
+            assertEquals(thisWeekEndSlot.captured, topCategoriesEndSlot.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
-    fun `doWork calculates percentage and calls notification helper correctly`() =
+    fun `doWork calculates percentage change correctly and shows notification`() =
         runTest {
-            // Arrange
             val thisWeekSummary = FinancialSummary(0.0, 300.0)
             val lastWeekSummary = FinancialSummary(0.0, 200.0)
             val topCategories = listOf(CategorySpending("Travel", 150.0, "blue", "icon"))
 
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } returns thisWeekSummary andThen lastWeekSummary
-            coEvery { transactionAnalyticsDao.getTopSpendingCategoriesForRange(any(), any()) } returns topCategories
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns thisWeekSummary andThen lastWeekSummary
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns topCategories
 
-            val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
+            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
 
             val expensesCaptor = slot<Double>()
             val percentageCaptor = slot<Int?>()
             val categoriesCaptor = slot<List<CategorySpending>>()
 
-            // Act
             val result = worker.doWork()
 
-            // Assert
             assertEquals(ListenableWorker.Result.success(), result)
-            coVerify { ReminderManager.scheduleWeeklySummary(context) }
             verify {
                 NotificationHelper.showWeeklySummaryNotification(
                     context = any(),
@@ -166,23 +120,79 @@ class WeeklySummaryWorkerTest : BaseViewModelTest() {
             }
 
             assertEquals(300.0, expensesCaptor.captured, 0.0)
-            assertEquals(50, percentageCaptor.captured) // (300-200)/200 * 100
+            assertEquals(50, percentageCaptor.captured)
             assertEquals(topCategories, categoriesCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
         }
 
     @Test
-    fun `doWork returns retry on failure`() =
+    fun `doWork with zero last week expenses calculates null percentage change`() =
         runTest {
-            // Arrange
-            coEvery { transactionAnalyticsDao.getFinancialSummaryForRange(any(), any()) } throws RuntimeException("DB Error")
+            val thisWeekSummary = FinancialSummary(0.0, 150.0)
+            val lastWeekSummary = FinancialSummary(0.0, 0.0)
 
-            val worker = TestListenableWorkerBuilder<WeeklySummaryWorker>(context).build()
+            coEvery { transactionRepository.getFinancialSummaryForRange(any(), any()) } returns thisWeekSummary andThen lastWeekSummary
+            coEvery { transactionRepository.getTopSpendingCategoriesForRange(any(), any()) } returns emptyList()
 
-            // Act
+            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
+            val percentageCaptor = slot<Int?>()
+
             val result = worker.doWork()
 
-            // Assert
-            assertEquals(ListenableWorker.Result.retry(), result)
-            coVerify(exactly = 0) { ReminderManager.scheduleWeeklySummary(any()) }
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify {
+                NotificationHelper.showWeeklySummaryNotification(
+                    context = any(),
+                    totalExpenses = 150.0,
+                    percentageChange = captureNullable(percentageCaptor),
+                    topCategories = any(),
+                )
+            }
+            assertNull(percentageCaptor.captured)
+            coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
         }
+
+    @Test
+    fun `doWork skips summary generation and reschedules when feature is disabled`() =
+        runTest {
+            every { settingsRepository.getWeeklySummaryEnabled() } returns flowOf(false)
+
+            val worker = SummaryWorkerTestFixtures.createWorker<WeeklySummaryWorker>(context)
+            val result = worker.doWork()
+
+            assertEquals(ListenableWorker.Result.success(), result)
+            verify(exactly = 0) {
+                NotificationHelper.showWeeklySummaryNotification(any(), any(), any(), any())
+            }
+            coVerify(exactly = 1) { workScheduler.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
+        }
+
+    @Test
+    fun `doWork returns retry on failure on attempt 0 and does not reschedule`() =
+        runTest {
+            assertRetryOnFirstAttempt<WeeklySummaryWorker> {
+                coVerify(exactly = 0) { it.scheduleWeeklySummary(any()) }
+            }
+        }
+
+    @Test
+    fun `doWork returns failure on final attempt 2 and reschedules`() =
+        runTest {
+            assertFailureOnFinalAttemptAndReschedules<WeeklySummaryWorker> {
+                coVerify(exactly = 1) { it.scheduleWeeklySummary(ExistingWorkPolicy.REPLACE) }
+            }
+        }
+
+    @Test
+    fun `doWork returns failure immediately when runAttemptCount is 3 or more`() =
+        runTest {
+            assertImmediateFailureWhenAttemptCapExceeded<WeeklySummaryWorker> {
+                coVerify(exactly = 0) { it.scheduleWeeklySummary(any()) }
+            }
+        }
+
+    @Test
+    fun `doWork rethrows CancellationException`() {
+        assertRethrowsCancellationException<WeeklySummaryWorker>()
+    }
 }

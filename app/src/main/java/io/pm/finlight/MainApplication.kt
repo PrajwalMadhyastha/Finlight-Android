@@ -16,8 +16,10 @@ import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.memory.MemoryCache
 import com.github.mikephil.charting.utils.Utils
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ml.MlModelFactory
+import kotlinx.coroutines.launch
 
 class MainApplication :
     Application(),
@@ -81,6 +83,12 @@ class MainApplication :
         createMonthlySummaryNotificationChannel()
         createBackupNotificationChannel()
         createGoalsNotificationChannel()
+
+        val applicationScope = ServiceLocator.provideApplicationScope(this)
+        val workScheduler = ServiceLocator.provideWorkScheduler(this)
+        applicationScope.launch {
+            workScheduler.reconcileWorkOnStartup()
+        }
     }
 
     private fun createGoalsNotificationChannel() {

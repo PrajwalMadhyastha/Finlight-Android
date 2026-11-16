@@ -44,6 +44,15 @@ class SettingsRepository(
     override fun getRecurringTransactionsEnabled(): Flow<Boolean> =
         featureSettingsRepository.getRecurringTransactionsEnabled()
 
+    override suspend fun getNotifiedPatternSignatures(): Set<String> =
+        featureSettingsRepository.getNotifiedPatternSignatures()
+
+    override suspend fun markPatternNotified(signature: String) =
+        featureSettingsRepository.markPatternNotified(signature)
+
+    override suspend fun clearNotifiedPatternSignatures() =
+        featureSettingsRepository.clearNotifiedPatternSignatures()
+
     // --- Savings Goals Settings ---
 
     override suspend fun saveGoalIncomeThreshold(amount: Int) =
@@ -57,6 +66,14 @@ class SettingsRepository(
 
     override fun getGoalNudgesEnabled(): Flow<Boolean> =
         featureSettingsRepository.getGoalNudgesEnabled()
+
+    override suspend fun saveLastSurplusPrompt(
+        year: Int,
+        month: Int,
+    ) = featureSettingsRepository.saveLastSurplusPrompt(year, month)
+
+    override fun getLastSurplusPrompt(): Flow<Pair<Int, Int>?> =
+        featureSettingsRepository.getLastSurplusPrompt()
 
     // --- Outlier Month Management Functions ---
 

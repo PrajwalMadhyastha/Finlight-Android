@@ -3,6 +3,10 @@
 // REASON: FIX - The CoroutineWorker's constructor has been corrected to properly
 // pass the application context. This resolves the "Argument type mismatch" and
 // "No value passed for parameter" compilation errors.
+//
+// REFACTOR (Issue #386): Migrated all DAO/AppDatabase queries to ITransactionRepository
+// via ServiceLocator (Zero-DAO). Added retry check cap (runAttemptCount >= 3 and
+// runAttemptCount >= 2 on error), and explicit rethrow of CancellationException.
 // =================================================================================
 package io.pm.finlight
 
@@ -10,9 +14,9 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.NotificationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
@@ -21,13 +25,17 @@ import java.util.Calendar
 class TransactionNotificationWorker(
     private val context: Context,
     workerParams: WorkerParameters,
-) : CoroutineWorker(context, workerParams) { // <-- FIX: Pass context to the parent constructor
-
+) : CoroutineWorker(context, workerParams) {
     companion object {
         const val KEY_TRANSACTION_ID = "transaction_id"
     }
 
     override suspend fun doWork(): Result {
+        if (runAttemptCount >= 3) {
+            Log.e("TransactionNotificationWorker", "Max retries exceeded ($runAttemptCount). Failing permanently.")
+            return Result.failure()
+        }
+
         val transactionId = inputData.getInt(KEY_TRANSACTION_ID, -1)
         if (transactionId == -1) {
             Log.e("TransactionNotificationWorker", "Worker invoked without a valid transaction ID.")
@@ -37,12 +45,10 @@ class TransactionNotificationWorker(
         val dispatcherProvider = ServiceLocator.provideDispatcherProvider(context)
         return withContext(dispatcherProvider.io) {
             try {
-                val db = AppDatabase.getInstance(context)
-                val transactionQueryDao = db.transactionQueryDao()
-                val transactionAnalyticsDao = db.transactionAnalyticsDao()
+                val transactionRepository = ServiceLocator.provideTransactionRepository(context)
 
                 // 1. Fetch details
-                val details = transactionQueryDao.getTransactionDetailsById(transactionId).firstOrNull()
+                val details = transactionRepository.getTransactionDetailsById(transactionId).firstOrNull()
                 if (details == null) {
                     Log.e("TransactionNotificationWorker", "Transaction details not found for id: $transactionId")
                     return@withContext Result.failure()
@@ -60,18 +66,18 @@ class TransactionNotificationWorker(
                         set(Calendar.DAY_OF_MONTH, 1)
                         add(Calendar.DAY_OF_MONTH, -1)
                     }.timeInMillis
-                val summary = transactionAnalyticsDao.getFinancialSummaryForRange(monthStart, monthEnd)
+                val summary = transactionRepository.getFinancialSummaryForRange(monthStart, monthEnd)
                 val monthlyTotal = if (details.transaction.transactionType == TransactionType.INCOME) summary?.totalIncome else summary?.totalExpenses
 
                 // 3. Get visit count and merchant total spent
                 val (visitCount, merchantTotalSpent) =
                     if (details.transaction.transactionType != TransactionType.INCOME) {
                         val count =
-                            transactionQueryDao.getTransactionCountForMerchant(
+                            transactionRepository.getTransactionCountForMerchant(
                                 details.transaction.description,
                             ).first()
                         val totalSpent =
-                            transactionQueryDao.getTotalSpentForMerchant(
+                            transactionRepository.getTotalSpentForMerchant(
                                 details.transaction.description,
                             ).first()
                         Pair(count, totalSpent)
@@ -89,9 +95,11 @@ class TransactionNotificationWorker(
                 )
 
                 Result.success()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.e("TransactionNotificationWorker", "Worker failed for transaction id: $transactionId", e)
-                Result.retry()
+                if (runAttemptCount >= 2) Result.failure() else Result.retry()
             }
         }
     }
