@@ -665,6 +665,7 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 CategoryPickerBottomSheet(
                     title = "Change Category",
                     categories = categories,
+                    selectedCategoryId = transactionForCategoryChange?.transaction?.categoryId,
                     onCategorySelected = { newCategory ->
                         transactionViewModel.updateTransactionCategory(transactionForCategoryChange!!.transaction.id, newCategory.id)
                         transactionViewModel.cancelCategoryChange()

@@ -40,57 +40,38 @@ fun TransactionTypeToggle(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val expenseSelected = selectedType == TransactionType.EXPENSE
-        val incomeSelected = selectedType == TransactionType.INCOME
+        val types =
+            listOf(
+                TransactionType.EXPENSE to "Expense",
+                TransactionType.INCOME to "Income",
+            )
 
-        Button(
-            onClick = { onTypeSelected(TransactionType.EXPENSE) },
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(48.dp),
-            shape = CircleShape,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = if (expenseSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    contentColor = if (expenseSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    disabledContainerColor =
-                        if (expenseSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                        } else {
-                            Color.Transparent
-                        },
-                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                ),
-            elevation = null,
-        ) {
-            Text("Expense", fontWeight = FontWeight.Bold)
-        }
-
-        Button(
-            onClick = { onTypeSelected(TransactionType.INCOME) },
-            enabled = enabled,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .height(48.dp),
-            shape = CircleShape,
-            colors =
-                ButtonDefaults.buttonColors(
-                    containerColor = if (incomeSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                    contentColor = if (incomeSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                    disabledContainerColor =
-                        if (incomeSelected) {
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                        } else {
-                            Color.Transparent
-                        },
-                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                ),
-            elevation = null,
-        ) {
-            Text("Income", fontWeight = FontWeight.Bold)
+        types.forEach { (type, label) ->
+            val isSelected = selectedType == type
+            Button(
+                onClick = { onTypeSelected(type) },
+                enabled = enabled,
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(48.dp),
+                shape = CircleShape,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
+                        contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        disabledContainerColor =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            } else {
+                                Color.Transparent
+                            },
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    ),
+                elevation = null,
+            ) {
+                Text(label, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

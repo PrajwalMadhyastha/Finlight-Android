@@ -38,6 +38,7 @@ fun CategoryPickerBottomSheet(
         )
         CategorySelectionGrid(
             categories = categories,
+            selectedCategoryId = selectedCategoryId,
             onCategorySelected = onCategorySelected,
             onAddNew = onAddNew,
         )

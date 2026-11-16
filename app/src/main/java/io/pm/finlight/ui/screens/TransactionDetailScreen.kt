@@ -1888,28 +1888,10 @@ private fun ChipWithIcon(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(20.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        CategoryIconDisplay(
+            category = category,
+            modifier = Modifier.size(20.dp),
+        )
         Text(
             text = text,
             fontWeight = FontWeight.SemiBold,

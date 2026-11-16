@@ -233,4 +233,60 @@ class PickerSheetsTest {
         composeTestRule.onNodeWithContentDescription("Uncategorized").assertIsDisplayed()
         composeTestRule.onNodeWithText("P").assertIsDisplayed()
     }
+
+    @Test
+    fun accountPickerBottomSheet_displaysCreditCardWithLimitAndSelected() {
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                AccountPickerBottomSheet(
+                    accounts = sampleAccounts,
+                    selectedAccountId = 2,
+                    onAccountSelected = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("SBI Credit").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Currently Selected • Limit:", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun tagPickerBottomSheet_savesPendingNewTagNameWhenSaveClickedDirectly() {
+        var addedTagName = ""
+        var confirmTriggered = false
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                TagPickerBottomSheet(
+                    allTags = sampleTags,
+                    selectedTags = emptySet(),
+                    onTagSelected = {},
+                    onAddNewTag = { addedTagName = it },
+                    onConfirm = { confirmTriggered = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("New Tag Name").performTextInput("Travel")
+        composeTestRule.onNodeWithText("Save").performClick()
+        assertEquals("Travel", addedTagName)
+        assertTrue(confirmTriggered)
+    }
+
+    @Test
+    fun categoryPickerBottomSheet_displaysCategoriesWithSelectedId() {
+        var selectedCategory: Category? = null
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                CategoryPickerBottomSheet(
+                    categories = sampleCategories,
+                    selectedCategoryId = 2,
+                    onCategorySelected = { selectedCategory = it },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Uncategorized").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Groceries").performClick()
+        assertEquals(1, selectedCategory?.id)
+    }
 }

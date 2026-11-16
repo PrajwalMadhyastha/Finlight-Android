@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -75,11 +76,13 @@ fun TagPickerBottomSheet(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 allTags.forEach { tag ->
-                    FilterChip(
-                        selected = tag in selectedTags,
-                        onClick = { onTagSelected(tag) },
-                        label = { Text(tag.name) },
-                    )
+                    key(tag.id) {
+                        FilterChip(
+                            selected = tag in selectedTags,
+                            onClick = { onTagSelected(tag) },
+                            label = { Text(tag.name) },
+                        )
+                    }
                 }
             }
         }

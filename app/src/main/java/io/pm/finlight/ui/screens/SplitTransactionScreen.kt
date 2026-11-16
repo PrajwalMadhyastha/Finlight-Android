@@ -203,6 +203,7 @@ fun SplitTransactionScreen(
             CategoryPickerBottomSheet(
                 title = "Select Category for Split",
                 categories = categories,
+                selectedCategoryId = activeSheetTarget?.category?.id,
                 onCategorySelected = { category ->
                     activeSheetTarget?.let {
                         viewModel.updateSplitCategory(it, category)
