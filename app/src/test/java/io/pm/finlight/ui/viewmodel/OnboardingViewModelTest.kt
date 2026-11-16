@@ -17,12 +17,8 @@ import androidx.work.Configuration
 import androidx.work.testing.SynchronousExecutor
 import androidx.work.testing.WorkManagerTestInitHelper
 import app.cash.turbine.test
-import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
-import io.mockk.verify
 import io.pm.finlight.*
 import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.CategoryIconHelper
@@ -36,6 +32,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -59,6 +56,15 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
     private lateinit var viewModel: OnboardingViewModel
 
+    private fun createViewModel(app: Application = application): OnboardingViewModel =
+        OnboardingViewModel(
+            application = app,
+            categoryRepository = categoryRepository,
+            settingsRepository = settingsRepository,
+            dispatcherProvider = TestDispatcherProvider(testDispatcher),
+            workScheduler = workScheduler,
+        )
+
     @Before
     override fun setup() {
         super.setup()
@@ -72,14 +78,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         workScheduler = mockk(relaxed = true)
         ServiceLocator.setWorkScheduler(workScheduler)
 
-        viewModel =
-            OnboardingViewModel(
-                application = application,
-                categoryRepository = categoryRepository,
-                settingsRepository = settingsRepository,
-                dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                workScheduler = workScheduler,
-            )
+        viewModel = createViewModel()
     }
 
     @After
@@ -100,14 +99,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
             // Act
             // Re-init viewModel to trigger init block
-            viewModel =
-                OnboardingViewModel(
-                    application = application,
-                    categoryRepository = categoryRepository,
-                    settingsRepository = settingsRepository,
-                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                    workScheduler = workScheduler,
-                )
+            viewModel = createViewModel()
 
             // Assert
             viewModel.homeCurrency.test {
@@ -135,14 +127,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             res.updateConfiguration(config, res.displayMetrics)
 
             // Act
-            viewModel =
-                OnboardingViewModel(
-                    application = application,
-                    categoryRepository = categoryRepository,
-                    settingsRepository = settingsRepository,
-                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                    workScheduler = workScheduler,
-                )
+            viewModel = createViewModel()
 
             // Assert
             viewModel.homeCurrency.test {
@@ -179,14 +164,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             java.util.Locale.setDefault(java.util.Locale.UK)
 
             // Act
-            viewModel =
-                OnboardingViewModel(
-                    application = application,
-                    categoryRepository = categoryRepository,
-                    settingsRepository = settingsRepository,
-                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                    workScheduler = workScheduler,
-                )
+            viewModel = createViewModel()
 
             // Assert
             viewModel.homeCurrency.test {
@@ -206,14 +184,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
 
             // Act
-            viewModel =
-                OnboardingViewModel(
-                    application = mockApp,
-                    categoryRepository = categoryRepository,
-                    settingsRepository = settingsRepository,
-                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                    workScheduler = workScheduler,
-                )
+            viewModel = createViewModel(app = mockApp)
 
             // Assert
             viewModel.homeCurrency.test {
@@ -404,14 +375,7 @@ class OnboardingViewModelTest : BaseViewModelTest() {
     fun `finishOnboarding on repository failure emits error to uiEvent`() =
         runTest {
             // Arrange
-            viewModel =
-                OnboardingViewModel(
-                    application = application,
-                    categoryRepository = categoryRepository,
-                    settingsRepository = settingsRepository,
-                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
-                    workScheduler = workScheduler,
-                )
+            viewModel = createViewModel()
             viewModel.onNameChanged("Alice")
             doThrow(RuntimeException("DB save failed")).`when`(settingsRepository).saveUserName("Alice")
 
@@ -423,4 +387,20 @@ class OnboardingViewModelTest : BaseViewModelTest() {
                 cancelAndIgnoreRemainingEvents()
             }
         }
+
+    @Test
+    fun `constructor uses default parameters and resolves workScheduler from ServiceLocator`() {
+        val vm =
+            OnboardingViewModel(
+                application = application,
+                categoryRepository = categoryRepository,
+                settingsRepository = settingsRepository,
+            )
+
+        val workSchedulerField =
+            OnboardingViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(vm)
+        assertSame(workScheduler, workSchedulerField)
+    }
 }
