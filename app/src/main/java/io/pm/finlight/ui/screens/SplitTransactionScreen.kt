@@ -45,8 +45,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import io.pm.finlight.*
-import io.pm.finlight.ui.components.CategorySelectionGrid
 import io.pm.finlight.ui.components.GlassPanel
+import io.pm.finlight.ui.components.pickers.CategoryPickerBottomSheet
 import io.pm.finlight.di.FinlightViewModelFactory
 import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -200,14 +200,17 @@ fun SplitTransactionScreen(
             sheetState = sheetState,
             containerColor = popupContainerColor,
         ) {
-            SplitCategoryPickerSheet(
+            CategoryPickerBottomSheet(
+                title = "Select Category for Split",
                 categories = categories,
+                selectedCategoryId = activeSheetTarget?.category?.id,
                 onCategorySelected = { category ->
                     activeSheetTarget?.let {
                         viewModel.updateSplitCategory(it, category)
                     }
                     activeSheetTarget = null
                 },
+                onDismiss = { activeSheetTarget = null },
             )
         }
     }
@@ -334,26 +337,6 @@ private fun SplitItemRow(
                 Icon(Icons.Default.Delete, contentDescription = "Delete Split", tint = MaterialTheme.colorScheme.error)
             }
         }
-    }
-}
-
-@Composable
-private fun SplitCategoryPickerSheet(
-    categories: List<Category>,
-    onCategorySelected: (Category) -> Unit,
-) {
-    Column(modifier = Modifier.navigationBarsPadding()) {
-        Text(
-            "Select Category for Split",
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-        )
-        // --- UPDATED: Replaced the LazyVerticalGrid with the new reusable component ---
-        CategorySelectionGrid(
-            categories = categories,
-            onCategorySelected = onCategorySelected,
-        )
-        Spacer(Modifier.height(16.dp))
     }
 }
 

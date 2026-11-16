@@ -31,11 +31,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.MergeType
@@ -51,11 +47,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.FragmentActivity
@@ -83,6 +76,7 @@ import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
 import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.HelpActionIcon
+import io.pm.finlight.ui.components.pickers.CategoryPickerBottomSheet
 import io.pm.finlight.ui.screenTitles
 import io.pm.finlight.ui.screens.*
 import io.pm.finlight.ui.theme.AppTheme
@@ -90,7 +84,6 @@ import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.*
-import io.pm.finlight.utils.CategoryIconHelper
 // REMOVED: import io.pm.finlight.ui.common.ForceSmallFonts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -669,10 +662,11 @@ fun MainAppScreen(shortcutAction: String? = null) {
                 sheetState = sheetState,
                 containerColor = popupContainerColor,
             ) {
-                CategoryPickerSheet(
+                CategoryPickerBottomSheet(
                     title = "Change Category",
-                    items = categories,
-                    onItemSelected = { newCategory ->
+                    categories = categories,
+                    selectedCategoryId = transactionForCategoryChange?.transaction?.categoryId,
+                    onCategorySelected = { newCategory ->
                         transactionViewModel.updateTransactionCategory(transactionForCategoryChange!!.transaction.id, newCategory.id)
                         transactionViewModel.cancelCategoryChange()
                     },
@@ -1645,114 +1639,6 @@ fun SplashScreen(
             CircularProgressIndicator()
             Spacer(modifier = Modifier.height(16.dp))
             Text(statusText, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
-}
-
-@Composable
-private fun CategoryPickerSheet(
-    title: String,
-    items: List<Category>,
-    onItemSelected: (Category) -> Unit,
-    onDismiss: () -> Unit,
-    onAddNew: (() -> Unit)? = null,
-) {
-    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 100.dp),
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            items(items) { category ->
-                Column(
-                    modifier =
-                        Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .clickable {
-                                onItemSelected(category)
-                            }
-                            .padding(vertical = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    CategoryIconDisplay(category)
-                    Text(
-                        category.name,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = TextAlign.Center,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-            }
-            if (onAddNew != null) {
-                item {
-                    Column(
-                        modifier =
-                            Modifier
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable(onClick = onAddNew)
-                                .padding(vertical = 12.dp)
-                                .height(80.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Icon(
-                            Icons.Default.AddCircleOutline,
-                            contentDescription = "Create New",
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            "New",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@Composable
-private fun CategoryIconDisplay(category: Category) {
-    Box(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
         }
     }
 }

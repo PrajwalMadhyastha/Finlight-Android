@@ -33,11 +33,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallSplit
@@ -81,6 +79,7 @@ import com.google.gson.Gson
 import io.pm.finlight.*
 import io.pm.finlight.R
 import io.pm.finlight.ui.components.*
+import io.pm.finlight.ui.components.pickers.*
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.di.FinlightViewModelFactory
@@ -1728,24 +1727,27 @@ private fun TransactionEditSheetContent(
             )
         }
         is SheetContent.Account -> {
-            AccountPickerSheet(
+            AccountPickerBottomSheet(
                 title = "Select Account",
-                currentAccountId = details.transaction.accountId,
-                items = accounts,
-                onItemSelected = {
+                selectedAccountId = details.transaction.accountId,
+                accounts = accounts,
+                onAccountSelected = {
                     viewModel.updateTransactionAccount(transactionId, it.id)
                     onDismiss()
                 },
                 onDismiss = onDismiss,
                 onAddNew = onAddNewAccount,
-                accountViewModel = accountViewModel,
+                onRenameAccount = { accountId, newName ->
+                    accountViewModel.renameAccount(accountId, newName)
+                },
             )
         }
         is SheetContent.Category -> {
-            CategoryPickerSheet(
+            CategoryPickerBottomSheet(
                 title = "Select Category",
-                items = categories,
-                onItemSelected = {
+                categories = categories,
+                selectedCategoryId = details.transaction.categoryId,
+                onCategorySelected = {
                     viewModel.updateTransactionCategory(transactionId, it.id)
                     onDismiss()
                 },
@@ -1754,7 +1756,7 @@ private fun TransactionEditSheetContent(
             )
         }
         is SheetContent.Tags -> {
-            TagPickerSheet(
+            TagPickerBottomSheet(
                 allTags = allTags,
                 selectedTags = selectedTags,
                 onTagSelected = viewModel::onTagSelected,
@@ -1766,188 +1768,6 @@ private fun TransactionEditSheetContent(
                 onDismiss = onDismiss,
             )
         }
-    }
-}
-
-@Composable
-private fun AccountPickerSheet(
-    title: String,
-    currentAccountId: Int,
-    items: List<Account>,
-    onItemSelected: (Account) -> Unit,
-    onDismiss: () -> Unit,
-    onAddNew: () -> Unit,
-    accountViewModel: AccountViewModel,
-) {
-    var editingAccount by remember { mutableStateOf<Account?>(null) }
-    var editingName by remember { mutableStateOf("") }
-
-    val currentAccount = items.find { it.id == currentAccountId }
-    val otherAccounts = items.filter { it.id != currentAccountId }
-
-    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-
-        currentAccount?.let { account ->
-            AccountPickerItem(
-                account = account,
-                isEditing = editingAccount?.id == account.id,
-                editingName = editingName,
-                onEditingNameChange = { editingName = it },
-                onEditClick = {
-                    editingAccount = account
-                    editingName = account.name
-                },
-                onSaveClick = {
-                    accountViewModel.renameAccount(account.id, editingName)
-                    editingAccount = null
-                },
-                onCancelClick = { editingAccount = null },
-                onSelectClick = { onItemSelected(account) },
-                isCurrent = true,
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-        }
-
-        LazyColumn {
-            items(otherAccounts) { account ->
-                AccountPickerItem(
-                    account = account,
-                    isEditing = editingAccount?.id == account.id,
-                    editingName = editingName,
-                    onEditingNameChange = { editingName = it },
-                    onEditClick = {
-                        editingAccount = account
-                        editingName = account.name
-                    },
-                    onSaveClick = {
-                        accountViewModel.renameAccount(account.id, editingName)
-                        editingAccount = null
-                    },
-                    onCancelClick = { editingAccount = null },
-                    onSelectClick = { onItemSelected(account) },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Create New Account", color = MaterialTheme.colorScheme.onSurface) },
-                    leadingContent = {
-                        Icon(
-                            Icons.Default.Add,
-                            contentDescription = "Create New Account",
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    modifier = Modifier.clickable(onClick = onAddNew),
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@Composable
-private fun AccountPickerItem(
-    account: Account,
-    isEditing: Boolean,
-    editingName: String,
-    onEditingNameChange: (String) -> Unit,
-    onEditClick: () -> Unit,
-    onSaveClick: () -> Unit,
-    onCancelClick: () -> Unit,
-    onSelectClick: () -> Unit,
-    isCurrent: Boolean = false,
-) {
-    val focusRequester = remember { FocusRequester() }
-    // Local TextFieldValue to preserve selection state; parent receives plain String on change
-    var localTextFieldValue by remember(editingName) {
-        mutableStateOf(TextFieldValue(editingName, TextRange(editingName.length)))
-    }
-
-    if (isEditing) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = localTextFieldValue,
-                onValueChange = {
-                    localTextFieldValue = it
-                    onEditingNameChange(it.text)
-                },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester),
-                singleLine = true,
-                label = { Text("Account Name") },
-            )
-            IconButton(onClick = onSaveClick, enabled = editingName.isNotBlank()) {
-                Icon(Icons.Default.Check, contentDescription = "Save Name", tint = MaterialTheme.colorScheme.primary)
-            }
-            IconButton(onClick = onCancelClick) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel Edit", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        LaunchedEffect(Unit) {
-            focusRequester.requestFocus()
-        }
-    } else {
-        val colors =
-            if (isCurrent) {
-                ListItemDefaults.colors(
-                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                    headlineColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                    supportingColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                )
-            } else {
-                ListItemDefaults.colors(
-                    headlineColor = MaterialTheme.colorScheme.onSurface,
-                    supportingColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-
-        ListItem(
-            colors = colors,
-            headlineContent = {
-                Text(account.name, fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal)
-            },
-            supportingContent =
-                if (isCurrent || (account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0)) {
-                    {
-                        val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
-                        val hasLimit = account.isCreditCard && (account.creditLimit ?: 0.0) > 0.0
-                        when {
-                            isCurrent && hasLimit -> {
-                                Text("Currently Selected • Limit: ${currencyFormat.format(account.creditLimit)}")
-                            }
-                            isCurrent -> {
-                                Text("Currently Selected")
-                            }
-                            hasLimit -> {
-                                Text("Limit: ${currencyFormat.format(account.creditLimit)}")
-                            }
-                        }
-                    }
-                } else {
-                    null
-                },
-            modifier = Modifier.clickable(onClick = onSelectClick),
-            trailingContent = {
-                IconButton(onClick = onEditClick) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit Account Name", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            },
-        )
     }
 }
 
@@ -2030,157 +1850,6 @@ private fun EditTextFieldSheet(
     }
 }
 
-@Composable
-internal fun CategoryPickerSheet(
-    title: String,
-    items: List<Category>,
-    onItemSelected: (Category) -> Unit,
-    onDismiss: () -> Unit,
-    onAddNew: (() -> Unit)? = null,
-) {
-    Column(modifier = Modifier.navigationBarsPadding().fillMaxHeight()) {
-        Text(
-            title,
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        CategorySelectionGrid(
-            categories = items,
-            onCategorySelected = onItemSelected,
-            onAddNew = onAddNew,
-        )
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun TagPickerSheet(
-    allTags: List<Tag>,
-    selectedTags: Set<Tag>,
-    onTagSelected: (Tag) -> Unit,
-    onAddNewTag: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var newTagFieldValue by remember { mutableStateOf(TextFieldValue("")) }
-
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .fillMaxHeight()
-                .navigationBarsPadding(),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Text("Manage Tags", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface)
-
-        Column(
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-        ) {
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                allTags.forEach { tag ->
-                    FilterChip(
-                        selected = tag in selectedTags,
-                        onClick = { onTagSelected(tag) },
-                        label = { Text(tag.name) },
-                    )
-                }
-            }
-        }
-
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            OutlinedTextField(
-                value = newTagFieldValue,
-                onValueChange = { newTagFieldValue = it },
-                label = { Text("New Tag Name") },
-                modifier = Modifier.weight(1f),
-                colors =
-                    OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        unfocusedLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-            )
-            IconButton(
-                onClick = {
-                    onAddNewTag(newTagFieldValue.text)
-                    newTagFieldValue = TextFieldValue("")
-                },
-                enabled = newTagFieldValue.text.isNotBlank(),
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add New Tag", tint = MaterialTheme.colorScheme.primary)
-            }
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-            Spacer(modifier = Modifier.width(8.dp))
-            Button(onClick = {
-                if (newTagFieldValue.text.isNotBlank()) {
-                    onAddNewTag(newTagFieldValue.text)
-                }
-                onConfirm()
-            }) { Text("Save") }
-        }
-    }
-}
-
-@Composable
-private fun CategoryIconDisplay(category: Category) {
-    Box(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        }
-    }
-}
-
 private fun TransactionDetails.toCategory(): Category {
     return if (this.categoryName == null || this.categoryName == "Uncategorized") {
         Category(
@@ -2219,28 +1888,10 @@ private fun ChipWithIcon(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(20.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = null,
-                tint = Color.Black,
-                modifier = Modifier.size(20.dp),
-            )
-        }
+        CategoryIconDisplay(
+            category = category,
+            modifier = Modifier.size(20.dp),
+        )
         Text(
             text = text,
             fontWeight = FontWeight.SemiBold,
