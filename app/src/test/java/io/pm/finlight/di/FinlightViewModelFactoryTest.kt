@@ -68,6 +68,7 @@ import io.pm.finlight.ui.viewmodel.TagViewModel
 import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
 import io.pm.finlight.ui.viewmodel.TripDetailViewModel
 import io.pm.finlight.ui.viewmodel.WhatIfViewModel
+import io.pm.finlight.utils.IWorkScheduler
 import kotlinx.coroutines.flow.flowOf
 import org.junit.After
 import org.junit.Assert.assertNotNull
@@ -316,9 +317,11 @@ class FinlightViewModelFactoryTest {
     fun create_withOnboardingViewModelClass_resolvesDependenciesFromServiceLocator() {
         val mockCategoryRepo: ICategoryRepository = mockk(relaxed = true)
         val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
 
         ServiceLocator.setCategoryRepository(mockCategoryRepo)
         ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         val factory = FinlightViewModelFactory.create(application)
         val viewModel = factory.create(OnboardingViewModel::class.java)
@@ -329,6 +332,12 @@ class FinlightViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockCategoryRepo, catField)
+
+        val workSchedulerField =
+            OnboardingViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockWorkScheduler, workSchedulerField)
     }
 
     @Test
@@ -456,10 +465,12 @@ class FinlightViewModelFactoryTest {
     @Test
     fun create_withSettingsViewModelClass_resolvesDependenciesFromServiceLocator() {
         val mockSettingsRepo: ISettingsRepository = mockk(relaxed = true)
+        val mockWorkScheduler: IWorkScheduler = mockk(relaxed = true)
         every { mockSettingsRepo.getSelectedTheme() } returns flowOf(io.pm.finlight.ui.theme.AppTheme.SYSTEM_DEFAULT)
         every { mockSettingsRepo.getHasSeenOnboarding() } returns flowOf(false)
         every { mockSettingsRepo.getPrivacyModeEnabled() } returns flowOf(false)
         ServiceLocator.setSettingsRepository(mockSettingsRepo)
+        ServiceLocator.setWorkScheduler(mockWorkScheduler)
 
         val factory = FinlightViewModelFactory.create(application)
         val viewModel = factory.create(SettingsViewModel::class.java)
@@ -470,6 +481,12 @@ class FinlightViewModelFactoryTest {
                 isAccessible = true
             }.get(viewModel)
         assertSame(mockSettingsRepo, settingsField)
+
+        val workSchedulerField =
+            SettingsViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockWorkScheduler, workSchedulerField)
     }
 
     @Test
