@@ -8,12 +8,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.pm.finlight.ICategoryRepository
 import io.pm.finlight.ISettingsRepository
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
 import io.pm.finlight.utils.DefaultDispatcherProvider
 import io.pm.finlight.utils.DispatcherProvider
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.IWorkScheduler
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,6 +28,7 @@ class OnboardingViewModel(
     private val categoryRepository: ICategoryRepository,
     private val settingsRepository: ISettingsRepository,
     private val dispatcherProvider: DispatcherProvider = DefaultDispatcherProvider(),
+    private val workScheduler: IWorkScheduler = ServiceLocator.provideWorkScheduler(application),
 ) : ViewModel() {
     private val _uiEvent = Channel<String>(Channel.UNLIMITED)
     val uiEvent = _uiEvent.receiveAsFlow()
@@ -136,7 +138,7 @@ class OnboardingViewModel(
                 }
 
                 // --- FIX: Schedule all default-enabled background workers ---
-                ReminderManager.rescheduleAllWork(application)
+                workScheduler.rescheduleAllWork()
             } catch (e: Exception) {
                 _uiEvent.send("Error completing onboarding: ${e.message}")
             }

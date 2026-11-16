@@ -23,11 +23,12 @@ import io.pm.finlight.*
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.TransactionRunner
 import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.domain.usecase.AutoSaveSmsTransactionUseCase
 import io.pm.finlight.ml.SmsClassifier
 import io.pm.finlight.ml.SmsEntityExtractor
 import io.pm.finlight.ui.theme.AppTheme
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,6 +99,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
     @Mock private lateinit var smsParseTemplateProvider: SmsParseTemplateProvider
 
+    private lateinit var workScheduler: IWorkScheduler
     private lateinit var viewModel: SettingsViewModel
 
     // Helper function to set the private StateFlow using reflection
@@ -130,16 +132,8 @@ class SettingsViewModelTest : BaseViewModelTest() {
     override fun setup() {
         super.setup()
 
-        // --- NEW: Mock ReminderManager ---
-        mockkObject(ReminderManager)
-        coEvery { ReminderManager.scheduleAutoBackup(any()) } just runs
-        coEvery { ReminderManager.cancelAutoBackup(any()) } just runs
-        coEvery { ReminderManager.scheduleDailyReport(any()) } just runs
-        coEvery { ReminderManager.cancelDailyReport(any()) } just runs
-        coEvery { ReminderManager.scheduleWeeklySummary(any()) } just runs
-        coEvery { ReminderManager.cancelWeeklySummary(any()) } just runs
-        coEvery { ReminderManager.scheduleMonthlySummary(any()) } just runs
-        coEvery { ReminderManager.cancelMonthlySummary(any()) } just runs
+        workScheduler = io.mockk.mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(workScheduler)
 
         // --- NEW: Mock TransactionRunner to execute immediately ---
         transactionRunner = io.mockk.mockk()
@@ -219,11 +213,13 @@ class SettingsViewModelTest : BaseViewModelTest() {
                 nerExtractorProvider = customNerExtractorProvider ?: { nerExtractor },
                 transactionRunner = transactionRunner,
                 dispatchers = TestDispatcherProvider(testDispatcher),
+                workScheduler = workScheduler,
             )
     }
 
     @After
     fun after() {
+        ServiceLocator.reset()
         unmockkAll()
     }
 
@@ -1488,7 +1484,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setAutoBackupEnabled calls repository and ReminderManager`() =
+    fun `setAutoBackupEnabled calls repository and workScheduler`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -1499,7 +1495,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert 1
             verify(settingsRepository).saveAutoBackupEnabled(true)
-            coVerify { ReminderManager.scheduleAutoBackup(applicationContext) }
+            coVerify { workScheduler.scheduleAutoBackup() }
 
             // Act 2: Disable
             viewModel.setAutoBackupEnabled(false)
@@ -1507,7 +1503,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert 2
             verify(settingsRepository).saveAutoBackupEnabled(false)
-            coVerify { ReminderManager.cancelAutoBackup(applicationContext) }
+            coVerify { workScheduler.cancelAutoBackup() }
         }
 
     @Test
@@ -1789,7 +1785,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `setDailyReportEnabled calls repository and ReminderManager`() =
+    fun `setDailyReportEnabled calls repository and workScheduler`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -1800,7 +1796,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Enable)
             verify(settingsRepository).saveDailyReportEnabled(true)
-            coVerify { ReminderManager.scheduleDailyReport(applicationContext) }
+            coVerify { workScheduler.scheduleDailyReport() }
 
             // Act (Disable)
             viewModel.setDailyReportEnabled(false)
@@ -1808,7 +1804,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Disable)
             verify(settingsRepository).saveDailyReportEnabled(false)
-            coVerify { ReminderManager.cancelDailyReport(applicationContext) }
+            coVerify { workScheduler.cancelDailyReport() }
         }
 
     @Test
@@ -1832,7 +1828,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveDailyReportTime(8, 30)
             // Verify it was called *after* the save
-            coVerify { ReminderManager.scheduleDailyReport(applicationContext) }
+            coVerify { workScheduler.scheduleDailyReport() }
 
             // Cleanup
             job.cancel()
@@ -1854,11 +1850,11 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveDailyReportTime(8, 30)
             // Verify schedule was *not* called
-            coVerify(exactly = 0) { ReminderManager.scheduleDailyReport(applicationContext) }
+            coVerify(exactly = 0) { workScheduler.scheduleDailyReport() }
         }
 
     @Test
-    fun `setWeeklySummaryEnabled calls repository and ReminderManager`() =
+    fun `setWeeklySummaryEnabled calls repository and workScheduler`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -1869,7 +1865,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Enable)
             verify(settingsRepository).saveWeeklySummaryEnabled(true)
-            coVerify { ReminderManager.scheduleWeeklySummary(applicationContext) }
+            coVerify { workScheduler.scheduleWeeklySummary() }
 
             // Act (Disable)
             viewModel.setWeeklySummaryEnabled(false)
@@ -1877,7 +1873,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Disable)
             verify(settingsRepository).saveWeeklySummaryEnabled(false)
-            coVerify { ReminderManager.cancelWeeklySummary(applicationContext) }
+            coVerify { workScheduler.cancelWeeklySummary() }
         }
 
     @Test
@@ -1896,7 +1892,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveWeeklyReportTime(Calendar.TUESDAY, 10, 30)
             // Verify it was called *after* the save
-            coVerify { ReminderManager.scheduleWeeklySummary(applicationContext) }
+            coVerify { workScheduler.scheduleWeeklySummary() }
         }
 
     @Test
@@ -1920,14 +1916,14 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveWeeklyReportTime(Calendar.TUESDAY, 10, 30)
             // Verify schedule was *not* called
-            coVerify(exactly = 0) { ReminderManager.scheduleWeeklySummary(applicationContext) }
+            coVerify(exactly = 0) { workScheduler.scheduleWeeklySummary() }
 
             // --- FIX: Cancel the collector job ---
             job.cancel()
         }
 
     @Test
-    fun `setMonthlySummaryEnabled calls repository and ReminderManager`() =
+    fun `setMonthlySummaryEnabled calls repository and workScheduler`() =
         runTest {
             // Arrange
             initializeViewModel()
@@ -1938,7 +1934,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Enable)
             verify(settingsRepository).saveMonthlySummaryEnabled(true)
-            coVerify { ReminderManager.scheduleMonthlySummary(applicationContext) }
+            coVerify { workScheduler.scheduleMonthlySummary() }
 
             // Act (Disable)
             viewModel.setMonthlySummaryEnabled(false)
@@ -1946,7 +1942,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
 
             // Assert (Disable)
             verify(settingsRepository).saveMonthlySummaryEnabled(false)
-            coVerify { ReminderManager.cancelMonthlySummary(applicationContext) }
+            coVerify { workScheduler.cancelMonthlySummary() }
         }
 
     @Test
@@ -1965,7 +1961,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveMonthlyReportTime(15, 8, 0)
             // Verify it was called *after* the save
-            coVerify { ReminderManager.scheduleMonthlySummary(applicationContext) }
+            coVerify { workScheduler.scheduleMonthlySummary() }
         }
 
     @Test
@@ -1989,7 +1985,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
             // Assert
             verify(settingsRepository).saveMonthlyReportTime(15, 8, 0)
             // Verify schedule was *not* called
-            coVerify(exactly = 0) { ReminderManager.scheduleMonthlySummary(applicationContext) }
+            coVerify(exactly = 0) { workScheduler.scheduleMonthlySummary() }
 
             // --- FIX: Cancel the collector job ---
             job.cancel()
@@ -2118,6 +2114,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     nerExtractorProvider = { nerExtractor },
                     transactionRunner = transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
                 )
 
             // This tests the ML classifier filtering path
@@ -2179,6 +2176,7 @@ class SettingsViewModelTest : BaseViewModelTest() {
                     nerExtractorProvider = { nerExtractor },
                     transactionRunner = transactionRunner,
                     dispatchers = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
                 )
 
             val sms1 = SmsMessage(1, "BANK", "Transaction 1", 1L)

@@ -1389,6 +1389,7 @@ object ServiceLocator {
                 categoryRepository = categoryRepository,
                 settingsRepository = settingsRepository,
                 dispatcherProvider = dispatcherProvider,
+                workScheduler = provideWorkScheduler(app),
             )
         }
     }
@@ -1637,6 +1638,7 @@ object ServiceLocator {
                 transactionRunner = transactionRunner,
                 databaseHealthChecker = databaseHealthChecker,
                 dispatchers = dispatcherProvider,
+                workScheduler = provideWorkScheduler(app),
             )
         }
     }

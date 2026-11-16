@@ -72,6 +72,7 @@ import io.pm.finlight.ui.viewmodel.OnboardingViewModel
 import io.pm.finlight.ui.viewmodel.ProfileViewModel
 import io.pm.finlight.ui.viewmodel.RuleCreationViewModel
 import io.pm.finlight.ui.viewmodel.SearchViewModel
+import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.ui.viewmodel.SplitTransactionViewModel
 import io.pm.finlight.ui.viewmodel.TagViewModel
 import io.pm.finlight.ui.viewmodel.TimePeriodReportViewModel
@@ -1416,8 +1417,15 @@ class ServiceLocatorTest {
 
     @Test
     fun provideOnboardingViewModel_returnsConfiguredInstance() {
+        val mockScheduler: IWorkScheduler = mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(mockScheduler)
         val viewModel = ServiceLocator.provideOnboardingViewModel(application)
         assertNotNull(viewModel)
+        val field =
+            OnboardingViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockScheduler, field)
     }
 
     @Test
@@ -1575,6 +1583,8 @@ class ServiceLocatorTest {
 
     @Test
     fun provideSettingsViewModel_returnsConfiguredInstance() {
+        val mockScheduler: IWorkScheduler = mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(mockScheduler)
         val autoSaveUseCase: AutoSaveSmsTransactionUseCase = mockk(relaxed = true)
         val nerExtractor: io.pm.finlight.ml.SmsEntityExtractor = mockk(relaxed = true)
         val viewModel =
@@ -1585,6 +1595,11 @@ class ServiceLocatorTest {
                 nerExtractorProvider = { nerExtractor },
             )
         assertNotNull(viewModel)
+        val field =
+            SettingsViewModel::class.java.getDeclaredField("workScheduler").apply {
+                isAccessible = true
+            }.get(viewModel)
+        assertSame(mockScheduler, field)
         assertNotNull(ServiceLocator.provideSettingsViewModel(application))
     }
 

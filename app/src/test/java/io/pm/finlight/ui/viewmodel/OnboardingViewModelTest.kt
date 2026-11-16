@@ -20,15 +20,15 @@ import app.cash.turbine.test
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
-import io.mockk.mockkObject
+import io.mockk.mockk
 import io.mockk.runs
-import io.mockk.unmockkObject
 import io.mockk.verify
 import io.pm.finlight.*
+import io.pm.finlight.di.ServiceLocator
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.CurrencyHelper
 import io.pm.finlight.utils.CurrencyInfo
-import io.pm.finlight.utils.ReminderManager
+import io.pm.finlight.utils.IWorkScheduler
 import io.pm.finlight.utils.TestDispatcherProvider
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -55,14 +55,13 @@ class OnboardingViewModelTest : BaseViewModelTest() {
     @Mock
     private lateinit var settingsRepository: SettingsRepository
 
+    private lateinit var workScheduler: IWorkScheduler
+
     private lateinit var viewModel: OnboardingViewModel
 
     @Before
     override fun setup() {
         super.setup()
-        // --- FIX: Manually initialize WorkManager for testing ---
-        // This is required because the OnboardingViewModel now triggers WorkManager
-        // tasks via ReminderManager.
         val config =
             Configuration.Builder()
                 .setMinimumLoggingLevel(android.util.Log.DEBUG)
@@ -70,16 +69,22 @@ class OnboardingViewModelTest : BaseViewModelTest() {
                 .build()
         WorkManagerTestInitHelper.initializeTestWorkManager(application, config)
 
-        mockkObject(ReminderManager)
-        coEvery { ReminderManager.rescheduleAllWork(any()) } just runs
+        workScheduler = mockk(relaxed = true)
+        ServiceLocator.setWorkScheduler(workScheduler)
 
-        viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+        viewModel =
+            OnboardingViewModel(
+                application = application,
+                categoryRepository = categoryRepository,
+                settingsRepository = settingsRepository,
+                dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                workScheduler = workScheduler,
+            )
     }
 
     @After
     override fun tearDown() {
-        // Clean up static mocks after tests
-        unmockkObject(ReminderManager)
+        ServiceLocator.reset()
         super.tearDown()
     }
 
@@ -95,7 +100,14 @@ class OnboardingViewModelTest : BaseViewModelTest() {
 
             // Act
             // Re-init viewModel to trigger init block
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel =
+                OnboardingViewModel(
+                    application = application,
+                    categoryRepository = categoryRepository,
+                    settingsRepository = settingsRepository,
+                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
+                )
 
             // Assert
             viewModel.homeCurrency.test {
@@ -123,7 +135,14 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             res.updateConfiguration(config, res.displayMetrics)
 
             // Act
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel =
+                OnboardingViewModel(
+                    application = application,
+                    categoryRepository = categoryRepository,
+                    settingsRepository = settingsRepository,
+                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
+                )
 
             // Assert
             viewModel.homeCurrency.test {
@@ -160,7 +179,14 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             java.util.Locale.setDefault(java.util.Locale.UK)
 
             // Act
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel =
+                OnboardingViewModel(
+                    application = application,
+                    categoryRepository = categoryRepository,
+                    settingsRepository = settingsRepository,
+                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
+                )
 
             // Assert
             viewModel.homeCurrency.test {
@@ -180,7 +206,14 @@ class OnboardingViewModelTest : BaseViewModelTest() {
             `when`(mockApp.getSystemService(anyString())).thenThrow(RuntimeException("System Service Error"))
 
             // Act
-            viewModel = OnboardingViewModel(mockApp, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel =
+                OnboardingViewModel(
+                    application = mockApp,
+                    categoryRepository = categoryRepository,
+                    settingsRepository = settingsRepository,
+                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
+                )
 
             // Assert
             viewModel.homeCurrency.test {
@@ -357,25 +390,28 @@ class OnboardingViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `finishOnboarding schedules default workers via ReminderManager`() =
+    fun `finishOnboarding schedules default workers via workScheduler`() =
         runTest {
-            // Arrange
-            mockkObject(ReminderManager)
-            coEvery { ReminderManager.rescheduleAllWork(any()) } just runs
-
             // Act
             viewModel.finishOnboarding()
             advanceUntilIdle() // Ensure the coroutine in finishOnboarding completes
 
             // Assert
-            coVerify(exactly = 1) { ReminderManager.rescheduleAllWork(application) }
+            coVerify(exactly = 1) { workScheduler.rescheduleAllWork() }
         }
 
     @Test
     fun `finishOnboarding on repository failure emits error to uiEvent`() =
         runTest {
             // Arrange
-            viewModel = OnboardingViewModel(application, categoryRepository, settingsRepository, TestDispatcherProvider(testDispatcher))
+            viewModel =
+                OnboardingViewModel(
+                    application = application,
+                    categoryRepository = categoryRepository,
+                    settingsRepository = settingsRepository,
+                    dispatcherProvider = TestDispatcherProvider(testDispatcher),
+                    workScheduler = workScheduler,
+                )
             viewModel.onNameChanged("Alice")
             doThrow(RuntimeException("DB save failed")).`when`(settingsRepository).saveUserName("Alice")
 
