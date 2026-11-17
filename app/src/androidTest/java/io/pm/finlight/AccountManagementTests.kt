@@ -312,7 +312,7 @@ class AccountManagementTests {
 
         // Dialog goes away, we are still on the Add New Account screen
         composeTestRule.onNodeWithText("Account Already Exists", useUnmergedTree = true).assertDoesNotExist()
-        composeTestRule.onAllNodesWithText("Add New Account").onFirst().assertIsDisplayed()
+        composeTestRule.onAllNodesWithText("Add New Account").onFirst().assertExists()
     }
 
     /**

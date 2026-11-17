@@ -34,11 +34,12 @@ val AccountSaver: Saver<Account?, Any> =
             if (account == null) {
                 emptyList()
             } else {
+                val creditLimit = account.creditLimit
                 listOf(
                     account.id,
                     account.name,
                     account.type,
-                    account.creditLimit?.toString() ?: "",
+                    if (creditLimit != null) creditLimit.toString() else "",
                     account.billingCycleDay ?: -1,
                 )
             }
