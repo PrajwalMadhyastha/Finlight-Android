@@ -14,7 +14,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.di.FinlightViewModelFactory
-import io.pm.finlight.ui.screens.ApproveTransactionScreen
+import io.pm.finlight.ui.screens.sms.ApproveTransactionScreen
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

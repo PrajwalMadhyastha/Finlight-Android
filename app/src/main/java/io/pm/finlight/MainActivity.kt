@@ -77,6 +77,13 @@ import io.pm.finlight.ui.components.HelpActionIcon
 import io.pm.finlight.ui.components.pickers.CategoryPickerBottomSheet
 import io.pm.finlight.ui.screenTitles
 import io.pm.finlight.ui.screens.*
+import io.pm.finlight.ui.screens.recurring.RecurringTransactionScreen
+import io.pm.finlight.ui.screens.settings.AppearanceSettingsScreen
+import io.pm.finlight.ui.screens.settings.AutomationSettingsScreen
+import io.pm.finlight.ui.screens.settings.DataSettingsScreen
+import io.pm.finlight.ui.screens.settings.NotificationSettingsScreen
+import io.pm.finlight.ui.screens.sms.ApproveTransactionScreen
+import io.pm.finlight.ui.screens.sms.ReviewSmsScreen
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark

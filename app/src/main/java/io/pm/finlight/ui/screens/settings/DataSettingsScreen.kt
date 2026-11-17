@@ -1,45 +1,58 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/screens/SettingsSubScreens.kt
-//
-// REASON: FEATURE (Bulk Import Progress)
-// - `AutomationSettingsScreen` now collects the new `totalSmsToScan` and
-//   `processedSmsCount` state flows from the `SettingsViewModel`.
-// - The `isScanning` UI logic is now enhanced.
-// - If `isScanning` is true AND `totalSmsToScan` > 0, it displays a non-dismissible
-//   `AlertDialog` with a `LinearProgressIndicator` and text showing the
-//   determinate progress (e.g., "Scanning: 300 / 1500").
-// - If `isScanning` is true but `totalSmsToScan` is 0 (i.e., the scan is
-//   still initializing), it shows the old indeterminate spinner as a fallback.
-// =================================================================================
-package io.pm.finlight.ui.screens
+package io.pm.finlight.ui.screens.settings
 
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
-import androidx.compose.material.icons.automirrored.filled.ManageSearch
-import androidx.compose.material.icons.automirrored.filled.Rule
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.GridOn
+import androidx.compose.material.icons.filled.HealthAndSafety
+import androidx.compose.material.icons.filled.PostAdd
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WarningAmber
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -47,7 +60,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import io.pm.finlight.data.DataExportService
 import io.pm.finlight.ui.components.ConfirmationDialog
@@ -55,402 +67,20 @@ import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.components.SettingsActionItem
 import io.pm.finlight.ui.components.SettingsToggleItem
-import io.pm.finlight.ui.components.WeeklyReportTimePicker
-import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.FormatUtils
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.Date
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
-
-private fun hasSmsPermission(context: Context): Boolean {
-    return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
-}
 
 @Composable
 private fun formatBackupTimestamp(timestamp: Long): String {
     if (timestamp == 0L) return "Never"
     return FormatUtils.dateTimeFormatter.format(Date(timestamp))
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AppearanceSettingsScreen(
-    navController: NavController,
-    settingsViewModel: SettingsViewModel,
-) {
-    val selectedTheme by settingsViewModel.selectedTheme.collectAsState()
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            GlassPanel {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Theme",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Text(
-                        text = "Select the app's color palette.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                    ) {
-                        AppTheme.entries.forEach { theme ->
-                            ThemePickerItem(
-                                theme = theme,
-                                isSelected = selectedTheme == theme,
-                                onClick = { settingsViewModel.saveSelectedTheme(theme) },
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AutomationSettingsScreen(
-    navController: NavController,
-    settingsViewModel: SettingsViewModel,
-) {
-    val context = LocalContext.current
-    val isScanning by settingsViewModel.isScanning.collectAsState()
-    var showDatePickerDialog by remember { mutableStateOf(false) }
-    val smsScanStartDate by settingsViewModel.smsScanStartDate.collectAsState()
-    val dateFormatter = remember { FormatUtils.longDateFormatter }
-    val isUnknownTransactionPopupEnabled by settingsViewModel.unknownTransactionPopupEnabled.collectAsState()
-
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-    // --- NEW: Collect progress state ---
-    val totalSms by settingsViewModel.totalSmsToScan.collectAsState()
-    val processedSms by settingsViewModel.processedSmsCount.collectAsState()
-
-    LaunchedEffect(Unit) {
-        settingsViewModel.uiEvent.collectLatest { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-        }
-    }
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        item {
-            GlassPanel {
-                Column {
-                    SettingsActionItem(
-                        text = "Scan Full Inbox",
-                        subtitle = "Scan all messages to find transactions",
-                        icon = Icons.AutoMirrored.Filled.ManageSearch,
-                        onClick = {
-                            if (!isScanning) {
-                                settingsViewModel.startSmsScanAndIdentifyMappings(null) { importedCount ->
-                                    // The lambda now just returns the count.
-                                    // The navigation logic is removed.
-                                }
-                            }
-                        },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = { Text("Scan from specific date", color = MaterialTheme.colorScheme.onSurface) },
-                        supportingContent = {
-                            Text(
-                                text = "Start date: ${dateFormatter.format(Date(smsScanStartDate))}",
-                                modifier = Modifier.clickable { showDatePickerDialog = true },
-                                color = MaterialTheme.colorScheme.primary,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        },
-                        leadingContent = { Icon(Icons.Default.Event, "Scan from date", tint = MaterialTheme.colorScheme.primary) },
-                        trailingContent = {
-                            Button(
-                                onClick = {
-                                    if (!isScanning) {
-                                        settingsViewModel.startSmsScanAndIdentifyMappings(smsScanStartDate) { importedCount ->
-                                            // The lambda now just returns the count.
-                                            // The navigation logic is removed.
-                                        }
-                                    }
-                                },
-                                enabled = !isScanning,
-                            ) { Text("Scan") }
-                        },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsActionItem(
-                        text = "Manage Custom Parse Rules",
-                        subtitle = "View or delete your SMS parsing rules",
-                        icon = Icons.AutoMirrored.Filled.Rule,
-                        onClick = { navController.navigate("manage_parse_rules") },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsActionItem(
-                        text = "Manage Parser Ignore List",
-                        subtitle = "Add or remove phrases to ignore",
-                        icon = Icons.Default.Block,
-                        onClick = { navController.navigate("manage_ignore_rules") },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsActionItem(
-                        text = "Merchant Rename Rules",
-                        subtitle = "View rules for auto-renaming merchants",
-                        icon = Icons.Default.Storefront,
-                        onClick = { navController.navigate("manage_merchant_rules") },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsActionItem(
-                        text = "Debug SMS Parsing",
-                        subtitle = "See why recent messages were parsed or ignored",
-                        icon = Icons.Default.BugReport,
-                        onClick = { navController.navigate("sms_debug_screen") },
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsToggleItem(
-                        title = "Popup for Unknown Transactions",
-                        subtitle = "Show notification for new merchants",
-                        icon = Icons.AutoMirrored.Filled.HelpOutline,
-                        checked = isUnknownTransactionPopupEnabled,
-                        onCheckedChange = { settingsViewModel.setUnknownTransactionPopupEnabled(it) },
-                    )
-                }
-            }
-        }
-    }
-
-    if (showDatePickerDialog) {
-        val datePickerState = rememberDatePickerState(initialSelectedDateMillis = smsScanStartDate)
-        DatePickerDialog(
-            onDismissRequest = { showDatePickerDialog = false },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        datePickerState.selectedDateMillis?.let {
-                            settingsViewModel.saveSmsScanStartDate(it)
-                        }
-                        showDatePickerDialog = false
-                    },
-                ) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePickerDialog = false }) { Text("Cancel") }
-            },
-            colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
-        ) {
-            DatePicker(
-                state = datePickerState,
-                colors = DatePickerDefaults.colors(containerColor = popupContainerColor.copy(alpha = 1f)),
-            )
-        }
-    }
-
-    // --- REPLACED: This block now handles both indeterminate and determinate progress ---
-    if (isScanning && totalSms > 0) {
-        // --- Determinate Progress Dialog ---
-        AlertDialog(
-            onDismissRequest = { /* Non-dismissible */ },
-            containerColor = popupContainerColor,
-            title = { Text("Scanning Your Messages") },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Spacer(Modifier.height(16.dp))
-                    LinearProgressIndicator(
-                        progress = { (processedSms.toFloat() / totalSms.toFloat()).coerceIn(0f, 1f) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(8.dp)
-                                .clip(CircleShape),
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        "Scanning: $processedSms / $totalSms messages",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-            confirmButton = { /* No button, non-dismissible */ },
-        )
-    } else if (isScanning) {
-        // --- Indeterminate Fallback Scrim ---
-        // (This shows briefly before totalSms is updated)
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.5f),
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(16.dp))
-                    Text("Starting scan...", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun NotificationSettingsScreen(
-    navController: NavController,
-    settingsViewModel: SettingsViewModel,
-) {
-    val isWeeklySummaryEnabled by settingsViewModel.weeklySummaryEnabled.collectAsState()
-    val isDailyReportEnabled by settingsViewModel.dailyReportEnabled.collectAsState()
-    val isMonthlySummaryEnabled by settingsViewModel.monthlySummaryEnabled.collectAsState()
-    val dailyReportTime by settingsViewModel.dailyReportTime.collectAsState()
-    var showDailyTimePicker by remember { mutableStateOf(false) }
-    val weeklyReportTime by settingsViewModel.weeklyReportTime.collectAsState()
-    var showWeeklyTimePicker by remember { mutableStateOf(false) }
-    val isAutoCaptureNotificationEnabled by settingsViewModel.autoCaptureNotificationEnabled.collectAsState()
-    val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState() // NEW: Collect isAutoBackupEnabled
-    val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState() // NEW: Collect autoBackupNotification setting
-
-    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-    ) {
-        item {
-            SettingsSection(title = "Transaction Notifications") {
-                SettingsToggleItem(
-                    title = "Auto-Captured Transactions",
-                    subtitle = "Notify when a transaction is saved from an SMS",
-                    icon = Icons.Default.Sms,
-                    checked = isAutoCaptureNotificationEnabled,
-                    onCheckedChange = { settingsViewModel.setAutoCaptureNotificationEnabled(it) },
-                )
-            }
-        }
-        item {
-            Spacer(Modifier.height(16.dp))
-            SettingsSection(title = "Backup Notification") { // NEW SECTION for Backup Notification
-                SettingsToggleItem(
-                    title = "Backup Notification",
-                    subtitle = "Notify when a backup is complete",
-                    icon = Icons.Default.CloudUpload,
-                    checked = isAutoBackupNotificationEnabled,
-                    onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                    // Keep the dependency on auto-backup being enabled
-                    enabled = isAutoBackupEnabled,
-                )
-            }
-        }
-        item {
-            Spacer(Modifier.height(16.dp))
-            SettingsSection(title = "Summaries & Reports") {
-                Column {
-                    SettingsToggleItem(
-                        title = "Daily Summary",
-                        subtitle = "Report of yesterday's spending",
-                        icon = Icons.Default.Notifications,
-                        checked = isDailyReportEnabled,
-                        onCheckedChange = { settingsViewModel.setDailyReportEnabled(it) },
-                    )
-                    SettingsActionItem(
-                        text = "Daily Report Time",
-                        subtitle = "Current: ${String.format("%02d:%02d", dailyReportTime.first, dailyReportTime.second)}",
-                        icon = Icons.Default.Schedule,
-                        onClick = { showDailyTimePicker = true },
-                        enabled = isDailyReportEnabled,
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsToggleItem(
-                        title = "Weekly Summary",
-                        subtitle = "Summary of your finances every week",
-                        icon = Icons.Default.CalendarViewWeek,
-                        checked = isWeeklySummaryEnabled,
-                        onCheckedChange = { settingsViewModel.setWeeklySummaryEnabled(it) },
-                    )
-                    SettingsActionItem(
-                        text = "Weekly Report Time",
-                        subtitle = "Current: ${FormatUtils.dayOfWeekFormatter.format(
-                            Calendar.getInstance().apply { set(Calendar.DAY_OF_WEEK, weeklyReportTime.first) }.time,
-                        )} at ${String.format("%02d:%02d", weeklyReportTime.second, weeklyReportTime.third)}",
-                        icon = Icons.Default.Schedule,
-                        onClick = { showWeeklyTimePicker = true },
-                        enabled = isWeeklySummaryEnabled,
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    SettingsToggleItem(
-                        title = "Monthly Summary",
-                        subtitle = "Delivered on the 1st of each month at 9 AM",
-                        icon = Icons.Default.CalendarViewMonth,
-                        checked = isMonthlySummaryEnabled,
-                        onCheckedChange = { settingsViewModel.setMonthlySummaryEnabled(it) },
-                    )
-                }
-            }
-        }
-    }
-
-    if (showDailyTimePicker) {
-        val timePickerState =
-            rememberTimePickerState(
-                initialHour = dailyReportTime.first,
-                initialMinute = dailyReportTime.second,
-                is24Hour = false,
-            )
-        AlertDialog(
-            onDismissRequest = { showDailyTimePicker = false },
-            title = { Text("Select Daily Report Time") },
-            text = {
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TimePicker(state = timePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        settingsViewModel.saveDailyReportTime(timePickerState.hour, timePickerState.minute)
-                        showDailyTimePicker = false
-                    },
-                ) { Text("OK") }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDailyTimePicker = false }) { Text("Cancel") }
-            },
-            containerColor = popupContainerColor,
-        )
-    }
-
-    if (showWeeklyTimePicker) {
-        WeeklyReportTimePicker(
-            initialDay = weeklyReportTime.first,
-            initialHour = weeklyReportTime.second,
-            initialMinute = weeklyReportTime.third,
-            onDismiss = { showWeeklyTimePicker = false },
-            onConfirm = { day, hour, minute ->
-                settingsViewModel.saveWeeklyReportTime(day, hour, minute)
-                showWeeklyTimePicker = false
-            },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -474,8 +104,6 @@ fun DataSettingsScreen(
     val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
     val isAutoBackupEnabled by settingsViewModel.autoBackupEnabled.collectAsState()
-    // --- DELETED: val isAutoBackupNotificationEnabled by settingsViewModel.autoBackupNotificationEnabled.collectAsState()
-
     val isPrivacyModeEnabled by settingsViewModel.privacyModeEnabled.collectAsState()
 
     val lastBackupTimestamp by settingsViewModel.lastBackupTimestamp.collectAsState()
@@ -646,19 +274,6 @@ fun DataSettingsScreen(
                         checked = isAutoBackupEnabled,
                         onCheckedChange = { settingsViewModel.setAutoBackupEnabled(it) },
                     )
-                    // --- DELETED: Backup Notification Toggle ---
-
-                    /*
-                    SettingsToggleItem(
-                        title = "Backup Notification",
-                        subtitle = "Notify when a backup is complete",
-                        icon = Icons.Default.Notifications,
-                        checked = isAutoBackupNotificationEnabled,
-                        onCheckedChange = { settingsViewModel.setAutoBackupNotificationEnabled(it) },
-                        enabled = isAutoBackupEnabled
-                    )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                     */
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
                     SettingsActionItem(
                         text = "Export Data (JSON)",
@@ -724,7 +339,6 @@ fun DataSettingsScreen(
                         },
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                    // --- Photo receipts disclaimer ---
                     Row(
                         modifier =
                             Modifier
@@ -917,81 +531,6 @@ private fun BackupSnapshotSuccessDialog(onDismiss: () -> Unit) {
             }
         },
     )
-}
-
-@Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = title.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp),
-        )
-        GlassPanel {
-            Column {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemePickerItem(
-    theme: AppTheme,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-) {
-    val isDark = isSystemInDarkTheme()
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.clickable(onClick = onClick),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .border(2.dp, borderColor, CircleShape)
-                    .padding(4.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(
-                            brush =
-                                Brush.horizontalGradient(
-                                    colors =
-                                        listOf(
-                                            if (isDark) theme.darkColor else theme.lightColor,
-                                            if (isDark) theme.darkColor.copy(alpha = 0.7f) else theme.lightColor.copy(alpha = 0.7f),
-                                        ),
-                                ),
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = theme.icon,
-                    contentDescription = theme.displayName,
-                    tint = if (isDark) Color.White.copy(alpha = 0.8f) else Color.Black.copy(alpha = 0.8f),
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        }
-        Text(
-            text = theme.displayName,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 @Composable

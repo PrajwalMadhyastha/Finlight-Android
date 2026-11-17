@@ -26,6 +26,8 @@ import io.pm.finlight.ui.components.dashboard.AuroraRecentTransactionsCard
 import io.pm.finlight.ui.components.dashboard.AuroraSimulatorsCard
 import io.pm.finlight.ui.components.dashboard.BudgetWatchCard
 import io.pm.finlight.ui.components.dashboard.DashboardHeroCard
+import io.pm.finlight.ui.screens.recurring.RecurringSuggestionsCard
+import io.pm.finlight.ui.screens.recurring.UpcomingPaymentsCard
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.util.Calendar
