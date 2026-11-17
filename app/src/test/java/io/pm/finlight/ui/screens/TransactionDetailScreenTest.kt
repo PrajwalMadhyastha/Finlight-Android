@@ -1,5 +1,6 @@
 package io.pm.finlight.ui.screens
 
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -10,34 +11,50 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.pm.finlight.CanonicalNudgeSheetState
 import io.pm.finlight.CanonicalVariant
 import io.pm.finlight.RetroUpdateSheetState
+import io.pm.finlight.SmsMessage
 import io.pm.finlight.SplitTransaction
 import io.pm.finlight.SplitTransactionDetails
 import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
+import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.model.MergedTransactionItem
 import io.pm.finlight.ui.screens.transactiondetail.AccountCard
 import io.pm.finlight.ui.screens.transactiondetail.CanonicalNudgeSheetContent
 import io.pm.finlight.ui.screens.transactiondetail.CurrencyConversionInfoCard
+import io.pm.finlight.ui.screens.transactiondetail.EditTextFieldSheet
 import io.pm.finlight.ui.screens.transactiondetail.MultiAccountBreakdownCard
 import io.pm.finlight.ui.screens.transactiondetail.OriginalSmsCard
 import io.pm.finlight.ui.screens.transactiondetail.RetrospectiveUpdateSheetContent
 import io.pm.finlight.ui.screens.transactiondetail.ReviewBannerCard
 import io.pm.finlight.ui.screens.transactiondetail.SplitSummaryCard
+import io.pm.finlight.ui.screens.transactiondetail.TransactionActionsCard
 import io.pm.finlight.ui.screens.transactiondetail.TransactionPropertiesCard
 import io.pm.finlight.ui.screens.transactiondetail.TransactionSpotlightHeader
+import io.pm.finlight.ui.screens.transactiondetail.navigateToRuleCreation
 import io.pm.finlight.ui.theme.PersonalFinanceAppTheme
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.anyOrNull
+import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowToast
 import java.util.Date
 
 @RunWith(AndroidJUnit4::class)
@@ -435,4 +452,129 @@ class TransactionDetailScreenTest {
         composeTestRule.onNodeWithText("Original SMS Message").assertIsDisplayed()
         composeTestRule.onNodeWithText("Rs 1500 debited from A/C XX1234 at POS").assertIsDisplayed()
     }
+
+    @Test
+    fun transactionActionsCard_rendersAttachAndFixParsingWhenSmsPresent() {
+        var addClicked = false
+        var fixParsingClicked = false
+
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                TransactionActionsCard(
+                    images = emptyList(),
+                    onAddClick = { addClicked = true },
+                    onViewClick = {},
+                    onDeleteClick = {},
+                    sourceSmsId = 123L,
+                    onFixParsingClick = { fixParsingClicked = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Attach").assertIsDisplayed().performClick()
+        assertTrue(addClicked)
+
+        composeTestRule.onNodeWithText("Fix Parsing").assertIsDisplayed().performClick()
+        assertTrue(fixParsingClicked)
+    }
+
+    @Test
+    fun transactionActionsCard_hidesFixParsingWhenSmsAbsent() {
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                TransactionActionsCard(
+                    images = emptyList(),
+                    onAddClick = {},
+                    onViewClick = {},
+                    onDeleteClick = {},
+                    sourceSmsId = null,
+                    onFixParsingClick = {},
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Attach").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Fix Parsing").assertDoesNotExist()
+    }
+
+    @Test
+    fun editTextFieldSheet_editsAndConfirms() {
+        var savedValue = ""
+        var dismissed = false
+
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                EditTextFieldSheet(
+                    title = "Edit Notes",
+                    initialValue = "Dinner with friends",
+                    onConfirm = { savedValue = it },
+                    onDismiss = { dismissed = true },
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("Edit Notes").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Dinner with friends").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Save").performClick()
+        assertEquals("Dinner with friends", savedValue)
+
+        composeTestRule.onNodeWithText("Cancel").performClick()
+        assertTrue(dismissed)
+    }
+
+    @Test
+    fun navigateToRuleCreation_handlesNullSmsIdGracefully() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val navController = mock<NavController>()
+        val viewModel = mock<TransactionViewModel>()
+        val details = createSampleDetails(txn = createSampleTransaction().copy(sourceSmsId = null))
+        val testDispatcher = StandardTestDispatcher()
+        val testScope = TestScope(testDispatcher)
+
+        navigateToRuleCreation(context, navController, viewModel, testScope, details)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals("Original SMS not found.", ShadowToast.getTextOfLatestToast())
+    }
+
+    @Test
+    fun navigateToRuleCreation_withMissingSms_showsToast() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val navController = mock<NavController>()
+            val viewModel = mock<TransactionViewModel>()
+            val details = createSampleDetails(txn = createSampleTransaction().copy(sourceSmsId = 888L))
+
+            whenever(viewModel.getOriginalSmsMessage(888L)).thenReturn(null)
+
+            navigateToRuleCreation(context, navController, viewModel, this, details)
+            testScheduler.advanceUntilIdle()
+
+            assertEquals("Original SMS not found.", ShadowToast.getTextOfLatestToast())
+        }
+
+    @Test
+    fun navigateToRuleCreation_withValidSms_navigatesToRuleCreation() =
+        runTest {
+            val context = ApplicationProvider.getApplicationContext<Context>()
+            val navController = mock<NavController>()
+            val viewModel = mock<TransactionViewModel>()
+            val details = createSampleDetails(txn = createSampleTransaction().copy(sourceSmsId = 555L))
+            val sampleSms =
+                SmsMessage(
+                    id = 555L,
+                    sender = "HDFCBK",
+                    body = "Paid Rs 1450.50 to Starbucks",
+                    date = 1700000000000L,
+                )
+
+            whenever(viewModel.getOriginalSmsMessage(555L)).thenReturn(sampleSms)
+
+            navigateToRuleCreation(context, navController, viewModel, this, details)
+            testScheduler.advanceUntilIdle()
+
+            val captor = argumentCaptor<String>()
+            verify(navController).navigate(captor.capture(), anyOrNull(), anyOrNull())
+            assertTrue(captor.firstValue.startsWith("rule_creation_screen?potentialTransactionJson="))
+        }
 }

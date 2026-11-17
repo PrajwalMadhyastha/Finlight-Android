@@ -209,9 +209,9 @@ fun TransactionDetailScreen(
         val isThemeDark = MaterialTheme.colorScheme.background.isDark()
         val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
 
-        if (retroUpdateSheetState != null) {
+        retroUpdateSheetState?.let { sheetState ->
             RetrospectiveUpdateSheet(
-                state = retroUpdateSheetState!!,
+                state = sheetState,
                 onToggleSelection = viewModel::toggleRetroUpdateSelection,
                 onToggleSelectAll = viewModel::toggleRetroUpdateSelectAll,
                 onToggleUpdateFuture = viewModel::toggleUpdateFutureTransactions,
@@ -221,9 +221,9 @@ fun TransactionDetailScreen(
             )
         }
 
-        if (canonicalNudgeState != null) {
+        canonicalNudgeState?.let { nudgeState ->
             CanonicalNudgeSheet(
-                state = canonicalNudgeState!!,
+                state = nudgeState,
                 onToggleVariant = viewModel::toggleCanonicalVariant,
                 onConfirm = { viewModel.confirmCanonicalNudge() },
                 onDismiss = { viewModel.dismissCanonicalNudge() },
@@ -387,12 +387,13 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    if (details.transaction.transactionType == TransactionType.INCOME && linkedExpense != null) {
+                    val expense = linkedExpense
+                    if (details.transaction.transactionType == TransactionType.INCOME && expense != null) {
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                                 LinkedAsReimbursementBadge(
-                                    linkedExpense = linkedExpense!!,
-                                    onNavigateToExpense = { navController.navigate("transaction_detail/${linkedExpense!!.transaction.id}") },
+                                    linkedExpense = expense,
+                                    onNavigateToExpense = { navController.navigate("transaction_detail/${expense.transaction.id}") },
                                     onUnlinkClick = { viewModel.unlinkReimbursement(transactionId) },
                                 )
                             }
@@ -434,10 +435,10 @@ fun TransactionDetailScreen(
                         }
                     }
 
-                    if (!originalSms.isNullOrBlank()) {
+                    originalSms?.takeIf { it.isNotBlank() }?.let { sms ->
                         item {
                             Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                OriginalSmsCard(originalSms = originalSms!!)
+                                OriginalSmsCard(originalSms = sms)
                             }
                         }
                     }
@@ -448,7 +449,6 @@ fun TransactionDetailScreen(
                     details = details,
                     viewModel = viewModel,
                     accountViewModel = accountViewModel,
-                    onSaveRenameRule = onSaveRenameRule,
                     accounts = accounts,
                     categories = categories,
                     allTags = allTags,

@@ -405,8 +405,13 @@ fun navigateToRuleCreation(
     scope: CoroutineScope,
     details: TransactionDetails,
 ) {
+    val sourceSmsId = details.transaction.sourceSmsId
+    if (sourceSmsId == null) {
+        Toast.makeText(context, "Original SMS not found.", Toast.LENGTH_SHORT).show()
+        return
+    }
     scope.launch {
-        val smsMessage = viewModel.getOriginalSmsMessage(details.transaction.sourceSmsId!!)
+        val smsMessage = viewModel.getOriginalSmsMessage(sourceSmsId)
         if (smsMessage != null) {
             val potentialTxn =
                 PotentialTransaction(
