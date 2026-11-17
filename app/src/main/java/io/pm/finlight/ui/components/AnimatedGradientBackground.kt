@@ -106,13 +106,11 @@ internal fun AnimatedGradientBackground(
     durationMillis: Int,
     label: String,
     modifier: Modifier = Modifier,
-    animationsDisabled: Boolean =
-        run {
-            val context = LocalContext.current
-            remember(context) { isAnimationDisabled(context) }
-        },
+    animationsDisabled: Boolean? = null,
 ) {
-    if (animationsDisabled) {
+    val context = LocalContext.current
+    val disabled = animationsDisabled ?: remember(context) { isAnimationDisabled(context) }
+    if (disabled) {
         Spacer(
             modifier =
                 modifier

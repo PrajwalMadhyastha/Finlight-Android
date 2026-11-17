@@ -1,7 +1,6 @@
 package io.pm.finlight.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -48,21 +47,11 @@ fun AuroraAnimatedBackground(
     modifier: Modifier = Modifier,
     animationsDisabled: Boolean? = null,
 ) {
-    val circles = remember { AuroraCircles }
-    if (animationsDisabled != null) {
-        AnimatedGradientBackground(
-            circles = circles,
-            durationMillis = 30000,
-            label = "Aurora",
-            modifier = modifier,
-            animationsDisabled = animationsDisabled,
-        )
-    } else {
-        AnimatedGradientBackground(
-            circles = circles,
-            durationMillis = 30000,
-            label = "Aurora",
-            modifier = modifier,
-        )
-    }
+    AnimatedGradientBackground(
+        circles = AuroraCircles,
+        durationMillis = 30000,
+        label = "Aurora",
+        modifier = modifier,
+        animationsDisabled = animationsDisabled,
+    )
 }

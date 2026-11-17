@@ -1,7 +1,6 @@
 package io.pm.finlight.ui.components
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -48,21 +47,11 @@ fun DaybreakAnimatedBackground(
     modifier: Modifier = Modifier,
     animationsDisabled: Boolean? = null,
 ) {
-    val circles = remember { DaybreakCircles }
-    if (animationsDisabled != null) {
-        AnimatedGradientBackground(
-            circles = circles,
-            durationMillis = 35000,
-            label = "Daybreak",
-            modifier = modifier,
-            animationsDisabled = animationsDisabled,
-        )
-    } else {
-        AnimatedGradientBackground(
-            circles = circles,
-            durationMillis = 35000,
-            label = "Daybreak",
-            modifier = modifier,
-        )
-    }
+    AnimatedGradientBackground(
+        circles = DaybreakCircles,
+        durationMillis = 35000,
+        label = "Daybreak",
+        modifier = modifier,
+        animationsDisabled = animationsDisabled,
+    )
 }

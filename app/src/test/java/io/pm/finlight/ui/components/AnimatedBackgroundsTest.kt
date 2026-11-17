@@ -45,6 +45,14 @@ class AnimatedBackgroundsTest {
     }
 
     @Test
+    fun auroraAnimatedBackground_rendersWithDefaultParameters() {
+        composeTestRule.setContent {
+            AuroraAnimatedBackground()
+        }
+        composeTestRule.waitForIdle()
+    }
+
+    @Test
     fun daybreakAnimatedBackground_rendersInActiveMode() {
         composeTestRule.setContent {
             DaybreakAnimatedBackground(animationsDisabled = false)
@@ -56,6 +64,14 @@ class AnimatedBackgroundsTest {
     fun daybreakAnimatedBackground_rendersInDisabledMode() {
         composeTestRule.setContent {
             DaybreakAnimatedBackground(animationsDisabled = true)
+        }
+        composeTestRule.waitForIdle()
+    }
+
+    @Test
+    fun daybreakAnimatedBackground_rendersWithDefaultParameters() {
+        composeTestRule.setContent {
+            DaybreakAnimatedBackground()
         }
         composeTestRule.waitForIdle()
     }
