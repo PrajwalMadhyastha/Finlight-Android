@@ -99,7 +99,8 @@ fun TransactionDetailScreen(
     transactionId: Int,
     viewModel: TransactionViewModel = viewModel(),
     accountViewModel: AccountViewModel = viewModel(),
-    onSaveRenameRule: (originalName: String, newName: String) -> Unit,
+    @Suppress("UNUSED_PARAMETER")
+    onSaveRenameRule: (originalName: String, newName: String) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
