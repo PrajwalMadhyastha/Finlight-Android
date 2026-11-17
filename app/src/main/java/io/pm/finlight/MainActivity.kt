@@ -44,10 +44,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.app.NotificationManagerCompat
@@ -71,6 +68,7 @@ import io.pm.finlight.ui.viewmodel.SearchViewModel
 import io.pm.finlight.data.health.DatabaseHealthChecker
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ui.BottomNavItem
+import io.pm.finlight.ui.common.ForceAppScaling
 import io.pm.finlight.ui.common.WindowSecurityController
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
@@ -1641,52 +1639,4 @@ fun SplashScreen(
             Text(statusText, style = MaterialTheme.typography.bodyLarge)
         }
     }
-}
-
-/**
- * A wrapper that enforces a consistent app scaling experience, ignoring system-level
- * font size and display size changes if they compromise the layout integrity.
- *
- * BEHAVIOR:
- * 1. Forces [fontScale] to 1.0f (Standard).
- * 2. Clamps [density] (DPI) if the screen width drops below 375dp (e.g., due to Display Zoom),
- * ensuring the layout never gets "crunched" narrower than a standard small phone.
- */
-@Composable
-fun ForceAppScaling(content: @Composable () -> Unit) {
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-
-    // "Project Aurora" layouts generally break below ~360dp width.
-    // We set 375dp as a safe minimum width to maintain card proportions.
-    val minWidthDp = 375f
-    val screenWidthDp = configuration.screenWidthDp.toFloat()
-
-    // Calculate scaling factor.
-    // If screenWidthDp is 320 (zoomed in), we need a multiplier < 1 to "zoom out" the density.
-    // Logic: Target / Actual? No.
-    // We want the app to THINK it has 375dp width.
-    // WidthDp = Pixels / Density.
-    // To increase WidthDp, we must DECREASE Density.
-    // TargetDensity = CurrentDensity * (CurrentWidth / TargetWidth)
-    // Example: 320 / 375 = 0.85. New Density = 3.0 * 0.85 = 2.55.
-    // New Width = (320 * 3.0) / 2.55 = 376.
-    val densityMultiplier =
-        if (screenWidthDp < minWidthDp && screenWidthDp > 0) {
-            screenWidthDp / minWidthDp
-        } else {
-            1f
-        }
-
-    val customDensity =
-        Density(
-            density = density.density * densityMultiplier,
-            // Always enforce 1.0 font scale
-            fontScale = 1f,
-        )
-
-    CompositionLocalProvider(
-        LocalDensity provides customDensity,
-        content = content,
-    )
 }
