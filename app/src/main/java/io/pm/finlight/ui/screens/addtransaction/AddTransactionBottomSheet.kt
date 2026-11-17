@@ -18,17 +18,17 @@ import io.pm.finlight.ui.components.pickers.CategoryPickerBottomSheet
 import io.pm.finlight.ui.components.pickers.TagPickerBottomSheet
 
 sealed class ComposerSheet {
-    object Category : ComposerSheet()
+    data object Category : ComposerSheet()
 
-    object Account : ComposerSheet()
+    data object Account : ComposerSheet()
 
-    object Tags : ComposerSheet()
+    data object Tags : ComposerSheet()
 
-    object Notes : ComposerSheet()
+    data object Notes : ComposerSheet()
 
-    object Merchant : ComposerSheet()
+    data object Merchant : ComposerSheet()
 
-    object History : ComposerSheet()
+    data object History : ComposerSheet()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
