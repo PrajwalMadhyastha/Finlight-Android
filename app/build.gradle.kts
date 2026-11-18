@@ -133,8 +133,7 @@ kover {
                     "*ViewModelFactory*",
                     "*Screen",
                     "*Screen$*",
-                    "*Scaffold",
-                    "*Scaffold$*",
+                    "*Scaffold*",
                 )
                 packages(
                     "io.pm.finlight.ui.screens",

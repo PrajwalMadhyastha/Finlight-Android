@@ -87,7 +87,6 @@ import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
-import io.pm.finlight.utils.findAppCompatActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -104,7 +103,6 @@ fun MainAppScaffold(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val activity = context.findAppCompatActivity()
 
     val dashboardViewModel: DashboardViewModel = resolveActivityViewModel()
     val transactionViewModel: TransactionViewModel = resolveActivityViewModel()
