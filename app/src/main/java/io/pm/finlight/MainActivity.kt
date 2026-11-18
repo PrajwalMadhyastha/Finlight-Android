@@ -85,7 +85,6 @@ class MainActivity : AppCompatActivity() {
                         )
                     } else if (hasSeenOnboarding == true) {
                         FinanceAppWithLockScreen(
-                            shortcutAction = shortcutAction,
                             settingsViewModel = settingsViewModel,
                         ) {
                             MainAppScaffold(shortcutAction = shortcutAction)

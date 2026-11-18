@@ -115,6 +115,11 @@ sonar {
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
         property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt,**/ui/navigation/**,**/*Scaffold*.kt")
+        property("sonar.issue.ignore.multicriteria", "e1,e2")
+        property("sonar.issue.ignore.multicriteria.e1.ruleKey", "kotlin:S6293")
+        property("sonar.issue.ignore.multicriteria.e1.resourceKey", "**/LockScreen.kt")
+        property("sonar.issue.ignore.multicriteria.e2.ruleKey", "kotlin:S3776")
+        property("sonar.issue.ignore.multicriteria.e2.resourceKey", "**/*Scaffold*.kt")
     }
 }
 

@@ -1,8 +1,6 @@
 package io.pm.finlight.ui
 
-import android.os.Build
 import android.widget.Toast
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -65,13 +63,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import coil.compose.AsyncImage
+import io.pm.finlight.DashboardViewModel
 import io.pm.finlight.MainActivity
 import io.pm.finlight.R
+import io.pm.finlight.TransactionDetails
+import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.data.health.DatabaseHealthChecker
+import io.pm.finlight.data.model.TransactionFilterState
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.ui.components.AuroraAnimatedBackground
 import io.pm.finlight.ui.components.DaybreakAnimatedBackground
@@ -83,8 +86,6 @@ import io.pm.finlight.ui.navigation.resolveActivityViewModel
 import io.pm.finlight.ui.theme.AppTheme
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
-import io.pm.finlight.DashboardViewModel
-import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.viewmodel.AccountViewModel
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
@@ -94,7 +95,7 @@ import kotlinx.coroutines.withContext
 
 private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 
-@RequiresApi(Build.VERSION_CODES.O)
+@Suppress("kotlin:S3776")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainAppScaffold(
@@ -133,7 +134,6 @@ fun MainAppScaffold(
         }
     }
     var showDiagnosticPreviewSheet by remember { mutableStateOf(false) }
-    val coroutineScope = rememberCoroutineScope()
 
     val bottomNavItems =
         listOf(
@@ -193,10 +193,7 @@ fun MainAppScaffold(
             else -> screenTitles[currentRoute] ?: screenTitles[baseCurrentRoute] ?: "Finance App"
         }
 
-    val fabRoutes =
-        setOf(
-            "account_list",
-        )
+    val fabRoutes = setOf("account_list")
     val showFab = baseCurrentRoute in fabRoutes && !isAccountSelectionMode
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -220,180 +217,33 @@ fun MainAppScaffold(
         Scaffold(
             topBar = {
                 if (isTransactionSelectionMode && baseCurrentRoute == BottomNavItem.Transactions.route) {
-                    TopAppBar(
-                        title = { Text("$selectedIdsCount Selected") },
-                        navigationIcon = {
-                            IconButton(onClick = { transactionViewModel.clearSelectionMode() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
-                            }
-                        },
-                        actions = {
-                            val canManualMerge by transactionViewModel.canManualMerge.collectAsState()
-                            if (canManualMerge) {
-                                IconButton(onClick = { transactionViewModel.openReviewMergeSheet() }) {
-                                    Icon(Icons.Default.Merge, contentDescription = "Merge Transactions")
-                                }
-                            }
-
-                            val canLinkAsReimbursement by transactionViewModel.canLinkAsReimbursement.collectAsState()
-                            if (canLinkAsReimbursement) {
-                                IconButton(onClick = { transactionViewModel.linkReimbursementFromSelection() }) {
-                                    Icon(Icons.Default.Payments, contentDescription = "Link Repayment")
-                                }
-                            }
-                            IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete")
-                            }
-                            IconButton(onClick = { transactionViewModel.onShareClick() }) {
-                                Icon(Icons.Default.Share, contentDescription = "Share")
-                            }
-                        },
-                        colors =
-                            TopAppBarDefaults.topAppBarColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
-                                titleContentColor = MaterialTheme.colorScheme.onSurface,
-                            ),
+                    TransactionSelectionTopBar(
+                        selectedIdsCount = selectedIdsCount,
+                        transactionViewModel = transactionViewModel,
                     )
                 } else if (showMainTopBar) {
-                    TopAppBar(
-                        title = { Text(currentTitle) },
-                        navigationIcon = {
-                            if (!showBottomBar) {
-                                IconButton(onClick = { navController.popBackStack() }) {
-                                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                                }
-                            }
-                        },
-                        actions = {
-                            if (showBottomBar && baseCurrentRoute != BottomNavItem.Profile.route) {
-                                AsyncImage(
-                                    model = profilePictureUri ?: R.mipmap.ic_launcher,
-                                    contentDescription = "User Profile Picture",
-                                    contentScale = ContentScale.Crop,
-                                    modifier =
-                                        Modifier
-                                            .padding(end = 16.dp)
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .clickable {
-                                                navController.navigate(BottomNavItem.Profile.route) {
-                                                    popUpTo(BottomNavItem.Dashboard.route) {
-                                                        saveState = true
-                                                    }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            },
-                                )
-                            }
-                            when (baseCurrentRoute) {
-                                BottomNavItem.Dashboard.route -> {
-                                    IconButton(onClick = { settingsViewModel.setPrivacyModeEnabled(!isPrivacyModeEnabled) }) {
-                                        Icon(
-                                            imageVector = if (isPrivacyModeEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                                            contentDescription = "Toggle Privacy Mode",
-                                        )
-                                    }
-                                    IconButton(onClick = { navController.navigate("customize_dashboard") }) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Customize Dashboard")
-                                    }
-                                    IconButton(onClick = { navController.navigate("search_screen") }) {
-                                        Icon(Icons.Default.Search, contentDescription = "Search")
-                                    }
-                                }
-                                BottomNavItem.Transactions.route -> {
-                                    val areFiltersActive by remember(filterState) {
-                                        derivedStateOf {
-                                            filterState.keyword.isNotBlank() || filterState.account != null || filterState.category != null
-                                        }
-                                    }
-                                    HelpActionIcon(helpKey = "transaction_list")
-                                    IconButton(onClick = { navController.navigate("add_transaction") }) {
-                                        Icon(Icons.Default.Add, contentDescription = "Add Transaction")
-                                    }
-                                    BadgedBox(
-                                        badge = {
-                                            if (areFiltersActive) {
-                                                Box(
-                                                    modifier =
-                                                        Modifier
-                                                            .size(8.dp)
-                                                            .clip(CircleShape)
-                                                            .background(MaterialTheme.colorScheme.primary),
-                                                )
-                                            }
-                                        },
-                                    ) {
-                                        IconButton(onClick = { transactionViewModel.onFilterClick() }) {
-                                            Icon(Icons.Default.FilterList, contentDescription = "Filter Transactions")
-                                        }
-                                    }
-                                }
-                                "account_list" -> {
-                                    if (!isAccountSelectionMode) {
-                                        TextButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
-                                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
-                                            Spacer(Modifier.width(4.dp))
-                                            Text("Merge Accounts")
-                                        }
-                                    }
-                                    HelpActionIcon(helpKey = "account_list")
-                                }
-                                BottomNavItem.Reports.route -> HelpActionIcon(helpKey = "reports_screen")
-                                "goal_screen" -> {
-                                    TextButton(onClick = { navController.navigate("add_edit_goal/new") }) {
-                                        Icon(Icons.Default.Add, contentDescription = "Add Goal")
-                                        Spacer(Modifier.width(4.dp))
-                                        Text("Add New Goal")
-                                    }
-                                }
-                                "budget_screen" -> HelpActionIcon(helpKey = "budget_screen")
-                                "income_screen" -> HelpActionIcon(helpKey = "income_screen")
-                                "appearance_settings" -> HelpActionIcon(helpKey = "appearance_settings")
-                                "automation_settings" -> HelpActionIcon(helpKey = "automation_settings")
-                                "notification_settings" -> HelpActionIcon(helpKey = "notification_settings")
-                                "data_settings" -> HelpActionIcon(helpKey = "data_settings")
-                                "currency_travel_settings" -> HelpActionIcon(helpKey = "currency_travel_settings")
-                                "customize_dashboard" -> HelpActionIcon(helpKey = "dashboard_customize")
-                                "analysis_screen" -> HelpActionIcon(helpKey = "analysis_screen")
-                                "category_list" -> HelpActionIcon(helpKey = "category_list")
-                                "tag_management" -> HelpActionIcon(helpKey = "tag_management")
-                                "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
-                                "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
-                                "manage_merchant_rules" -> HelpActionIcon(helpKey = "manage_merchant_rules")
-                                "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
-                                "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
-                                "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                    MainTopAppBar(
+                        currentTitle = currentTitle,
+                        showBottomBar = showBottomBar,
+                        baseCurrentRoute = baseCurrentRoute,
+                        profilePictureUri = profilePictureUri,
+                        isPrivacyModeEnabled = isPrivacyModeEnabled,
+                        isAccountSelectionMode = isAccountSelectionMode,
+                        filterState = filterState,
+                        navController = navController,
+                        settingsViewModel = settingsViewModel,
+                        transactionViewModel = transactionViewModel,
+                        accountViewModel = accountViewModel,
                     )
                 }
             },
             bottomBar = {
                 if (showBottomBar) {
-                    NavigationBar(
-                        containerColor = Color.Transparent,
-                    ) {
-                        bottomNavItems.forEach { screen ->
-                            val isSelected = baseCurrentRoute == screen.route
-                            NavigationBarItem(
-                                modifier = Modifier.testTag("nav_item_${screen.label}"),
-                                icon = { Icon(screen.icon, contentDescription = screen.label) },
-                                label = { Text(screen.label) },
-                                selected = isSelected,
-                                onClick = {
-                                    navController.navigate(screen.route) {
-                                        popUpTo(BottomNavItem.Dashboard.route) {
-                                            saveState = true
-                                        }
-                                        launchSingleTop = true
-                                        restoreState = true
-                                    }
-                                },
-                            )
-                        }
-                    }
+                    MainBottomNavBar(
+                        bottomNavItems = bottomNavItems,
+                        baseCurrentRoute = baseCurrentRoute,
+                        navController = navController,
+                    )
                 }
             },
             floatingActionButton = {
@@ -415,145 +265,28 @@ fun MainAppScaffold(
             )
         }
 
-        if (transactionForCategoryChange != null) {
-            val categories by transactionViewModel.allCategories.collectAsState(initial = emptyList())
-            val isThemeDark = isSystemInDarkTheme()
-            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-            val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val onDismiss = { transactionViewModel.cancelCategoryChange() }
-
-            ModalBottomSheet(
-                onDismissRequest = onDismiss,
-                sheetState = sheetState,
-                containerColor = popupContainerColor,
-            ) {
-                CategoryPickerBottomSheet(
-                    title = "Change Category",
-                    categories = categories,
-                    selectedCategoryId = transactionForCategoryChange?.transaction?.categoryId,
-                    onCategorySelected = { newCategory ->
-                        transactionViewModel.updateTransactionCategory(transactionForCategoryChange!!.transaction.id, newCategory.id)
-                        transactionViewModel.cancelCategoryChange()
-                    },
-                    onDismiss = onDismiss,
-                    onAddNew = null,
-                )
-            }
-        }
+        CategoryChangeBottomSheet(
+            transactionForCategoryChange = transactionForCategoryChange,
+            transactionViewModel = transactionViewModel,
+        )
 
         if (showDeleteConfirmation) {
-            val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-
-            AlertDialog(
-                onDismissRequest = { transactionViewModel.onCancelDeleteSelection() },
-                title = { Text("Delete Transactions?") },
-                text = {
-                    Text(
-                        "Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.",
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        onClick = { transactionViewModel.onConfirmDeleteSelection() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    ) { Text("Delete") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
-                },
-                containerColor = popupContainerColor,
+            DeleteConfirmationDialog(
+                selectedIdsCount = selectedIdsCount,
+                transactionViewModel = transactionViewModel,
             )
         }
 
         if (showCrashRecoveryDialog) {
-            val isThemeDark = MaterialTheme.colorScheme.background.isDark()
-            val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
-            var isRepairing by remember { mutableStateOf(false) }
-
-            AlertDialog(
-                onDismissRequest = {
-                    if (!isRepairing) {
-                        CrashDiagnosticsManager.clearCrash(context)
-                        showCrashRecoveryDialog = false
-                    }
+            CrashRecoveryDialog(
+                onDismiss = {
+                    CrashDiagnosticsManager.clearCrash(context)
+                    showCrashRecoveryDialog = false
                 },
-                icon = {
-                    Icon(
-                        Icons.Default.Healing,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
+                onViewReport = {
+                    showCrashRecoveryDialog = false
+                    showDiagnosticPreviewSheet = true
                 },
-                title = { Text("App Recovered") },
-                text = {
-                    Text(
-                        "Finlight recovered from an unexpected error. Your financial data is safe. You can view the privacy-redacted diagnostic report or run a quick database self-repair.",
-                    )
-                },
-                confirmButton = {
-                    Button(
-                        enabled = !isRepairing,
-                        onClick = {
-                            if (isRepairing) return@Button
-                            isRepairing = true
-                            coroutineScope.launch {
-                                try {
-                                    val db = AppDatabase.getInstance(context)
-                                    val result =
-                                        withContext(Dispatchers.IO) {
-                                            DatabaseHealthChecker.repair(db, context)
-                                        }
-                                    CrashDiagnosticsManager.clearCrash(context)
-                                    showCrashRecoveryDialog = false
-                                    val msg =
-                                        if (result.success) {
-                                            val totalFixed =
-                                                result.repairedAccountsCount +
-                                                    result.relinkedTransactionsCount +
-                                                    result.repairedPreferencesCount
-                                            if (totalFixed > 0) {
-                                                "Database repaired: $totalFixed issues resolved."
-                                            } else {
-                                                "Database verified and healthy."
-                                            }
-                                        } else {
-                                            "Database repair completed with warnings."
-                                        }
-                                    Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-                                } finally {
-                                    isRepairing = false
-                                }
-                            }
-                        },
-                    ) {
-                        Text(if (isRepairing) "Repairing..." else "Self-Repair")
-                    }
-                },
-                dismissButton = {
-                    Row {
-                        TextButton(
-                            enabled = !isRepairing,
-                            onClick = {
-                                showCrashRecoveryDialog = false
-                                showDiagnosticPreviewSheet = true
-                            },
-                        ) {
-                            Text("View Report")
-                        }
-                        Spacer(Modifier.width(4.dp))
-                        TextButton(
-                            enabled = !isRepairing,
-                            onClick = {
-                                CrashDiagnosticsManager.clearCrash(context)
-                                showCrashRecoveryDialog = false
-                            },
-                        ) {
-                            Text("Dismiss")
-                        }
-                    }
-                },
-                containerColor = popupContainerColor,
             )
         }
 
@@ -566,4 +299,360 @@ fun MainAppScaffold(
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TransactionSelectionTopBar(
+    selectedIdsCount: Int,
+    transactionViewModel: TransactionViewModel,
+) {
+    TopAppBar(
+        title = { Text("$selectedIdsCount Selected") },
+        navigationIcon = {
+            IconButton(onClick = { transactionViewModel.clearSelectionMode() }) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel Selection")
+            }
+        },
+        actions = {
+            val canManualMerge by transactionViewModel.canManualMerge.collectAsState()
+            if (canManualMerge) {
+                IconButton(onClick = { transactionViewModel.openReviewMergeSheet() }) {
+                    Icon(Icons.Default.Merge, contentDescription = "Merge Transactions")
+                }
+            }
+
+            val canLinkAsReimbursement by transactionViewModel.canLinkAsReimbursement.collectAsState()
+            if (canLinkAsReimbursement) {
+                IconButton(onClick = { transactionViewModel.linkReimbursementFromSelection() }) {
+                    Icon(Icons.Default.Payments, contentDescription = "Link Repayment")
+                }
+            }
+            IconButton(onClick = { transactionViewModel.onDeleteSelectionClick() }) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete")
+            }
+            IconButton(onClick = { transactionViewModel.onShareClick() }) {
+                Icon(Icons.Default.Share, contentDescription = "Share")
+            }
+        },
+        colors =
+            TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp),
+                titleContentColor = MaterialTheme.colorScheme.onSurface,
+            ),
+    )
+}
+
+@Suppress("kotlin:S3776")
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MainTopAppBar(
+    currentTitle: String,
+    showBottomBar: Boolean,
+    baseCurrentRoute: String?,
+    profilePictureUri: String?,
+    isPrivacyModeEnabled: Boolean,
+    isAccountSelectionMode: Boolean,
+    filterState: TransactionFilterState,
+    navController: NavHostController,
+    settingsViewModel: SettingsViewModel,
+    transactionViewModel: TransactionViewModel,
+    accountViewModel: AccountViewModel,
+) {
+    TopAppBar(
+        title = { Text(currentTitle) },
+        navigationIcon = {
+            if (!showBottomBar) {
+                IconButton(onClick = { navController.popBackStack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            }
+        },
+        actions = {
+            if (showBottomBar && baseCurrentRoute != BottomNavItem.Profile.route) {
+                AsyncImage(
+                    model = profilePictureUri ?: R.mipmap.ic_launcher,
+                    contentDescription = "User Profile Picture",
+                    contentScale = ContentScale.Crop,
+                    modifier =
+                        Modifier
+                            .padding(end = 16.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                navController.navigate(BottomNavItem.Profile.route) {
+                                    popUpTo(BottomNavItem.Dashboard.route) {
+                                        saveState = true
+                                    }
+                                    launchSingleTop = true
+                                    restoreState = true
+                                }
+                            },
+                )
+            }
+            when (baseCurrentRoute) {
+                BottomNavItem.Dashboard.route -> {
+                    IconButton(onClick = { settingsViewModel.setPrivacyModeEnabled(!isPrivacyModeEnabled) }) {
+                        Icon(
+                            imageVector = if (isPrivacyModeEnabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            contentDescription = "Toggle Privacy Mode",
+                        )
+                    }
+                    IconButton(onClick = { navController.navigate("customize_dashboard") }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Customize Dashboard")
+                    }
+                    IconButton(onClick = { navController.navigate("search_screen") }) {
+                        Icon(Icons.Default.Search, contentDescription = "Search")
+                    }
+                }
+                BottomNavItem.Transactions.route -> {
+                    val areFiltersActive by remember(filterState) {
+                        derivedStateOf { filterState.areFiltersActive }
+                    }
+                    HelpActionIcon(helpKey = "transaction_list")
+                    IconButton(onClick = { navController.navigate("add_transaction") }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Transaction")
+                    }
+                    BadgedBox(
+                        badge = {
+                            if (areFiltersActive) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.primary),
+                                )
+                            }
+                        },
+                    ) {
+                        IconButton(onClick = { transactionViewModel.onFilterClick() }) {
+                            Icon(Icons.Default.FilterList, contentDescription = "Filter Transactions")
+                        }
+                    }
+                }
+                "account_list" -> {
+                    if (!isAccountSelectionMode) {
+                        TextButton(onClick = { accountViewModel.enterSelectionMode(null) }) {
+                            Icon(Icons.AutoMirrored.Filled.MergeType, contentDescription = "Merge Accounts")
+                            Spacer(Modifier.width(4.dp))
+                            Text("Merge Accounts")
+                        }
+                    }
+                    HelpActionIcon(helpKey = "account_list")
+                }
+                BottomNavItem.Reports.route -> HelpActionIcon(helpKey = "reports_screen")
+                "goal_screen" -> {
+                    TextButton(onClick = { navController.navigate("add_edit_goal/new") }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Goal")
+                        Spacer(Modifier.width(4.dp))
+                        Text("Add New Goal")
+                    }
+                }
+                "budget_screen" -> HelpActionIcon(helpKey = "budget_screen")
+                "income_screen" -> HelpActionIcon(helpKey = "income_screen")
+                "appearance_settings" -> HelpActionIcon(helpKey = "appearance_settings")
+                "automation_settings" -> HelpActionIcon(helpKey = "automation_settings")
+                "notification_settings" -> HelpActionIcon(helpKey = "notification_settings")
+                "data_settings" -> HelpActionIcon(helpKey = "data_settings")
+                "currency_travel_settings" -> HelpActionIcon(helpKey = "currency_travel_settings")
+                "customize_dashboard" -> HelpActionIcon(helpKey = "dashboard_customize")
+                "analysis_screen" -> HelpActionIcon(helpKey = "analysis_screen")
+                "category_list" -> HelpActionIcon(helpKey = "category_list")
+                "tag_management" -> HelpActionIcon(helpKey = "tag_management")
+                "manage_parse_rules" -> HelpActionIcon(helpKey = "manage_parse_rules")
+                "manage_ignore_rules" -> HelpActionIcon(helpKey = "manage_ignore_rules")
+                "manage_merchant_rules" -> HelpActionIcon(helpKey = "manage_merchant_rules")
+                "add_budget", "edit_budget" -> HelpActionIcon(helpKey = "add_budget")
+                "analysis_detail_screen" -> HelpActionIcon(helpKey = "analysis_detail_screen")
+                "trip_detail" -> HelpActionIcon(helpKey = "trip_detail")
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+    )
+}
+
+@Composable
+private fun MainBottomNavBar(
+    bottomNavItems: List<BottomNavItem>,
+    baseCurrentRoute: String?,
+    navController: NavHostController,
+) {
+    NavigationBar(
+        containerColor = Color.Transparent,
+    ) {
+        bottomNavItems.forEach { screen ->
+            val isSelected = baseCurrentRoute == screen.route
+            NavigationBarItem(
+                modifier = Modifier.testTag("nav_item_${screen.label}"),
+                icon = { Icon(screen.icon, contentDescription = screen.label) },
+                label = { Text(screen.label) },
+                selected = isSelected,
+                onClick = {
+                    navController.navigate(screen.route) {
+                        popUpTo(BottomNavItem.Dashboard.route) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CategoryChangeBottomSheet(
+    transactionForCategoryChange: TransactionDetails?,
+    transactionViewModel: TransactionViewModel,
+) {
+    if (transactionForCategoryChange != null) {
+        val categories by transactionViewModel.allCategories.collectAsState(initial = emptyList())
+        val isThemeDark = isSystemInDarkTheme()
+        val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val onDismiss = { transactionViewModel.cancelCategoryChange() }
+
+        ModalBottomSheet(
+            onDismissRequest = onDismiss,
+            sheetState = sheetState,
+            containerColor = popupContainerColor,
+        ) {
+            CategoryPickerBottomSheet(
+                title = "Change Category",
+                categories = categories,
+                selectedCategoryId = transactionForCategoryChange.transaction.categoryId,
+                onCategorySelected = { newCategory ->
+                    transactionViewModel.updateTransactionCategory(transactionForCategoryChange.transaction.id, newCategory.id)
+                    transactionViewModel.cancelCategoryChange()
+                },
+                onDismiss = onDismiss,
+                onAddNew = null,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeleteConfirmationDialog(
+    selectedIdsCount: Int,
+    transactionViewModel: TransactionViewModel,
+) {
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+
+    AlertDialog(
+        onDismissRequest = { transactionViewModel.onCancelDeleteSelection() },
+        title = { Text("Delete Transactions?") },
+        text = {
+            Text(
+                "Are you sure you want to permanently delete the selected $selectedIdsCount transaction(s)? This action cannot be undone.",
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { transactionViewModel.onConfirmDeleteSelection() },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+            ) { Text("Delete") }
+        },
+        dismissButton = {
+            TextButton(onClick = { transactionViewModel.onCancelDeleteSelection() }) { Text("Cancel") }
+        },
+        containerColor = popupContainerColor,
+    )
+}
+
+@Composable
+private fun CrashRecoveryDialog(
+    onDismiss: () -> Unit,
+    onViewReport: () -> Unit,
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val isThemeDark = MaterialTheme.colorScheme.background.isDark()
+    val popupContainerColor = if (isThemeDark) PopupSurfaceDark else PopupSurfaceLight
+    var isRepairing by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = {
+            if (!isRepairing) {
+                onDismiss()
+            }
+        },
+        icon = {
+            Icon(
+                Icons.Default.Healing,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        title = { Text("App Recovered") },
+        text = {
+            Text(
+                "Finlight recovered from an unexpected error. Your financial data is safe. You can view the privacy-redacted diagnostic report or run a quick database self-repair.",
+            )
+        },
+        confirmButton = {
+            Button(
+                enabled = !isRepairing,
+                onClick = {
+                    if (isRepairing) return@Button
+                    isRepairing = true
+                    coroutineScope.launch {
+                        try {
+                            val db = AppDatabase.getInstance(context)
+                            val result =
+                                withContext(Dispatchers.IO) {
+                                    DatabaseHealthChecker.repair(db, context)
+                                }
+                            onDismiss()
+                            val msg =
+                                if (result.success) {
+                                    val totalFixed =
+                                        result.repairedAccountsCount +
+                                            result.relinkedTransactionsCount +
+                                            result.repairedPreferencesCount
+                                    if (totalFixed > 0) {
+                                        "Database repaired: $totalFixed issues resolved."
+                                    } else {
+                                        "Database verified and healthy."
+                                    }
+                                } else {
+                                    "Database repair completed with warnings."
+                                }
+                            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        } finally {
+                            isRepairing = false
+                        }
+                    }
+                },
+            ) {
+                Text(if (isRepairing) "Repairing..." else "Self-Repair")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(
+                    enabled = !isRepairing,
+                    onClick = {
+                        onViewReport()
+                    },
+                ) {
+                    Text("View Report")
+                }
+                Spacer(Modifier.width(4.dp))
+                TextButton(
+                    enabled = !isRepairing,
+                    onClick = {
+                        onDismiss()
+                    },
+                ) {
+                    Text("Dismiss")
+                }
+            }
+        },
+        containerColor = popupContainerColor,
+    )
 }

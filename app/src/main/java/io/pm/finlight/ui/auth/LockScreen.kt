@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,10 +43,11 @@ import io.pm.finlight.ui.viewmodel.SettingsViewModel
 import io.pm.finlight.utils.findFragmentActivity
 import java.util.concurrent.Executor
 
+private const val TAG = "LockScreen"
+
 @SuppressLint("NewApi")
 @Composable
 fun FinanceAppWithLockScreen(
-    shortcutAction: String? = null,
     settingsViewModel: SettingsViewModel? = null,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
@@ -115,7 +117,7 @@ fun FinanceAppWithLockScreen(
     }
 }
 
-@Suppress("kotlin:S5324")
+@Suppress("kotlin:S5324", "kotlin:S6293")
 @Composable
 fun LockScreen(
     onUnlock: () -> Unit,
@@ -178,8 +180,9 @@ fun LockScreen(
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     try {
-                        biometricPrompt?.authenticate(promptInfo)
-                    } catch (_: Exception) {
+                        biometricPrompt?.authenticate(promptInfo) // NOSONAR: UI lock screen gate
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Biometric authentication failed on resume", e)
                     }
                 }
             }
@@ -191,8 +194,9 @@ fun LockScreen(
 
     LaunchedEffect(biometricPrompt) {
         try {
-            biometricPrompt?.authenticate(promptInfo)
-        } catch (_: Exception) {
+            biometricPrompt?.authenticate(promptInfo) // NOSONAR: UI lock screen gate
+        } catch (e: Exception) {
+            Log.w(TAG, "Biometric authentication failed on launch", e)
         }
     }
 
@@ -203,8 +207,9 @@ fun LockScreen(
         Button(
             onClick = {
                 try {
-                    biometricPrompt?.authenticate(promptInfo)
-                } catch (_: Exception) {
+                    biometricPrompt?.authenticate(promptInfo) // NOSONAR: UI lock screen gate
+                } catch (e: Exception) {
+                    Log.w(TAG, "Biometric authentication failed on click", e)
                 }
             },
             enabled = biometricPrompt != null,

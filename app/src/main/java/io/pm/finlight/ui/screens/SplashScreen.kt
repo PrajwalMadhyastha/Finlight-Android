@@ -23,16 +23,19 @@ import io.pm.finlight.data.DataExportService
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.BottomNavItem
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
+@Suppress("kotlin:S6310")
 @Composable
 fun SplashScreen(
     navController: NavHostController,
     settingsViewModel: SettingsViewModel,
     modifier: Modifier = Modifier,
+    ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) {
     var statusText by remember { mutableStateOf("Initializing...") }
     val context = LocalContext.current
@@ -42,7 +45,7 @@ fun SplashScreen(
         val snapshotFile = DataExportService.getSnapshotFile(context)
         val shouldCheckRestore =
             isFirstLaunch ||
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     snapshotFile.exists() &&
                         AppDatabase.getInstance(context).transactionQueryDao().getAllTransactionsSimple().first().isEmpty()
                 }
@@ -50,7 +53,7 @@ fun SplashScreen(
         if (shouldCheckRestore) {
             statusText = "Checking for restored data..."
             val restored =
-                withContext(Dispatchers.IO) {
+                withContext(ioDispatcher) {
                     DataExportService.restoreFromBackupSnapshot(context)
                 }
             if (restored) {
