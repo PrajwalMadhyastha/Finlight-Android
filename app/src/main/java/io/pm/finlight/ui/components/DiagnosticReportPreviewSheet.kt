@@ -21,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.pm.finlight.R
 import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.diagnostics.CrashDiagnosticsManager
 import io.pm.finlight.diagnostics.DiagnosticsExportService
@@ -99,10 +101,13 @@ fun DiagnosticReportPreviewSheet(
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                IconButton(onClick = onDismissRequest) {
+                IconButton(
+                    onClick = onDismissRequest,
+                    modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Close",
+                        contentDescription = stringResource(R.string.cd_close),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -123,7 +128,7 @@ fun DiagnosticReportPreviewSheet(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Security,
-                        contentDescription = "Privacy Shield",
+                        contentDescription = stringResource(R.string.cd_privacy_shield),
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(24.dp),
                     )
@@ -218,7 +223,7 @@ fun DiagnosticReportPreviewSheet(
                     },
                     modifier = Modifier.weight(1f),
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = "Share Report", modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
                     Text("Share")
                 }

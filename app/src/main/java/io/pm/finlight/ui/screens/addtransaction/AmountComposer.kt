@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,10 +34,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import io.pm.finlight.R
 import io.pm.finlight.TravelModeSettings
 import io.pm.finlight.TripType
 import io.pm.finlight.utils.CurrencyHelper
@@ -109,10 +112,13 @@ fun AmountComposer(
                         innerTextField()
                     }
                     Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = onDescriptionClick, modifier = Modifier.size(24.dp)) {
+                    IconButton(
+                        onClick = onDescriptionClick,
+                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Search Predictions",
+                            contentDescription = stringResource(R.string.cd_search_predictions),
                             tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
                             modifier = Modifier.size(18.dp),
                         )
