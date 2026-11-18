@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -22,6 +23,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.LastMonthSummary
+import io.pm.finlight.R
 import io.pm.finlight.data.model.TimePeriod
 import io.pm.finlight.ui.theme.ExpenseRedDark
 import io.pm.finlight.ui.theme.IncomeGreenDark
@@ -34,7 +36,7 @@ fun LastMonthSummaryCard(
     navController: NavController,
     onDismiss: () -> Unit,
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("en", "IN")) }
+    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")) }
 
     GlassPanel {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -54,7 +56,7 @@ fun LastMonthSummaryCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Dismiss",
+                        contentDescription = stringResource(R.string.cd_dismiss),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
@@ -67,7 +69,7 @@ fun LastMonthSummaryCard(
             ) {
                 Icon(
                     imageVector = Icons.Default.Info,
-                    contentDescription = "Summary Info",
+                    contentDescription = stringResource(R.string.cd_summary_info),
                     modifier = Modifier.size(48.dp),
                     tint = MaterialTheme.colorScheme.primary,
                 )

@@ -25,7 +25,9 @@ import io.pm.finlight.TestApplication
 import io.pm.finlight.Transaction
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
+import io.pm.finlight.data.db.AppDatabase
 import io.pm.finlight.ui.components.AuroraProgressBar
+import io.pm.finlight.ui.components.DiagnosticReportPreviewSheet
 import io.pm.finlight.ui.components.LastMonthSummaryCard
 import io.pm.finlight.ui.components.dashboard.BudgetWatchCard
 import io.pm.finlight.ui.screens.SmsDebugItem
@@ -219,5 +221,34 @@ class UiAccessibilitySemanticsTest {
         composeTestRule.onNodeWithText("3 visits").assertIsDisplayed()
         // Chip decorative leading icon must retain contentDescription = null to avoid TalkBack repetition
         composeTestRule.onNodeWithContentDescription("History").assertDoesNotExist()
+    }
+
+    @Test
+    fun diagnosticReportPreviewSheet_accessibilitySemanticsAndTouchTargets() {
+        val mockDb = mockk<AppDatabase>(relaxed = true)
+        composeTestRule.setContent {
+            PersonalFinanceAppTheme {
+                DiagnosticReportPreviewSheet(
+                    onDismissRequest = {},
+                    database = mockDb,
+                )
+            }
+        }
+
+        // Close button meets 48dp minimum touch target and has content description
+        composeTestRule.onNodeWithContentDescription("Close")
+            .assertIsDisplayed()
+            .assertWidthIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(48.dp)
+
+        // Privacy Shield informative icon has content description
+        composeTestRule.onNodeWithContentDescription("Privacy Shield").assertIsDisplayed()
+
+        // Action buttons with text labels have decorative icons suppressing contentDescription
+        composeTestRule.onNodeWithText("Copy").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Share").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Copy").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Share").assertDoesNotExist()
+        composeTestRule.onNodeWithContentDescription("Share Report").assertDoesNotExist()
     }
 }
