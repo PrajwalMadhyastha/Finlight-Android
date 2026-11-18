@@ -15,7 +15,10 @@ data class TransactionFilterState(
     val account: Account? = null,
     val category: Category? = null,
     val transactionType: AnalysisTransactionType = AnalysisTransactionType.EXPENSE,
-)
+) {
+    val areFiltersActive: Boolean
+        get() = keyword.isNotBlank() || account != null || category != null
+}
 
 data class ManualTransactionData(
     val description: String,

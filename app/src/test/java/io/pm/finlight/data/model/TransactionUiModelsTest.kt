@@ -55,6 +55,26 @@ class TransactionUiModelsTest {
     }
 
     @Test
+    fun `TransactionFilterState areFiltersActive returns true when any filter is active and false when empty`() {
+        val defaultState = TransactionFilterState()
+        assertFalse(defaultState.areFiltersActive)
+
+        val withBlankKeyword = TransactionFilterState(keyword = "   ")
+        assertFalse(withBlankKeyword.areFiltersActive)
+
+        val withKeyword = TransactionFilterState(keyword = "lunch")
+        assertTrue(withKeyword.areFiltersActive)
+
+        val account = Account(id = 1, name = "Checking", type = "BANK")
+        val withAccount = TransactionFilterState(account = account)
+        assertTrue(withAccount.areFiltersActive)
+
+        val category = Category(id = 2, name = "Food", iconKey = "food", colorKey = "green")
+        val withCategory = TransactionFilterState(category = category)
+        assertTrue(withCategory.areFiltersActive)
+    }
+
+    @Test
     fun `AnalysisTransactionType toTransactionType maps types correctly`() {
         assertEquals(TransactionType.EXPENSE, AnalysisTransactionType.EXPENSE.toTransactionType())
         assertEquals(TransactionType.INCOME, AnalysisTransactionType.INCOME.toTransactionType())
