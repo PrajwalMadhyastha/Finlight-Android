@@ -1,6 +1,5 @@
 package io.pm.finlight.ui.navigation
 
-import android.app.Application
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -25,7 +24,7 @@ inline fun <reified VM : ViewModel> resolveActivityViewModel(): VM {
         context.findActivity()
             ?: LocalViewModelStoreOwner.current
             ?: error("No ViewModelStoreOwner available")
-    val factory = FinlightViewModelFactory.create(context.applicationContext as Application)
+    val factory = FinlightViewModelFactory.create(context)
     return viewModel(
         viewModelStoreOwner = owner,
         factory = factory,

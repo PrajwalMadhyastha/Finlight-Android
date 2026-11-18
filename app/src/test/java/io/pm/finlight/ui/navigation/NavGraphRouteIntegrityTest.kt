@@ -134,5 +134,18 @@ class NavGraphRouteIntegrityTest {
         assertNotNull(confirmPendingDest)
         assertTrue(confirmPendingDest!!.hasDeepLink(Uri.parse("app://finlight.pm.io/confirm_pending_transaction/1/2")))
         assertTrue(confirmPendingDest.hasDeepLink(Uri.parse("app://finlight.pm.io/confirm_pending/1/2")))
+
+        val timePeriodReportDest =
+            navGraph.findNode("time_period_report_screen/{timePeriod}?date={date}&showPreviousMonth={showPreviousMonth}")
+        assertNotNull(timePeriodReportDest)
+        assertTrue(timePeriodReportDest!!.hasDeepLink(Uri.parse("app://finlight.pm.io/report/MONTHLY?date=123456789&showPreviousMonth=true")))
+
+        val approveTxnDest = navGraph.findNode("approve_transaction_screen?potentialTxnJson={potentialTxnJson}")
+        assertNotNull(approveTxnDest)
+        assertTrue(approveTxnDest!!.hasDeepLink(Uri.parse("app://finlight.pm.io/approve_transaction_screen?potentialTxnJson=testJson")))
+
+        val linkRecurringDest = navGraph.findNode("link_recurring_transaction/{potentialTransactionJson}")
+        assertNotNull(linkRecurringDest)
+        assertTrue(linkRecurringDest!!.hasDeepLink(Uri.parse("app://finlight.pm.io/link_recurring/testJson")))
     }
 }

@@ -1,6 +1,5 @@
 package io.pm.finlight.ui.navigation
 
-import android.app.Application
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
@@ -110,7 +109,7 @@ fun NavGraphBuilder.settingsNavGraph(navController: NavController) {
         popEnterTransition = standardPopEnterTransition,
         popExitTransition = standardPopExitTransition,
     ) { backStackEntry ->
-        val context = LocalContext.current.applicationContext as Application
+        val context = LocalContext.current
         val tripId = backStackEntry.arguments?.getInt("tripId")
         val currencyViewModel: CurrencyViewModel = viewModel(factory = FinlightViewModelFactory.create(context))
         CurrencyTravelScreen(navController, if (tripId == -1) null else tripId, currencyViewModel)

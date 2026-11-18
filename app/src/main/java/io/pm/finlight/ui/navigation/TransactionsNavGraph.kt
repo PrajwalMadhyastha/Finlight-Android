@@ -1,6 +1,5 @@
 package io.pm.finlight.ui.navigation
 
-import android.app.Application
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -99,7 +98,7 @@ fun NavGraphBuilder.transactionsNavGraph(navController: NavController) {
         val expandFilters = backStackEntry.arguments?.getBoolean("expandFilters") ?: true
         val query = backStackEntry.arguments?.getString("query")
 
-        val context = LocalContext.current.applicationContext as Application
+        val context = LocalContext.current
         val factory =
             FinlightViewModelFactory.createSearchFactory(
                 context,
