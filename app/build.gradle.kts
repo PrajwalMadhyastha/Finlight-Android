@@ -103,6 +103,7 @@ sonar {
                 "**/ui/components/**," +
                 "**/ui/theme/**," +
                 "**/ui/NavItems.kt," +
+                "**/ui/navigation/**," +
                 "**/MainActivity.kt," +
                 "**/MainApplication.kt," +
                 "**/utils/ShareImageGenerator.kt," +
@@ -112,7 +113,7 @@ sonar {
                 "**/*_Impl*",
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
-        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt")
+        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt,**/ui/navigation/**")
     }
 }
 
@@ -136,6 +137,7 @@ kover {
                     "io.pm.finlight.ui.screens",
                     "io.pm.finlight.ui.components",
                     "io.pm.finlight.ui.theme",
+                    "io.pm.finlight.ui.navigation",
                     // Exclude DB package from unit tests
                     "io.pm.finlight.data.db",
                     "io.pm.finlight.data.db.dao",
