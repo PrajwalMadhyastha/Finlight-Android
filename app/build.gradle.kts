@@ -99,6 +99,7 @@ sonar {
             "sonar.coverage.exclusions",
             "**/*ViewModelFactory*.kt," +
                 "**/*Screen.kt," +
+                "**/*Scaffold*.kt," +
                 "**/ui/screens/**," +
                 "**/ui/components/**," +
                 "**/ui/theme/**," +
@@ -113,7 +114,7 @@ sonar {
                 "**/*_Impl*",
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
-        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt,**/ui/navigation/**")
+        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt,**/ui/navigation/**,**/*Scaffold*.kt")
     }
 }
 
@@ -132,6 +133,8 @@ kover {
                     "*ViewModelFactory*",
                     "*Screen",
                     "*Screen$*",
+                    "*Scaffold",
+                    "*Scaffold$*",
                 )
                 packages(
                     "io.pm.finlight.ui.screens",

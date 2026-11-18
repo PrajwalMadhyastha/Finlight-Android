@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import io.pm.finlight.SplashScreen
+import io.pm.finlight.ui.screens.SplashScreen
 import io.pm.finlight.ui.viewmodel.SettingsViewModel
 
 @RequiresApi(Build.VERSION_CODES.O)
