@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -49,14 +50,19 @@ fun AddEditGoalScreen(
     val accounts by txnViewModel.allAccounts.collectAsState(initial = emptyList())
 
     // Local UI state
-    var name by remember { mutableStateOf(TextFieldValue("")) }
-    var targetAmount by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedAccount by remember { mutableStateOf<Account?>(null) }
-    var targetDateMillis by remember { mutableStateOf<Long?>(null) }
-    var notes by remember { mutableStateOf(TextFieldValue("")) }
+    var name by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var targetAmount by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var selectedAccountId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedAccount =
+        remember(selectedAccountId, accounts) {
+            accounts.find { it.id == selectedAccountId }
+        }
+    var targetDateMillis by rememberSaveable { mutableStateOf<Long?>(null) }
+    var notes by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
 
-    var showDatePicker by remember { mutableStateOf(false) }
-    var accountExpanded by remember { mutableStateOf(false) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    var accountExpanded by rememberSaveable { mutableStateOf(false) }
+    var isInitialDataLoaded by rememberSaveable { mutableStateOf(false) }
 
     // Pre-populate when editing
     val goalToEdit by if (isEditMode) {
@@ -65,21 +71,24 @@ fun AddEditGoalScreen(
         remember { mutableStateOf(null) }
     }
 
-    LaunchedEffect(goalToEdit, accounts) {
+    LaunchedEffect(goalToEdit) {
         goalToEdit?.let { goal ->
-            val nameStr = goal.name
-            val targetStr =
-                if (goal.targetAmount % 1.0 == 0.0) {
-                    goal.targetAmount.toLong().toString()
-                } else {
-                    goal.targetAmount.toString()
-                }
-            val notesStr = goal.notes ?: ""
-            name = TextFieldValue(nameStr, TextRange(nameStr.length))
-            targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
-            notes = TextFieldValue(notesStr, TextRange(notesStr.length))
-            targetDateMillis = goal.targetDate
-            selectedAccount = accounts.find { it.id == goal.accountId }
+            if (!isInitialDataLoaded) {
+                val nameStr = goal.name
+                val targetStr =
+                    if (goal.targetAmount % 1.0 == 0.0) {
+                        goal.targetAmount.toLong().toString()
+                    } else {
+                        goal.targetAmount.toString()
+                    }
+                val notesStr = goal.notes ?: ""
+                name = TextFieldValue(nameStr, TextRange(nameStr.length))
+                targetAmount = TextFieldValue(targetStr, TextRange(targetStr.length))
+                notes = TextFieldValue(notesStr, TextRange(notesStr.length))
+                targetDateMillis = goal.targetDate
+                selectedAccountId = goal.accountId
+                isInitialDataLoaded = true
+            }
         }
     }
 
@@ -170,7 +179,7 @@ fun AddEditGoalScreen(
                                 DropdownMenuItem(
                                     text = { Text(account.name) },
                                     onClick = {
-                                        selectedAccount = account
+                                        selectedAccountId = account.id
                                         accountExpanded = false
                                     },
                                 )

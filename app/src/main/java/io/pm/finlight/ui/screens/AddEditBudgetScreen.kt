@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
@@ -24,7 +25,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import io.pm.finlight.Budget
-import io.pm.finlight.Category
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
 import io.pm.finlight.ui.theme.PopupSurfaceLight
@@ -42,11 +42,17 @@ fun AddEditBudgetScreen(
     val buttonText = if (isEditMode) "Update Budget" else "Save Budget"
     val titleText = if (isEditMode) "Edit Budget" else "Add Budget"
 
-    var amount by remember { mutableStateOf(TextFieldValue("")) }
+    var amount by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
     val availableCategories by viewModel.availableCategoriesForNewBudget.collectAsState(initial = emptyList())
     val allCategories by viewModel.allCategories.collectAsState(initial = emptyList())
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var isCategoryDropdownExpanded by remember { mutableStateOf(false) }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedCategory =
+        remember(selectedCategoryId, allCategories, availableCategories) {
+            allCategories.find { it.id == selectedCategoryId }
+                ?: availableCategories.find { it.id == selectedCategoryId }
+        }
+    var isCategoryDropdownExpanded by rememberSaveable { mutableStateOf(false) }
+    var isInitialDataLoaded by rememberSaveable { mutableStateOf(false) }
 
     val budgetToEdit by if (isEditMode) {
         viewModel.getBudgetById(budgetId!!).collectAsState(initial = null)
@@ -57,9 +63,15 @@ fun AddEditBudgetScreen(
     LaunchedEffect(budgetToEdit, allCategories) {
         if (isEditMode) {
             budgetToEdit?.let { budget ->
-                val formatted = "%.0f".format(budget.amount)
-                amount = TextFieldValue(formatted, TextRange(formatted.length))
-                selectedCategory = allCategories.find { it.name == budget.categoryName }
+                if (!isInitialDataLoaded) {
+                    val cat = allCategories.find { it.name == budget.categoryName }
+                    if (cat != null || allCategories.isNotEmpty()) {
+                        val formatted = "%.0f".format(budget.amount)
+                        amount = TextFieldValue(formatted, TextRange(formatted.length))
+                        selectedCategoryId = cat?.id
+                        isInitialDataLoaded = true
+                    }
+                }
             }
         }
     }
@@ -106,7 +118,7 @@ fun AddEditBudgetScreen(
                             DropdownMenuItem(
                                 text = { Text(category.name) },
                                 onClick = {
-                                    selectedCategory = category
+                                    selectedCategoryId = category.id
                                     isCategoryDropdownExpanded = false
                                 },
                             )
