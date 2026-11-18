@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -109,7 +110,10 @@ fun AmountComposer(
                         innerTextField()
                     }
                     Spacer(Modifier.width(8.dp))
-                    IconButton(onClick = onDescriptionClick, modifier = Modifier.size(24.dp)) {
+                    IconButton(
+                        onClick = onDescriptionClick,
+                        modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp),
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Search,
                             contentDescription = "Search Predictions",

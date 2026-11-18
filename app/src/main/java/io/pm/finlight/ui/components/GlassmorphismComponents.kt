@@ -20,6 +20,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
@@ -62,7 +65,10 @@ fun GlassPanel(
 }
 
 @Composable
-fun AuroraProgressBar(progress: Float) {
+fun AuroraProgressBar(
+    progress: Float,
+    modifier: Modifier = Modifier,
+) {
     val animatedPercentage = (progress * 100).roundToInt()
     val clampedProgress = progress.coerceIn(0f, 1f)
     val colors = FinlightTheme.colors
@@ -83,6 +89,10 @@ fun AuroraProgressBar(progress: Float) {
     val redZone = colors.expense.copy(alpha = 0.20f)
 
     Layout(
+        modifier =
+            modifier.semantics {
+                this.progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
+            },
         content = {
             Text(
                 text = "$animatedPercentage%",

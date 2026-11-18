@@ -25,6 +25,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -101,7 +104,14 @@ private fun CategoryBudgetGauge(
                 .width(90.dp),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(80.dp)) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            Canvas(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .semantics {
+                            this.progressBarRangeInfo = ProgressBarRangeInfo(progress, 0f..1f)
+                        },
+            ) {
                 val strokeWidth = 8.dp.toPx()
                 val diameter = min(size.width, size.height) - strokeWidth
                 drawArc(
