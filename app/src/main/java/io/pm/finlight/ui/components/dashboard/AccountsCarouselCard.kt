@@ -128,47 +128,63 @@ private fun AccountItem(
                 )
                 if (metrics != null) {
                     Spacer(Modifier.height(2.dp))
-                    val progress = (metrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                    val progressColor = getUtilizationColor(metrics.utilizationPercentage)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    if (metrics.creditLimit != null) {
+                        val utilization = metrics.utilizationPercentage ?: 0f
+                        val progress = (utilization / 100f).coerceIn(0f, 1f)
+                        val progressColor = getUtilizationColor(utilization)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "Limit: ${currencyFormat.format(metrics.creditLimit)}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false),
+                            )
+                            Text(
+                                text = "${String.format(Locale.getDefault(), "%.0f", utilization)}%",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = progressColor,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(3.dp)
+                                    .clip(RoundedCornerShape(1.5.dp)),
+                            color = progressColor,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        )
+                        Spacer(Modifier.height(3.dp))
                         Text(
-                            text = "Limit: ${currencyFormat.format(metrics.creditLimit)}",
+                            text = "${currencyFormat.format(metrics.currentCycleSpend)} spent • ${metrics.daysRemainingInCycle}d left",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false),
                         )
+                    } else {
                         Text(
-                            text = "${String.format(Locale.getDefault(), "%.0f", metrics.utilizationPercentage)}%",
+                            text = "${currencyFormat.format(metrics.currentCycleSpend)} spent",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "${metrics.daysRemainingInCycle}d left in cycle",
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = progressColor,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Spacer(Modifier.height(4.dp))
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .clip(RoundedCornerShape(1.5.dp)),
-                        color = progressColor,
-                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Text(
-                        text = "${currencyFormat.format(metrics.currentCycleSpend)} spent • ${metrics.daysRemainingInCycle}d left",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
                 } else if (hasLimit) {
                     Text(
                         text = "Limit: ${currencyFormat.format(creditLimit)}",
