@@ -223,7 +223,7 @@ fun AddEditAccountScreen(
                                     if (isBillingDayInvalid) {
                                         Text("Billing day must be between 1 and 31")
                                     } else {
-                                        Text("Day each month when your statement is generated")
+                                        Text("Day each month when the billing cycle begins (e.g., 15 for 15th to 14th)")
                                     }
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

@@ -16,11 +16,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +63,20 @@ fun AccountDetailScreen(
 
     val currentAccount = account ?: return // Don't compose if account is not loaded yet
 
+    var showOnlyCurrentCycle by rememberSaveable { mutableStateOf(true) }
+
+    val displayedTransactions =
+        remember(transactions, creditCardMetrics, showOnlyCurrentCycle) {
+            val metrics = creditCardMetrics
+            if (metrics != null && showOnlyCurrentCycle) {
+                transactions.filter {
+                    it.transaction.date in metrics.cycleStartDate..metrics.cycleEndDate
+                }
+            } else {
+                transactions
+            }
+        }
+
     LazyColumn(
         modifier =
             Modifier
@@ -74,7 +93,41 @@ fun AccountDetailScreen(
             )
         }
 
-        if (transactions.isNotEmpty()) {
+        if (creditCardMetrics != null) {
+            item {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = if (showOnlyCurrentCycle) "Current Cycle Transactions" else "All Transactions",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FilterChip(
+                        selected = showOnlyCurrentCycle,
+                        onClick = { showOnlyCurrentCycle = !showOnlyCurrentCycle },
+                        label = { Text(if (showOnlyCurrentCycle) "This Cycle" else "All") },
+                        leadingIcon =
+                            if (showOnlyCurrentCycle) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Selected",
+                                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                    )
+                }
+            }
+        } else if (transactions.isNotEmpty()) {
             item {
                 Text(
                     text = "Recent Transactions",
@@ -83,7 +136,10 @@ fun AccountDetailScreen(
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
-            items(transactions, key = { it.transaction.id }) { details ->
+        }
+
+        if (displayedTransactions.isNotEmpty()) {
+            items(displayedTransactions, key = { it.transaction.id }) { details ->
                 // --- UPDATED: Pass the navigation logic to the item ---
                 AccountDetailTransactionItem(
                     transactionDetails = details,
@@ -103,7 +159,12 @@ fun AccountDetailScreen(
                                 .padding(32.dp),
                     ) {
                         Text(
-                            "No transactions for this account yet.",
+                            text =
+                                if (creditCardMetrics != null && showOnlyCurrentCycle) {
+                                    "No transactions in the current billing cycle."
+                                } else {
+                                    "No transactions for this account yet."
+                                },
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -194,58 +255,61 @@ private fun AccountDetailHeader(
                     )
                 }
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                if (creditCardMetrics.creditLimit != null) {
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                        val statusColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically,
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Text(
-                                text = "Credit Utilization",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                            )
-                            Text(
-                                text = "${String.format(Locale.getDefault(), "%.1f", creditCardMetrics.utilizationPercentage)}%",
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.Bold,
+                            val utilization = creditCardMetrics.utilizationPercentage ?: 0f
+                            val progress = (utilization / 100f).coerceIn(0f, 1f)
+                            val statusColor = getUtilizationColor(utilization)
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = "Credit Utilization",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                                Text(
+                                    text = "${String.format(Locale.getDefault(), "%.1f", utilization)}%",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = statusColor,
+                                )
+                            }
+
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
                                 color = statusColor,
+                                trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                             )
-                        }
 
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                            color = statusColor,
-                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Text(
-                                text = "Available: ${currencyFormat.format(creditCardMetrics.availableLimit)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Text(
-                                text = "Limit: ${currencyFormat.format(creditCardMetrics.creditLimit)}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    text = "Available: ${currencyFormat.format(creditCardMetrics.availableLimit ?: 0.0)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                Text(
+                                    text = "Limit: ${currencyFormat.format(creditCardMetrics.creditLimit)}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

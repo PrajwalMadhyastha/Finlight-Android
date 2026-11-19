@@ -202,18 +202,19 @@ class DateUtilsTest : BaseViewModelTest() {
     @Test
     fun `getCreditCardBillingCycleRange returns correct range before billing day`() {
         // Today is Nov 10, 2025. Billing day is 24.
+        // Active cycle started Oct 24, 2025 and ends Nov 23, 2025.
         val currentTime = getTestTime(2025, Calendar.NOVEMBER, 10)
         val (start, end) = DateUtils.getCreditCardBillingCycleRange(24, currentTime)
 
         val expectedStart =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.OCTOBER, 25, 0, 0, 0)
+                set(2025, Calendar.OCTOBER, 24, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         val expectedEnd =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.NOVEMBER, 24, 23, 59, 59)
+                set(2025, Calendar.NOVEMBER, 23, 23, 59, 59)
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
@@ -224,18 +225,19 @@ class DateUtilsTest : BaseViewModelTest() {
     @Test
     fun `getCreditCardBillingCycleRange returns correct range on exact billing day`() {
         // Today is Nov 24, 2025. Billing day is 24.
+        // Active cycle starts today Nov 24, 2025 and ends Dec 23, 2025.
         val currentTime = getTestTime(2025, Calendar.NOVEMBER, 24)
         val (start, end) = DateUtils.getCreditCardBillingCycleRange(24, currentTime)
 
         val expectedStart =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.OCTOBER, 25, 0, 0, 0)
+                set(2025, Calendar.NOVEMBER, 24, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         val expectedEnd =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.NOVEMBER, 24, 23, 59, 59)
+                set(2025, Calendar.DECEMBER, 23, 23, 59, 59)
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
@@ -246,18 +248,41 @@ class DateUtilsTest : BaseViewModelTest() {
     @Test
     fun `getCreditCardBillingCycleRange returns correct range after billing day`() {
         // Today is Nov 25, 2025. Billing day is 24.
+        // Active cycle started Nov 24, 2025 and ends Dec 23, 2025.
         val currentTime = getTestTime(2025, Calendar.NOVEMBER, 25)
         val (start, end) = DateUtils.getCreditCardBillingCycleRange(24, currentTime)
 
         val expectedStart =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.NOVEMBER, 25, 0, 0, 0)
+                set(2025, Calendar.NOVEMBER, 24, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         val expectedEnd =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.DECEMBER, 24, 23, 59, 59)
+                set(2025, Calendar.DECEMBER, 23, 23, 59, 59)
+                set(Calendar.MILLISECOND, 999)
+            }.timeInMillis
+
+        assertEquals(expectedStart, start)
+        assertEquals(expectedEnd, end)
+    }
+
+    @Test
+    fun `getCreditCardBillingCycleRange returns full calendar month when billing day is 1`() {
+        // Today is Nov 15, 2025. Billing day is 1.
+        val currentTime = getTestTime(2025, Calendar.NOVEMBER, 15)
+        val (start, end) = DateUtils.getCreditCardBillingCycleRange(1, currentTime)
+
+        val expectedStart =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.NOVEMBER, 1, 0, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+        val expectedEnd =
+            Calendar.getInstance(testTimeZone).apply {
+                set(2025, Calendar.NOVEMBER, 30, 23, 59, 59)
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
@@ -268,18 +293,19 @@ class DateUtilsTest : BaseViewModelTest() {
     @Test
     fun `getCreditCardBillingCycleRange handles February and leap year boundaries`() {
         // Leap year 2024: Today is Feb 15, 2024. Billing day is 31.
+        // Cycle started Jan 31, 2024; next cycle starts Feb 29, so ends Feb 28, 2024.
         val leapYearTime = getTestTime(2024, Calendar.FEBRUARY, 15)
         val (leapStart, leapEnd) = DateUtils.getCreditCardBillingCycleRange(31, leapYearTime)
 
         val expectedLeapStart =
             Calendar.getInstance(testTimeZone).apply {
-                set(2024, Calendar.FEBRUARY, 1, 0, 0, 0)
+                set(2024, Calendar.JANUARY, 31, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         val expectedLeapEnd =
             Calendar.getInstance(testTimeZone).apply {
-                set(2024, Calendar.FEBRUARY, 29, 23, 59, 59)
+                set(2024, Calendar.FEBRUARY, 28, 23, 59, 59)
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 
@@ -287,18 +313,19 @@ class DateUtilsTest : BaseViewModelTest() {
         assertEquals(expectedLeapEnd, leapEnd)
 
         // Non-leap year 2025: Today is Feb 15, 2025. Billing day is 31.
+        // Cycle started Jan 31, 2025; next cycle starts Feb 28, so ends Feb 27, 2025.
         val nonLeapTime = getTestTime(2025, Calendar.FEBRUARY, 15)
         val (nonLeapStart, nonLeapEnd) = DateUtils.getCreditCardBillingCycleRange(31, nonLeapTime)
 
         val expectedNonLeapStart =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.FEBRUARY, 1, 0, 0, 0)
+                set(2025, Calendar.JANUARY, 31, 0, 0, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
 
         val expectedNonLeapEnd =
             Calendar.getInstance(testTimeZone).apply {
-                set(2025, Calendar.FEBRUARY, 28, 23, 59, 59)
+                set(2025, Calendar.FEBRUARY, 27, 23, 59, 59)
                 set(Calendar.MILLISECOND, 999)
             }.timeInMillis
 

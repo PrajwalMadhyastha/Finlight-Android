@@ -761,14 +761,54 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `calculateCreditCardMetrics returns null for non-credit card or invalid limit`() {
+    fun `calculateCreditCardMetrics returns null for non-credit card and valid metrics for credit card without limit`() {
         val bankAccount = Account(id = 1, name = "Savings", type = "Bank", creditLimit = 50000.0, billingCycleDay = 15)
         val ccNoLimit = Account(id = 2, name = "Card", type = "Credit Card", creditLimit = null, billingCycleDay = 15)
         val ccZeroLimit = Account(id = 3, name = "Card", type = "Credit Card", creditLimit = 0.0, billingCycleDay = 15)
 
         assertEquals(null, viewModel.calculateCreditCardMetrics(bankAccount, emptyList()))
-        assertEquals(null, viewModel.calculateCreditCardMetrics(ccNoLimit, emptyList()))
-        assertEquals(null, viewModel.calculateCreditCardMetrics(ccZeroLimit, emptyList()))
+
+        val noLimitMetrics = viewModel.calculateCreditCardMetrics(ccNoLimit, emptyList())
+        org.junit.Assert.assertNotNull(noLimitMetrics)
+        assertEquals(null, noLimitMetrics?.creditLimit)
+        assertEquals(null, noLimitMetrics?.availableLimit)
+        assertEquals(null, noLimitMetrics?.utilizationPercentage)
+        assertEquals(0.0, noLimitMetrics?.currentCycleSpend ?: 0.0, 0.01)
+
+        val zeroLimitMetrics = viewModel.calculateCreditCardMetrics(ccZeroLimit, emptyList())
+        org.junit.Assert.assertNotNull(zeroLimitMetrics)
+        assertEquals(null, zeroLimitMetrics?.creditLimit)
+    }
+
+    @Test
+    fun `calculateCreditCardMetrics excludes linked transfer bill payments from offsetting cycle spend`() {
+        val testTime =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 10, 12, 0, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+
+        val card = Account(id = 10, name = "HDFC Regalia", type = "Credit Card", creditLimit = 100000.0, billingCycleDay = 1)
+
+        val insideCycleExpense =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 5, 10, 0, 0)
+            }.timeInMillis
+        val insideCycleBillPayment =
+            Calendar.getInstance().apply {
+                set(2025, Calendar.NOVEMBER, 6, 10, 0, 0)
+            }.timeInMillis
+
+        val txns =
+            listOf(
+                Transaction(id = 1, description = "Groceries", amount = 15000.0, date = insideCycleExpense, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.EXPENSE),
+                // Bill payment transferred from bank to credit card
+                Transaction(id = 2, description = "Bill Payment", amount = 15000.0, date = insideCycleBillPayment, accountId = 10, categoryId = 1, notes = null, transactionType = TransactionType.INCOME, linkedTransferId = 999),
+            )
+
+        val metrics = viewModel.calculateCreditCardMetrics(card, txns, testTime)
+        org.junit.Assert.assertNotNull(metrics)
+        assertEquals(15000.0, metrics!!.currentCycleSpend, 0.01)
     }
 
     @Test
@@ -809,10 +849,10 @@ class AccountViewModelTest : BaseViewModelTest() {
 
         // Net spend: 25000 - 5000 = 20000
         assertEquals(20000.0, metrics.currentCycleSpend, 0.01)
-        assertEquals(80000.0, metrics.availableLimit, 0.01)
-        assertEquals(20.0f, metrics.utilizationPercentage, 0.01f)
+        assertEquals(80000.0, metrics.availableLimit ?: 0.0, 0.01)
+        assertEquals(20.0f, metrics.utilizationPercentage ?: 0f, 0.01f)
         assertEquals(24, metrics.billingCycleDay)
-        assertEquals(100000.0, metrics.creditLimit, 0.01)
+        assertEquals(100000.0, metrics.creditLimit ?: 0.0, 0.01)
         assertTrue(metrics.daysRemainingInCycle > 0)
     }
 
@@ -868,7 +908,7 @@ class AccountViewModelTest : BaseViewModelTest() {
             val nonCcAccounts =
                 listOf(
                     AccountWithBalance(Account(id = 1, name = "Savings", type = "Bank"), 1000.0),
-                    AccountWithBalance(Account(id = 2, name = "Card No Limit", type = "Credit Card", creditLimit = null), 0.0),
+                    AccountWithBalance(Account(id = 2, name = "Cash Wallet", type = "Wallet"), 500.0),
                 )
             `when`(accountRepository.accountsWithBalance).thenReturn(flowOf(nonCcAccounts))
 
@@ -936,26 +976,25 @@ class AccountViewModelTest : BaseViewModelTest() {
         }
 
     @Test
-    fun `getCreditCardMetrics returns null for null account, null limit, or non-positive limit`() =
+    fun `getCreditCardMetrics returns null for null or non-credit card account, and metrics for cards with or without limit`() =
         runTest {
             // Null account
             `when`(accountRepository.getAccountById(99)).thenReturn(flowOf(null))
             assertEquals(null, viewModel.getCreditCardMetrics(99).first())
 
-            // Null limit
-            val cardNullLimit = Account(id = 101, name = "Card", type = "Credit Card", creditLimit = null)
+            // Non-credit card account
+            val bankAccount = Account(id = 100, name = "Bank", type = "Bank")
+            `when`(accountRepository.getAccountById(100)).thenReturn(flowOf(bankAccount))
+            assertEquals(null, viewModel.getCreditCardMetrics(100).first())
+
+            // Credit card with null limit still computes metrics
+            val cardNullLimit = Account(id = 101, name = "Card", type = "Credit Card", creditLimit = null, billingCycleDay = 15)
             `when`(accountRepository.getAccountById(101)).thenReturn(flowOf(cardNullLimit))
-            assertEquals(null, viewModel.getCreditCardMetrics(101).first())
-
-            // 0.0 limit
-            val cardZeroLimit = Account(id = 102, name = "Card", type = "Credit Card", creditLimit = 0.0)
-            `when`(accountRepository.getAccountById(102)).thenReturn(flowOf(cardZeroLimit))
-            assertEquals(null, viewModel.getCreditCardMetrics(102).first())
-
-            // Negative limit
-            val cardNegLimit = Account(id = 103, name = "Card", type = "Credit Card", creditLimit = -100.0)
-            `when`(accountRepository.getAccountById(103)).thenReturn(flowOf(cardNegLimit))
-            assertEquals(null, viewModel.getCreditCardMetrics(103).first())
+            `when`(transactionRepository.getTransactionsForAccount(101)).thenReturn(flowOf(emptyList()))
+            val nullLimitMetrics = viewModel.getCreditCardMetrics(101).first()
+            org.junit.Assert.assertNotNull(nullLimitMetrics)
+            assertEquals(null, nullLimitMetrics?.creditLimit)
+            assertEquals(15, nullLimitMetrics?.billingCycleDay)
         }
 
     @Test
