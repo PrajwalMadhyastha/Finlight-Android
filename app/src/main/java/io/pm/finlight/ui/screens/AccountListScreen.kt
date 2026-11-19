@@ -254,26 +254,35 @@ private fun AccountListItem(
                 )
                 if (creditCardMetrics != null) {
                     Spacer(Modifier.height(2.dp))
-                    Text(
-                        text = "Spent: ${currencyFormat.format(creditCardMetrics.currentCycleSpend)} / ${currencyFormat.format(creditCardMetrics.creditLimit)}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    val progress = (creditCardMetrics.utilizationPercentage / 100f).coerceIn(0f, 1f)
-                    val progressColor = getUtilizationColor(creditCardMetrics.utilizationPercentage)
-                    LinearProgressIndicator(
-                        progress = { progress },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
-                        color = progressColor,
-                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = "${String.format(Locale.getDefault(), "%.1f", creditCardMetrics.utilizationPercentage)}% used • ${creditCardMetrics.daysRemainingInCycle}d left",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = progressColor,
-                    )
+                    if (creditCardMetrics.creditLimit != null) {
+                        Text(
+                            text = "Spent: ${currencyFormat.format(creditCardMetrics.currentCycleSpend)} / ${currencyFormat.format(creditCardMetrics.creditLimit)}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        val utilization = creditCardMetrics.utilizationPercentage ?: 0f
+                        val progress = (utilization / 100f).coerceIn(0f, 1f)
+                        val progressColor = getUtilizationColor(utilization)
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                            color = progressColor,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = "${String.format(Locale.getDefault(), "%.1f", utilization)}% used • ${creditCardMetrics.daysRemainingInCycle}d left",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = progressColor,
+                        )
+                    } else {
+                        Text(
+                            text = "Spent: ${currencyFormat.format(creditCardMetrics.currentCycleSpend)} • ${creditCardMetrics.daysRemainingInCycle}d left",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 } else if (accountWithBalance.account.isCreditCard && (accountWithBalance.account.creditLimit ?: 0.0) > 0.0) {
                     Text(
                         text = "Limit: ${currencyFormat.format(accountWithBalance.account.creditLimit)}",

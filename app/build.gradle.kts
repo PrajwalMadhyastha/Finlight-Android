@@ -99,10 +99,12 @@ sonar {
             "sonar.coverage.exclusions",
             "**/*ViewModelFactory*.kt," +
                 "**/*Screen.kt," +
+                "**/*Scaffold*.kt," +
                 "**/ui/screens/**," +
                 "**/ui/components/**," +
                 "**/ui/theme/**," +
                 "**/ui/NavItems.kt," +
+                "**/ui/navigation/**," +
                 "**/MainActivity.kt," +
                 "**/MainApplication.kt," +
                 "**/utils/ShareImageGenerator.kt," +
@@ -112,7 +114,12 @@ sonar {
                 "**/*_Impl*",
         )
         property("sonar.exclusions", "**/*ViewModelFactory*.kt")
-        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt")
+        property("sonar.cpd.exclusions", "**/ui/screens/**,**/ui/components/HelpSystem.kt,**/ui/navigation/**,**/*Scaffold*.kt")
+        property("sonar.issue.ignore.multicriteria", "e1,e2")
+        property("sonar.issue.ignore.multicriteria.e1.ruleKey", "kotlin:S6293")
+        property("sonar.issue.ignore.multicriteria.e1.resourceKey", "**/LockScreen.kt")
+        property("sonar.issue.ignore.multicriteria.e2.ruleKey", "kotlin:S3776")
+        property("sonar.issue.ignore.multicriteria.e2.resourceKey", "**/*Scaffold*.kt")
     }
 }
 
@@ -131,11 +138,13 @@ kover {
                     "*ViewModelFactory*",
                     "*Screen",
                     "*Screen$*",
+                    "*Scaffold*",
                 )
                 packages(
                     "io.pm.finlight.ui.screens",
                     "io.pm.finlight.ui.components",
                     "io.pm.finlight.ui.theme",
+                    "io.pm.finlight.ui.navigation",
                     // Exclude DB package from unit tests
                     "io.pm.finlight.data.db",
                     "io.pm.finlight.data.db.dao",

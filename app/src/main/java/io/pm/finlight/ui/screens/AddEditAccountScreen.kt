@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextRange
@@ -45,10 +46,10 @@ fun AddEditAccountScreen(
     val isEditMode = accountId != null
     val titleText = if (isEditMode) "Edit Account" else "Add New Account"
 
-    var accountName by remember { mutableStateOf(TextFieldValue("")) }
-    var accountType by remember { mutableStateOf(TextFieldValue("")) }
-    var creditLimitText by remember { mutableStateOf(TextFieldValue("")) }
-    var billingDayText by remember { mutableStateOf(TextFieldValue("")) }
+    var accountName by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var accountType by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var creditLimitText by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
+    var billingDayText by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue("")) }
     val isCreditCard = AccountType.fromString(accountType.text) == AccountType.CREDIT_CARD
     val isCreditLimitInvalid =
         isCreditCard && creditLimitText.text.isNotBlank() &&
@@ -58,7 +59,8 @@ fun AddEditAccountScreen(
         isCreditCard && billingDayText.text.isNotBlank() &&
             (billingDayInt == null || billingDayInt !in 1..31)
 
-    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by rememberSaveable { mutableStateOf(false) }
+    var isInitialDataLoaded by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var matchDialogState by remember { mutableStateOf<AccountMatch?>(null) }
 
@@ -99,15 +101,18 @@ fun AddEditAccountScreen(
 
     LaunchedEffect(accountToEdit) {
         accountToEdit?.let {
-            accountName = TextFieldValue(it.name, TextRange(it.name.length))
-            accountType = TextFieldValue(it.type, TextRange(it.type.length))
-            val limitStr =
-                it.creditLimit?.let { limit ->
-                    if (limit % 1.0 == 0.0) limit.toLong().toString() else limit.toString()
-                } ?: ""
-            creditLimitText = TextFieldValue(limitStr, TextRange(limitStr.length))
-            val dayStr = it.billingCycleDay?.toString() ?: ""
-            billingDayText = TextFieldValue(dayStr, TextRange(dayStr.length))
+            if (!isInitialDataLoaded) {
+                accountName = TextFieldValue(it.name, TextRange(it.name.length))
+                accountType = TextFieldValue(it.type, TextRange(it.type.length))
+                val limitStr =
+                    it.creditLimit?.let { limit ->
+                        if (limit % 1.0 == 0.0) limit.toLong().toString() else limit.toString()
+                    } ?: ""
+                creditLimitText = TextFieldValue(limitStr, TextRange(limitStr.length))
+                val dayStr = it.billingCycleDay?.toString() ?: ""
+                billingDayText = TextFieldValue(dayStr, TextRange(dayStr.length))
+                isInitialDataLoaded = true
+            }
         }
     }
 
@@ -218,7 +223,7 @@ fun AddEditAccountScreen(
                                     if (isBillingDayInvalid) {
                                         Text("Billing day must be between 1 and 31")
                                     } else {
-                                        Text("Day each month when your statement is generated")
+                                        Text("Day each month when the billing cycle begins (e.g., 15 for 15th to 14th)")
                                     }
                                 },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

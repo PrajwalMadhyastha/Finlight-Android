@@ -28,11 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.Category
+import io.pm.finlight.ui.components.CategoryIconDisplay
 import io.pm.finlight.ui.components.ConfirmationDialog
 import io.pm.finlight.ui.components.GlassPanel
 import io.pm.finlight.ui.theme.PopupSurfaceDark
@@ -92,30 +91,10 @@ fun CategoryListScreen(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                if (category.iconKey == "letter_default") {
-                                    Text(
-                                        text = category.name.firstOrNull()?.uppercase() ?: "?",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp,
-                                        color = Color.Black,
-                                    )
-                                } else {
-                                    Icon(
-                                        imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                                        contentDescription = category.name,
-                                        tint = Color.Black,
-                                        modifier = Modifier.size(22.dp),
-                                    )
-                                }
-                            }
+                            CategoryIconDisplay(
+                                category = category,
+                                modifier = Modifier.size(40.dp),
+                            )
                             Spacer(Modifier.width(16.dp))
                             Text(
                                 text = category.name,

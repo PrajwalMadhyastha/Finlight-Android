@@ -120,12 +120,13 @@ fun CreateAccountDialog(
                             },
                             label = { Text("Billing Day (1 - 31)") },
                             isError = isBillingDayInvalid,
-                            supportingText =
+                            supportingText = {
                                 if (isBillingDayInvalid) {
-                                    { Text("Day must be between 1 and 31") }
+                                    Text("Day must be between 1 and 31")
                                 } else {
-                                    null
-                                },
+                                    Text("Day each month when the billing cycle begins")
+                                }
+                            },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         )
                     }

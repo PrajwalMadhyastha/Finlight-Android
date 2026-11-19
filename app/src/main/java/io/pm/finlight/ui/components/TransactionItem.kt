@@ -35,10 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import io.pm.finlight.TransactionDetails
 import io.pm.finlight.TransactionType
-import io.pm.finlight.ui.theme.ExpenseRedDark
-import io.pm.finlight.ui.theme.ExpenseRedLight
-import io.pm.finlight.ui.theme.IncomeGreenDark
-import io.pm.finlight.ui.theme.IncomeGreenLight
+import io.pm.finlight.ui.theme.FinlightTheme
 import io.pm.finlight.utils.CategoryIconHelper
 import io.pm.finlight.utils.FormatUtils
 import java.util.*
@@ -201,11 +198,8 @@ fun TransactionItem(
             val displayAmount = kotlin.math.abs(transactionDetails.transaction.amount)
 
             val amountColor =
-                if (isSystemInDarkTheme()) {
-                    if (isIncome) IncomeGreenDark else ExpenseRedDark
-                } else {
-                    if (isIncome) IncomeGreenLight else ExpenseRedLight
-                }.copy(alpha = contentAlpha)
+                (if (isIncome) FinlightTheme.colors.income else FinlightTheme.colors.expense)
+                    .copy(alpha = contentAlpha)
             val icon = if (isIncome) Icons.Default.SouthWest else Icons.Default.NorthEast
 
             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -87,7 +87,7 @@ class AccountViewModel(
             val creditCardAccounts =
                 accounts
                     .map { it.account }
-                    .filter { it.isCreditCard && (it.creditLimit ?: 0.0) > 0.0 }
+                    .filter { it.isCreditCard }
 
             if (creditCardAccounts.isEmpty()) {
                 flowOf(emptyMap())
@@ -276,7 +276,7 @@ class AccountViewModel(
 
     fun getCreditCardMetrics(accountId: Int): Flow<CreditCardMetrics?> {
         return repository.getAccountById(accountId).flatMapLatest { account ->
-            if (account == null || !account.isCreditCard || account.creditLimit == null || account.creditLimit <= 0.0) {
+            if (account == null || !account.isCreditCard) {
                 flowOf(null)
             } else {
                 transactionRepository.getTransactionsForAccount(accountId).map { txns ->
@@ -291,16 +291,15 @@ class AccountViewModel(
      *
      * Note: Current cycle spend is calculated as `(expenseSum - incomeSum).coerceAtLeast(0.0)`.
      * `incomeSum` accounts for merchant refunds during the active billing cycle; note that any
-     * bill payments recorded as income directly on the credit card account during the active
-     * billing cycle will also offset current-cycle spend.
+     * bill payments (transfers) with a linkedTransferId are excluded from incomeSum to prevent
+     * repayments from zeroing out current-cycle spend.
      */
     fun calculateCreditCardMetrics(
         account: Account,
         transactions: List<Transaction>,
         currentTimeMillis: Long = System.currentTimeMillis(),
     ): CreditCardMetrics? {
-        val limit = account.creditLimit ?: return null
-        if (limit <= 0.0 || !account.isCreditCard) return null
+        if (!account.isCreditCard) return null
 
         val billingDay = account.billingCycleDay ?: 1
         val (cycleStart, cycleEnd) = DateUtils.getCreditCardBillingCycleRange(billingDay, currentTimeMillis)
@@ -316,12 +315,14 @@ class AccountViewModel(
                 .sumOf { it.amount }
         val incomeSum =
             cycleTransactions
-                .filter { it.transactionType == TransactionType.INCOME }
+                .filter { it.transactionType == TransactionType.INCOME && it.linkedTransferId == null }
                 .sumOf { it.amount }
 
         val currentCycleSpend = (expenseSum - incomeSum).coerceAtLeast(0.0)
-        val availableLimit = (limit - currentCycleSpend).coerceAtLeast(0.0)
-        val utilization = ((currentCycleSpend / limit) * 100.0).toFloat().coerceIn(0f, 1000f)
+
+        val limit = account.creditLimit?.takeIf { it > 0.0 }
+        val availableLimit = limit?.let { (it - currentCycleSpend).coerceAtLeast(0.0) }
+        val utilization = limit?.let { ((currentCycleSpend / it) * 100.0).toFloat().coerceIn(0f, 1000f) }
 
         val daysRemaining =
             max(

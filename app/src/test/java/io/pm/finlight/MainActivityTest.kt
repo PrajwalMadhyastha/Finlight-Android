@@ -113,19 +113,19 @@ class MainActivityTest {
         assertEquals(
             "ACTION_ADD_EXPENSE should have correct package-qualified name",
             "io.pm.finlight.ACTION_ADD_EXPENSE",
-            ACTION_ADD_EXPENSE,
+            MainActivity.ACTION_ADD_EXPENSE,
         )
 
         assertEquals(
             "ACTION_ADD_INCOME should have correct package-qualified name",
             "io.pm.finlight.ACTION_ADD_INCOME",
-            ACTION_ADD_INCOME,
+            MainActivity.ACTION_ADD_INCOME,
         )
 
         assertEquals(
             "ACTION_SEARCH should have correct package-qualified name",
             "io.pm.finlight.ACTION_SEARCH",
-            ACTION_SEARCH,
+            MainActivity.ACTION_SEARCH,
         )
     }
 

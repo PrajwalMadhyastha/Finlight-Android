@@ -6,11 +6,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import java.text.NumberFormat
-import java.util.*
+import java.util.Locale
 
 /**
  * A composable that displays a currency amount, automatically obscuring it
@@ -39,13 +41,13 @@ fun PrivacyAwareText(
     // --- FIX: Apply maximumFractionDigits = 0 to remove decimal points ---
     val currencyFormat =
         remember {
-            NumberFormat.getCurrencyInstance(Locale("en", "IN")).apply {
+            NumberFormat.getCurrencyInstance(Locale.forLanguageTag("en-IN")).apply {
                 maximumFractionDigits = 0
             }
         }
     val numberFormat =
         remember {
-            NumberFormat.getNumberInstance(Locale("en", "IN")).apply {
+            NumberFormat.getNumberInstance(Locale.forLanguageTag("en-IN")).apply {
                 maximumFractionDigits = 0
             }
         }
@@ -62,9 +64,18 @@ fun PrivacyAwareText(
                 }
         }
 
+    val semanticsModifier =
+        if (isPrivacyMode) {
+            modifier.semantics {
+                this.contentDescription = "Hidden balance"
+            }
+        } else {
+            modifier
+        }
+
     Text(
         text = textToShow,
-        modifier = modifier,
+        modifier = semanticsModifier,
         color = color,
         fontWeight = fontWeight,
         textAlign = textAlign,

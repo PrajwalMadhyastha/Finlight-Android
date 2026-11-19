@@ -8,4 +8,11 @@
     <string name="shortcut_add_income_long">Add a new income</string>
     <string name="shortcut_search_short">Search</string>
     <string name="shortcut_search_long">Search transactions</string>
+
+    <!-- Accessibility Content Descriptions -->
+    <string name="cd_dismiss">Dismiss</string>
+    <string name="cd_summary_info">Summary Info</string>
+    <string name="cd_search_predictions">Search Predictions</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_privacy_shield">Privacy Shield</string>
 </resources>

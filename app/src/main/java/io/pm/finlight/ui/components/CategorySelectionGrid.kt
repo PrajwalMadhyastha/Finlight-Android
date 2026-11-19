@@ -1,16 +1,8 @@
-// =================================================================================
-// FILE: ./app/src/main/java/io/pm/finlight/ui/components/CategorySelectionGrid.kt
-// REASON: UX REFINEMENT - The adaptive grid's minSize has been reduced from
-// 100.dp to 85.dp to allow more columns to fit on the screen. The spacing
-// between items has also been reduced from 12.dp to 8.dp, creating a much
-// more compact and information-dense layout.
-// =================================================================================
 package io.pm.finlight.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
@@ -19,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
@@ -35,19 +26,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.pm.finlight.Category
-import io.pm.finlight.utils.CategoryIconHelper
 
-private fun Modifier.categoryGridItem(onClick: () -> Unit) =
-    this
-        .clip(RoundedCornerShape(12.dp))
-        .clickable(onClick = onClick)
-        .padding(vertical = 12.dp)
+private fun Modifier.categoryGridItem(
+    backgroundColor: Color = Color.Transparent,
+    onClick: () -> Unit,
+) = this
+    .clip(RoundedCornerShape(12.dp))
+    .background(backgroundColor)
+    .clickable(onClick = onClick)
+    .padding(vertical = 12.dp)
 
 @Composable
 fun CategorySelectionGrid(
     categories: List<Category>,
+    selectedCategoryId: Int? = null,
     onCategorySelected: (Category) -> Unit,
     onAddNew: (() -> Unit)? = null,
 ) {
@@ -57,9 +50,10 @@ fun CategorySelectionGrid(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(categories) { category ->
+        items(categories, key = { it.id }) { category ->
             CategoryGridItem(
                 category = category,
+                isSelected = category.id == selectedCategoryId,
                 onSelected = { onCategorySelected(category) },
             )
         }
@@ -74,10 +68,22 @@ fun CategorySelectionGrid(
 @Composable
 private fun CategoryGridItem(
     category: Category,
+    isSelected: Boolean = false,
     onSelected: () -> Unit,
 ) {
+    val backgroundColor =
+        if (isSelected) {
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        } else {
+            Color.Transparent
+        }
+
     Column(
-        modifier = Modifier.categoryGridItem(onClick = onSelected),
+        modifier =
+            Modifier.categoryGridItem(
+                backgroundColor = backgroundColor,
+                onClick = onSelected,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -85,10 +91,16 @@ private fun CategoryGridItem(
         Text(
             category.name,
             style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            color = MaterialTheme.colorScheme.onSurface,
+            color =
+                if (isSelected) {
+                    MaterialTheme.colorScheme.onSecondaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
         )
     }
 }
@@ -97,7 +109,6 @@ private fun CategoryGridItem(
 private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
     Column(
         modifier = Modifier.categoryGridItem(onClick = onAddNew).height(80.dp),
-        // Match the approximate height of other items
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -112,40 +123,5 @@ private fun AddNewCategoryGridItem(onAddNew: () -> Unit) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
-    }
-}
-
-@Composable
-private fun CategoryIconDisplay(category: Category) {
-    Box(
-        modifier =
-            Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(CategoryIconHelper.getIconBackgroundColor(category.colorKey)),
-        contentAlignment = Alignment.Center,
-    ) {
-        if (category.name == "Uncategorized") {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon("help_outline"),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        } else if (category.iconKey == "letter_default") {
-            Text(
-                text = category.name.firstOrNull()?.uppercase() ?: "?",
-                color = Color.Black,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp,
-            )
-        } else {
-            Icon(
-                imageVector = CategoryIconHelper.getIcon(category.iconKey),
-                contentDescription = category.name,
-                tint = Color.Black,
-                modifier = Modifier.size(24.dp),
-            )
-        }
     }
 }

@@ -16,12 +16,14 @@
 package io.pm.finlight.ui.screens
 
 import io.pm.finlight.TransactionType
+import io.pm.finlight.ui.components.TransactionTypeToggle
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
@@ -39,8 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import io.pm.finlight.di.FinlightViewModelFactory
 import java.util.Locale
 import androidx.compose.ui.Alignment
-import io.pm.finlight.Account
-import io.pm.finlight.Category
 import io.pm.finlight.RecurringTransactionViewModel
 import io.pm.finlight.TransactionViewModel
 import io.pm.finlight.ui.components.GlassPanel
@@ -54,42 +54,49 @@ private fun Color.isDark() = (red * 0.299 + green * 0.587 + blue * 0.114) < 0.5
 fun AddRecurringTransactionScreen(
     navController: NavController,
     ruleId: Int?,
+    recurringViewModel: RecurringTransactionViewModel =
+        viewModel(
+            factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as Application),
+        ),
+    transactionViewModel: TransactionViewModel =
+        viewModel(
+            factory = FinlightViewModelFactory.create(LocalContext.current.applicationContext as Application),
+        ),
 ) {
-    val context = LocalContext.current
-    val recurringViewModel: RecurringTransactionViewModel =
-        viewModel(
-            factory = FinlightViewModelFactory.create(context.applicationContext as Application)
-        )
-    val transactionViewModel: TransactionViewModel =
-        viewModel(
-            factory = FinlightViewModelFactory.create(context.applicationContext as Application)
-        )
-
     val isEditMode = ruleId != null
     val titleText = if (isEditMode) "Edit Recurring Rule" else "Add Recurring Rule"
 
-    var description by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var transactionType by remember { mutableStateOf(TransactionType.EXPENSE) }
+    var description by rememberSaveable { mutableStateOf("") }
+    var amount by rememberSaveable { mutableStateOf("") }
+    var transactionType by rememberSaveable { mutableStateOf(TransactionType.EXPENSE) }
 
     val recurrenceIntervals = listOf("Daily", "Weekly", "Monthly", "Yearly")
-    var selectedInterval by remember { mutableStateOf(recurrenceIntervals[2]) }
-    var intervalExpanded by remember { mutableStateOf(false) }
+    var selectedInterval by rememberSaveable { mutableStateOf(recurrenceIntervals[2]) }
+    var intervalExpanded by rememberSaveable { mutableStateOf(false) }
 
     // --- NEW (Issue #105) ---
-    var isVariableBill by remember { mutableStateOf(false) }
-    var smsSenderId by remember { mutableStateOf("") }
-    var autoApprove by remember { mutableStateOf(false) }
-    var endDate by remember { mutableStateOf<Long?>(null) }
-    var showDatePicker by remember { mutableStateOf(false) }
+    var isVariableBill by rememberSaveable { mutableStateOf(false) }
+    var smsSenderId by rememberSaveable { mutableStateOf("") }
+    var autoApprove by rememberSaveable { mutableStateOf(false) }
+    var endDate by rememberSaveable { mutableStateOf<Long?>(null) }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
     val accounts by transactionViewModel.allAccounts.collectAsState(initial = emptyList())
-    var selectedAccount by remember { mutableStateOf<Account?>(null) }
-    var accountExpanded by remember { mutableStateOf(false) }
+    var selectedAccountId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedAccount =
+        remember(selectedAccountId, accounts) {
+            accounts.find { it.id == selectedAccountId }
+        }
+    var accountExpanded by rememberSaveable { mutableStateOf(false) }
 
     val categories by transactionViewModel.allCategories.collectAsState(initial = emptyList())
-    var selectedCategory by remember { mutableStateOf<Category?>(null) }
-    var categoryExpanded by remember { mutableStateOf(false) }
+    var selectedCategoryId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val selectedCategory =
+        remember(selectedCategoryId, categories) {
+            categories.find { it.id == selectedCategoryId }
+        }
+    var categoryExpanded by rememberSaveable { mutableStateOf(false) }
+    var isInitialDataLoaded by rememberSaveable { mutableStateOf(false) }
 
     // --- NEW: Correct theme detection ---
     val isThemeDark = MaterialTheme.colorScheme.background.isDark()
@@ -101,20 +108,23 @@ fun AddRecurringTransactionScreen(
         remember { mutableStateOf(null) }
     }
 
-    LaunchedEffect(ruleToEdit, accounts, categories) {
+    LaunchedEffect(ruleToEdit) {
         if (isEditMode) {
             ruleToEdit?.let { rule ->
-                description = rule.description
-                amount = rule.amount.toString()
-                transactionType = rule.transactionType
-                selectedInterval = rule.recurrenceInterval
-                selectedAccount = accounts.find { it.id == rule.accountId }
-                selectedCategory = categories.find { it.id == rule.categoryId }
-                // --- NEW (Issue #105) ---
-                isVariableBill = rule.isVariableBill
-                smsSenderId = rule.smsSenderId ?: ""
-                autoApprove = rule.autoApprove
-                endDate = rule.endDate
+                if (!isInitialDataLoaded) {
+                    description = rule.description
+                    amount = rule.amount.toString()
+                    transactionType = rule.transactionType
+                    selectedInterval = rule.recurrenceInterval
+                    selectedAccountId = rule.accountId
+                    selectedCategoryId = rule.categoryId
+                    // --- NEW (Issue #105) ---
+                    isVariableBill = rule.isVariableBill
+                    smsSenderId = rule.smsSenderId ?: ""
+                    autoApprove = rule.autoApprove
+                    endDate = rule.endDate
+                    isInitialDataLoaded = true
+                }
             }
         }
     }
@@ -262,7 +272,7 @@ fun AddRecurringTransactionScreen(
                         ) {
                             accounts.forEach { account ->
                                 DropdownMenuItem(text = { Text(account.name) }, onClick = {
-                                    selectedAccount = account
+                                    selectedAccountId = account.id
                                     accountExpanded = false
                                 })
                             }
@@ -290,7 +300,7 @@ fun AddRecurringTransactionScreen(
                         ) {
                             categories.forEach { category ->
                                 DropdownMenuItem(text = { Text(category.name) }, onClick = {
-                                    selectedCategory = category
+                                    selectedCategoryId = category.id
                                     categoryExpanded = false
                                 })
                             }
